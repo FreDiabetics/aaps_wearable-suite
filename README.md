@@ -22,6 +22,23 @@ Die unveränderliche AndroidAPS-Referenz ist `dev` bei
 `18101c8a2c0204a08d417f3d5fbac3e9ceae380f`. Details stehen in
 `docs/SOURCE_BASELINE.md`.
 
+## In Android Studio öffnen
+
+In Android Studio **File → New → Project from Version Control** wählen und
+folgende Repository-Adresse verwenden:
+
+```text
+https://github.com/FreDiabetics/aaps_wearable-suite.git
+```
+
+Als Zielordner einen neuen, leeren Ordner auswählen und anschließend die
+Gradle-Synchronisierung abwarten. Alternativ kann das Projekt zuerst geklont
+werden:
+
+```powershell
+git clone https://github.com/FreDiabetics/aaps_wearable-suite.git
+```
+
 ## Bauen
 
 Voraussetzungen sind JDK 21 und Android SDK 36.
