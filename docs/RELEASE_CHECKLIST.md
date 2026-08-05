@@ -12,15 +12,17 @@
 - [x] AGPL-/MIT-Nachweise, Datenschutz, Installationsanleitung, CI
 - [x] reproduzierbares DIY-ZIP mit SHA-256-Manifest
 - [x] kein Internet-Permission, keine Cloud/Telemetrie/Therapiekommandos
+- [x] realer Telefon-Uhr-Data-Layer-Einzeltest
+- [x] Galaxy Watch / One UI Watch 8
+- [x] öffentliches GitHub-Repository mit Android-Studio-Importanleitung
 
 ## Vor Version 1 zwingend offen
 
-- [ ] reale gekoppelte Telefon-Uhr-Data-Layer-Tests einschließlich Reconnect
-- [ ] Galaxy Watch / One UI Watch 8
+- [ ] Bluetooth-Unterbrechung/Reconnect und mehrere gekoppelte Uhren
 - [ ] mindestens ein reales Nicht-Samsung-Wear-OS-Gerät
 - [ ] Original-vs.-Port-Goldens mit kontrollierter identischer Testmatrix
 - [ ] eigener Produktionssignierschlüssel und reproduzierbarer signierter Build
-- [ ] Veröffentlichungskanal/Repository und Community-Review
+- [ ] Community-Review
 
 ## Bewusst ausgeschlossen
 

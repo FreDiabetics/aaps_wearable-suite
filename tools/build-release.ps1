@@ -1,5 +1,5 @@
 param(
-    [string]$Version = "0.3.0-diy-preview",
+    [string]$Version = "0.3.1-diy-preview",
     [switch]$SkipBuild
 )
 
@@ -60,7 +60,7 @@ Copy-Item -Path (Join-Path $projectRoot "LICENSES\*") -Destination (Join-Path $t
 $report = [ordered]@{
     release = $Version
     generatedAt = (Get-Date).ToString("o")
-    androidApsDevCommit = "18101c8a2c0204a08d417f3d5fbac3e9ceae380f"
+    androidApsDevCommit = "e1068e77db4f801c046340c8313cd7a2856f4e7c"
     watchfaceCount = $watchFaces.Count
     applicationSigning = "debug/development signing only"
     publishingReady = $false
@@ -77,4 +77,8 @@ $hashLines | Set-Content -LiteralPath (Join-Path $target "SHA256SUMS.txt") -Enco
 $zip = Join-Path $distRoot "aaps-wear-watchfaces-$Version.zip"
 if (Test-Path -LiteralPath $zip) { Remove-Item -LiteralPath $zip -Force }
 Compress-Archive -Path (Join-Path $target "*") -DestinationPath $zip -CompressionLevel Optimal
+$zipHash = (Get-FileHash -LiteralPath $zip -Algorithm SHA256).Hash.ToLowerInvariant()
+$zipChecksum = "$zipHash  $(Split-Path $zip -Leaf)"
+$zipChecksum | Set-Content -LiteralPath "$zip.sha256" -Encoding ascii
 Write-Host "Release bundle: $zip"
+Write-Host "Release SHA-256: $zipHash"

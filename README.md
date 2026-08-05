@@ -18,9 +18,10 @@ Der Datenfluss lautet:
 
 `AndroidAPS External Companion Apps → Mobile Bridge → DataClient → Watch DataStore → Complications → WFF`
 
-Die unveränderliche AndroidAPS-Referenz ist `dev` bei
-`18101c8a2c0204a08d417f3d5fbac3e9ceae380f`. Details stehen in
-`docs/SOURCE_BASELINE.md`.
+Der aktuelle AndroidAPS-Kontrollstand ist `dev` bei
+`e1068e77db4f801c046340c8313cd7a2856f4e7c`. Die reproduzierbare 0.3.0-
+Release-Baseline bleibt `18101c8a2c0204a08d417f3d5fbac3e9ceae380f`.
+Details und der geprüfte Delta-Einfluss stehen in `docs/SOURCE_BASELINE.md`.
 
 ## In Android Studio öffnen
 

@@ -1,5 +1,6 @@
 package app.aapswear.mobile
 import android.app.Activity
+import android.content.SharedPreferences
 import android.os.Bundle
 import android.widget.TextView
 import java.text.DateFormat
@@ -7,6 +8,10 @@ import java.util.Date
 
 class MainActivity : Activity() {
     private lateinit var text: TextView
+    private val preferences by lazy { getSharedPreferences("diagnostics", MODE_PRIVATE) }
+    private val diagnosticsListener = SharedPreferences.OnSharedPreferenceChangeListener { _, _ ->
+        runOnUiThread(::refresh)
+    }
 
     override fun onCreate(state: Bundle?) {
         super.onCreate(state)
@@ -22,9 +27,19 @@ class MainActivity : Activity() {
         refresh()
     }
 
+    override fun onStart() {
+        super.onStart()
+        preferences.registerOnSharedPreferenceChangeListener(diagnosticsListener)
+        refresh()
+    }
+
+    override fun onStop() {
+        preferences.unregisterOnSharedPreferenceChangeListener(diagnosticsListener)
+        super.onStop()
+    }
+
     private fun refresh() {
         if (!::text.isInitialized) return
-        val preferences = getSharedPreferences("diagnostics", MODE_PRIVATE)
         val receivedAt = preferences.getLong("received", 0L)
         val measuredAt = preferences.getLong("measurement", 0L)
         val syncStatus = when (preferences.getString("lastSyncStatus", null)) {

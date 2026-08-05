@@ -1,5 +1,29 @@
 # AndroidAPS Source Baseline
 
+## Kontrollstand vom 2026-08-05
+
+- Repository: `nightscout/AndroidAPS`
+- Branch: `dev`
+- aktueller öffentlicher Commit:
+  `e1068e77db4f801c046340c8313cd7a2856f4e7c`
+- Commit-Datum: 2026-08-05 21:02:28 +02:00
+- Nachricht: `:core:keys remove JVM dependency`
+- Gegenüber der Release-Baseline `18101c8a…`: 41 Commits voraus.
+
+Der am realen Telefon installierte lokale Dev-Build meldet
+`4.0.0-dev-b`/VersionCode 1500 und stammt aus dem lokalen Merge
+`8fd6b2782d01c0474f9f89307b1b69ae04692ddb`; dessen Upstream-Seite war
+`d9aba62e62f8e7dc7f02d436f14904ba00c8eaf5`.
+
+Geprüft wurden insbesondere `wear`, der neue Samsung-Watchface-Katalog,
+Complications und der externe Status-Broadcast. Der Git-Blob von
+`plugins/sync/src/main/kotlin/app/aaps/plugins/sync/tizen/TizenPlugin.kt` ist
+sowohl bei `18101c8a…` als auch bei `e1068e77…`
+`86e4337f037e403cb402cfb68d26a00475b63a1d`. Der von diesem Projekt gelesene
+Broadcastvertrag hat sich somit nicht verändert. Die neuen Wear-Änderungen
+betreffen unter anderem Samsung-Watchface-Auswahl und AAPS-interne Wear-UI,
+nicht den externen Adapter.
+
 ## Reproduzierbare Referenz vom 2026-08-02
 
 - Repository: `nightscout/AndroidAPS`

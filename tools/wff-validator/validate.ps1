@@ -5,21 +5,48 @@ param(
 
 $ErrorActionPreference = "Stop"
 $projectRoot = Resolve-Path (Join-Path $PSScriptRoot "..\..")
-$cacheRoot = Join-Path ([System.IO.Path]::GetTempPath()) "aaps-wff-validator-$ValidatorCommit"
+$cacheName = "aaps-wff-validator-$ValidatorCommit"
+$tempRoot = [System.IO.Path]::GetFullPath([System.IO.Path]::GetTempPath())
+$cacheRoot = [System.IO.Path]::GetFullPath((Join-Path $tempRoot $cacheName))
 $validatorRoot = Join-Path $cacheRoot "third_party\wff"
 $validatorJar = Join-Path $validatorRoot "specification\validator\build\libs\wff-validator.jar"
 
-if (-not (Test-Path (Join-Path $cacheRoot ".git"))) {
+function Assert-LastCommandSucceeded([string]$Message) {
+    if ($LASTEXITCODE -ne 0) { throw $Message }
+}
+
+$cacheHealthy = $false
+if (Test-Path (Join-Path $cacheRoot ".git")) {
+    & git -C $cacheRoot rev-parse --is-inside-work-tree 2>$null | Out-Null
+    $cacheHealthy = $LASTEXITCODE -eq 0
+}
+
+if (-not $cacheHealthy) {
+    $expectedCacheRoot = Join-Path $tempRoot $cacheName
+    if ($cacheRoot -ne $expectedCacheRoot -or (Split-Path $cacheRoot -Leaf) -ne $cacheName) {
+        throw "Refusing to repair unexpected validator cache path: $cacheRoot"
+    }
+    if (Test-Path $cacheRoot) {
+        Write-Host "Repairing incomplete WFF validator cache: $cacheRoot"
+        Remove-Item -LiteralPath $cacheRoot -Recurse -Force
+    }
     New-Item -ItemType Directory -Force -Path $cacheRoot | Out-Null
     & git -C $cacheRoot init
+    Assert-LastCommandSucceeded "Initializing the official WFF validator cache failed"
     & git -C $cacheRoot remote add origin https://github.com/google/watchface.git
+    Assert-LastCommandSucceeded "Configuring the official WFF validator remote failed"
     & git -C $cacheRoot sparse-checkout init --cone
+    Assert-LastCommandSucceeded "Initializing sparse checkout for the official WFF validator failed"
     & git -C $cacheRoot sparse-checkout set third_party/wff
+    Assert-LastCommandSucceeded "Configuring sparse checkout for the official WFF validator failed"
     & git -C $cacheRoot fetch --depth 1 origin $ValidatorCommit
+    Assert-LastCommandSucceeded "Fetching the pinned official WFF validator commit failed"
     & git -C $cacheRoot checkout --detach FETCH_HEAD
+    Assert-LastCommandSucceeded "Checking out the pinned official WFF validator commit failed"
 }
 
 $actualCommit = (& git -C $cacheRoot rev-parse HEAD).Trim()
+Assert-LastCommandSucceeded "Reading the official WFF validator cache commit failed"
 if ($actualCommit -ne $ValidatorCommit) {
     throw "Validator cache has commit $actualCommit, expected $ValidatorCommit"
 }

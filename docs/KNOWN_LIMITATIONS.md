@@ -6,13 +6,12 @@
 - Der Broadcast besitzt keine kryptografische Absenderauthentisierung. Die App
   prüft Paketinstallation, Wertebereiche, Pflichtfelder und Zeitstempel, kann
   aber einen lokal absichtlich gefälschten Broadcast nicht sicher unterscheiden.
-- Eine echte gekoppelte Telefon-Uhr-Data-Layer-Verbindung, Bluetooth-Ausfall,
-  Wiederverbindung und mehrere gleichzeitig gekoppelte Uhren konnten ohne reale
-  Hardware nicht integriert getestet werden. Persistenz, Protokoll und beide
-  Endpunkte wurden separat geprüft.
-- Wear OS 6 im runden 454×454-Emulator ist installiert getestet. Eine Samsung
-  Galaxy Watch mit One UI Watch 8 und ein zweites Nicht-Samsung-Gerät waren
-  nicht verfügbar und werden nicht als bestanden behauptet.
+- Eine echte gekoppelte Telefon-Uhr-Data-Layer-Verbindung wurde auf Samsung-
+  Hardware mit One UI Watch 8 erfolgreich geprüft. Gezielter Bluetooth-Ausfall,
+  Wiederverbindung und mehrere gleichzeitig gekoppelte Uhren sind noch offen.
+- Wear OS 6 im runden 454×454-Emulator und One UI Watch 8 auf einer Samsung
+  SM-L705F sind installiert getestet. Ein zweites reales Nicht-Samsung-Gerät
+  war nicht verfügbar und wird nicht als bestanden behauptet.
 - 23 Watchfaces besitzen aktive und echte Doze/AOD-Goldens mit synthetischen
   Daten. Das belegt Rendering und Daten-Slots, aber noch keinen pixelgenauen
   1:1-Vergleich mit jedem Original auf identischer Hardware.

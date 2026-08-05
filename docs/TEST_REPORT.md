@@ -1,5 +1,33 @@
 # Test Report
 
+## Reale Samsung-Telefon-/Uhr-Prüfung 2026-08-05
+
+- Smartphone: Samsung SM-S948B
+- Uhr: Samsung SM-L705F, Android 16/API 36,
+  `ro.build.version.oneui=80000` (One UI Watch 8)
+- AndroidAPS auf Telefon und Uhr: `4.0.0-dev-b`, VersionCode 1500
+- eigene Mobile-/Wear-App: `app.aapswear`; Mobile-Patch 0.3.1/Code 4
+- offizielles AAPS-V4-WFF und eigenes AAPS-V4-WFF gleichzeitig installiert
+
+Die mobile Bridge empfing einen gültigen
+`info.nightscout.androidaps.status`-Broadcast, erkannte
+`AAPS_EXTENDED_STATUS_V1`, meldete eine erreichbare Uhr und schloss den
+Data-Layer-Versand mit `ok` ab. Die DataStore-Dateien auf Telefon und Uhr wurden
+in derselben Minute aktualisiert. Beim erneuten Auslesen zeigte die Mobile-UI
+AAPS-Version, Vertrag, Empfangs-/Messzeit, eine Uhr und `übertragen`.
+
+Die zunächst beobachtete scheinbar leere Mobile-App war ein Anzeigeproblem:
+Eine bereits sichtbare Activity beobachtete keine späteren Änderungen an den
+Diagnose-SharedPreferences. Version 0.3.1 registriert den Listener nur im
+sichtbaren Lifecycle. `MainActivityTest` reproduziert und prüft diesen Ablauf.
+Gezielter Testlauf und Mobile-Debug-Build waren erfolgreich; das APK wurde als
+Update auf dem realen Smartphone installiert und als 0.3.1/Code 4 bestätigt.
+
+Dass offizielles und eigenes AAPS-V4-WFF dieselben Therapiewerte zeigen, ist
+erwartet: Beide bilden dieselbe AAPS-V4-Oberfläche nach, verwenden aber ihre
+jeweiligen Complication-Provider. Die übereinstimmenden aktuellen Werte passen
+zum nachgewiesenen erfolgreichen Bridge-/Data-Layer-Zustand.
+
 ## Abschlusslauf 2026-08-03
 
 Ausgeführt durch `tools/build-release.ps1`:
@@ -66,10 +94,8 @@ Regressionsbilder bleiben getrennt erhalten.
 
 ## Nicht als bestanden behauptet
 
-- echte Google-Play-Services-Paarung zwischen Telefon und Uhr; der offizielle
-  Pairing Assistant erfordert interaktive Companion-App-/Play-Store-Einrichtung
-- Bluetooth-Unterbrechung/Wiederverbindung und mehrere gekoppelte Uhren
-- Samsung Galaxy Watch mit One UI Watch 8 sowie zweites Nicht-Samsung-Gerät
+- gezielte Bluetooth-Unterbrechung/Wiederverbindung und mehrere gekoppelte Uhren
+- zweites reales Wear-OS-Gerät ohne Samsung-Oberfläche
 - pixelgleiche Original-vs.-Port-Aufnahmen auf identischer realer Hardware
 - produktive Release-Signatur und Store-/öffentliche Release-Freigabe
 - PinkFloydTheWall; rechtlich blockiert und nicht gebaut
@@ -77,3 +103,24 @@ Regressionsbilder bleiben getrennt erhalten.
 Diese offenen Punkte verhindern die Behauptung, die Version-1-Abnahmekriterien
 seien vollständig erfüllt. Der vorhandene Stand ist ein gebautes und breit
 automatisiert/emuliert geprüftes DIY-Vorschaupaket.
+
+## Abschlusslauf 2026-08-05
+
+Nach dem Realgeräte-Fix wurde `tools/build-release.ps1` ohne übersprungene
+Buildphase erneut ausgeführt. Ergebnis: **erfolgreich**.
+
+- 2.163 Gradle-Tasks: 24 ausgeführt, 2.139 aktuell
+- 11 JUnit-XML-Suites: 35 Tests, 0 Fehler, 0 Fehlschläge, 0 übersprungen
+- 24 von 24 `watchface.xml`: gültig mit dem auf Commit `702e9bdf…`
+  gepinnten offiziellen Google-WFF-Validator
+- 24 von 24 WFF-Release-APKs: ohne `classes*.dex`
+- Mobile-Debug-APK 0.3.1/Code 4 zuvor erfolgreich auf SM-S948B installiert;
+  vorhandener AAPS-Empfang und Data-Layer-Zustand blieben nach dem Update erhalten
+- Paket: `aaps-wear-watchfaces-0.3.1-diy-preview.zip`; die daneben erzeugte
+  `.sha256`-Datei enthält die Prüfsumme des vollständigen ZIP-Archivs
+
+Der erste Versuch deckte einen unvollständigen temporären Git-Cache des
+WFF-Validators auf. Nach der eng begrenzten Cache-Reparatur bestand sowohl der
+isolierte Validatorlauf als auch der vollständige Release-Lauf. Die öffentliche
+AndroidAPS-Dev-Referenz blieb währenddessen unverändert auf
+`e1068e77db4f801c046340c8313cd7a2856f4e7c`.

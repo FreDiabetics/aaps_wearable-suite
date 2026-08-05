@@ -38,3 +38,20 @@
 - Protokoll/Modell auf Schema 2 migriert, echte AAPS-Paketversion separat vom
   Payloadvertrag erkannt und Android-Paketvisibilität ergänzt.
 - Reproduzierbares DIY-Vorschaupaket mit SHA-256-Manifest vorbereitet.
+
+## 0.3.1 - 2026-08-05
+
+- Smartphone-Diagnoseansicht beobachtet den laufenden AAPS-Empfang jetzt
+  während sie sichtbar bleibt und aktualisiert sich ohne erneutes Öffnen.
+- Der WFF-Validator erkennt und repariert einen unvollständigen, eindeutig
+  begrenzten temporären Git-Cache und prüft native Git-Fehler explizit.
+- AndroidAPS-Dev-Kontrollbaseline auf `e1068e7` aktualisiert; der öffentlich
+  bereitgestellte Statusvertrag blieb gegenüber der Release-Baseline gleich.
+- Reale lokale Übertragung mit AndroidAPS 4.0.0-dev-b auf Samsung-Smartphone und
+  Galaxy Watch mit One UI Watch 8 bestätigt.
+- Regressionstest für eine Diagnosedatenänderung bei dauerhaft geöffneter
+  Activity ergänzt.
+- Realen End-to-End-Datenfluss mit AndroidAPS `4.0.0-dev-b`, physischem
+  Samsung-Smartphone und Samsung-Watch mit One UI Watch 8 belegt.
+- AndroidAPS-`dev` erneut bei `e1068e77` geprüft; der verwendete öffentliche
+  `TizenPlugin`-Broadcast ist gegenüber `18101c8a` byteidentisch.

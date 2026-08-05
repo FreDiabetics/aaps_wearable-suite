@@ -95,3 +95,55 @@
 - Einschränkungen: echte gekoppelte Data-Layer-Hardware und One UI Watch 8
   fehlen; PinkFloydTheWall ist rechtlich blockiert; pixelgenaue Original-Goldens
   auf identischer Hardware bleiben offen.
+
+## 2026-08-05, 22:21 +02:00, realer Datenweg und Mobile-Liveanzeige 0.3.1
+
+- Geändert: `app-mobile/MainActivity.kt`, Mobile-Buildkonfiguration,
+  `MainActivityTest.kt`, Changelog, Source-Baseline, Testbericht, bekannte
+  Einschränkungen und Release-Checkliste.
+- Zweck: gemeldete Diskrepanz untersuchen, bei der Watchfaces aktuelle Werte
+  zeigten, die bereits geöffnete Smartphone-Diagnose aber keinen Empfang
+  anzeigte.
+- Diagnose: Die Bridge hatte einen gültigen AAPS-Broadcast als
+  `AAPS_EXTENDED_STATUS_V1` gespeichert, eine Uhr erkannt und den DataItem-
+  Versand mit `ok` abgeschlossen. Telefon- und Uhr-DataStore wurden in derselben
+  Minute aktualisiert. Die Activity las SharedPreferences jedoch nur bei
+  `onCreate`/`onResume` und beobachtete spätere Änderungen nicht.
+- Umsetzung: Lifecycle-gebundener
+  `OnSharedPreferenceChangeListener` registriert; jede Diagnosedatenänderung
+  rendert auf dem UI-Thread neu. Mobile-Version auf 0.3.1/Code 4 angehoben.
+- Tests: `:app-mobile:testDebugUnitTest` und `:app-mobile:assembleDebug`
+  erfolgreich. Der neue Robolectric-Test lässt die Activity sichtbar, ändert
+  den Empfangsstatus und prüft die unmittelbare Textaktualisierung. APK auf dem
+  physischen Smartphone installiert; Version 0.3.1/Code 4 bestätigt.
+- Realgerät: Samsung SM-S948B mit AndroidAPS 4.0.0-dev-b und Samsung SM-L705F
+  mit Android 16/API 36, `ro.build.version.oneui=80000`. Bridge-Diagnose:
+  eine erreichbare Uhr, gültiger Vertrag und erfolgreiche Synchronisation.
+- Nicht abgeschlossen: gezielter Bluetooth-Ausfall/Reconnect, mehrere Uhren,
+  reales Nicht-Samsung-Gerät und produktive Signatur.
+- Nächster Schritt: vollständigen Regressionstest ausführen und Patch nach
+  sauberer Diff-/Baseline-Prüfung veröffentlichen.
+
+## 2026-08-05, 22:52 +02:00, Regression und DIY-Paket 0.3.1
+
+- Geändert: `tools/wff-validator/validate.ps1`, Changelog, Implementierungs- und
+  Testprotokoll.
+- Zweck: Einen durch ein unvollständiges temporäres Git-Repository blockierten
+  WFF-Abschlusslauf reproduzierbar fortsetzen und den Realgeräte-Fix vollständig
+  gegen das Projekt prüfen.
+- Umsetzung: Der Prüfer validiert den Cache jetzt als echtes Git-Repository.
+  Ausschließlich der exakt erwartete commitbezogene Ordner im Windows-Temp-
+  Verzeichnis darf bei Beschädigung neu erzeugt werden; jeder native Git-Schritt
+  wird auf seinen Exitcode geprüft.
+- Tests: `tools/build-release.ps1` vollständig erfolgreich; 35 Tests in elf
+  JUnit-Suites ohne Fehler, Fehlschlag oder Überspringen; 24 WFF-Dateien gegen
+  WFF v1 gültig; 24 WFF-Release-APKs ohne DEX. Paket
+  `aaps-wear-watchfaces-0.3.1-diy-preview.zip` einschließlich externer
+  `.sha256`-Prüfsummendatei erzeugt.
+- Baseline-Prüfung: Die öffentliche AndroidAPS-Dev-Branch stand vor und nach
+  dem Arbeitspaket auf `e1068e77db4f801c046340c8313cd7a2856f4e7c`.
+- Bekannte Einschränkungen: Reconnect-Test, mehrere Uhren, reales
+  Nicht-Samsung-Gerät, produktive Signatur und rechtlich blockierte Motive sind
+  weiterhin offen.
+- Nächster Schritt: Änderungen kontrolliert committen und in das öffentliche
+  GitHub-Repository übertragen; danach gezielten Reconnect-Test durchführen.
