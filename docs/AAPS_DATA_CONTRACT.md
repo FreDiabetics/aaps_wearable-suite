@@ -29,6 +29,7 @@ erzeugen keine Capability.
 | IOB, Bolus-/Basal-IOB, COB, zukünftige KH | ja | optional |
 | Basal und temporäre Basalrate | ja | absolut/Prozent/Dauer |
 | Suggested/Enacted | ja | Zeit und Rohpayload, kein Rückkanal |
+| `predBGs` in Suggested/Enacted | optional | IOB/COB/aCOB/UAM/ZT als echte Prognoseserien |
 | Profil, Pumpenstatus, Reservoir, Batterien | ja | optionale Capabilities |
 | Temporäres Ziel als sicherer eigener Zustand | nein | nicht behauptet |
 | kompletter Loopmodus/Modus-Endzeit | nein | nicht behauptet |
@@ -37,4 +38,19 @@ Der Broadcast enthält keine App-Version. Die Mobile-App deklariert per
 `<queries>` die fünf aktuellen AAPS-/Pumpcontrol-/Client-Pakete und ermittelt
 daraus VersionName/VersionCode. `sourceContract` enthält getrennt
 `AAPS_EXTENDED_STATUS_V1` oder `AAPS_LEGACY_STATUS`. Schema 1 wird beim Empfang
-auf Schema 2 migriert.
+auf Schema 3 migriert. Listenfelder aus neueren Schemata besitzen leere
+Standardwerte und fehlen bei älteren Zuständen ohne Fehler.
+
+## Anzeigeverlauf und Prognosen
+
+Der öffentliche Broadcast liefert keinen fertigen historischen Graphen. Die
+Mobile-App fügt deshalb ausschließlich die nacheinander real empfangenen
+Anzeigewerte zu einem begrenzten Verlauf zusammen: maximal 24 Stunden und 300
+Zeitpunkte, dedupliziert nach Messzeit. IOB, COB und Basal werden nur dann als
+Verlaufspunkt gespeichert, wenn der Broadcast den jeweiligen Wert enthält.
+
+Prognosen werden nicht lokal berechnet. Der Adapter liest optional das
+`predBGs`-Objekt aus dem vorhandenen Suggested-, ersatzweise Enacted-JSON,
+akzeptiert nur endliche Werte zwischen 20 und 1000 mg/dl, begrenzt jede Serie
+auf 96 Punkte und verwendet den AAPS-Zeitabstand von fünf Minuten. Fehlt das
+Objekt oder ist es ungültig, bleibt `PREDICTIONS` aus der Capability-Menge weg.

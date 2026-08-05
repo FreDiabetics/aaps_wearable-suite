@@ -1,5 +1,7 @@
 package app.aapswear.mobile
 
+import android.view.View
+import android.view.ViewGroup
 import android.widget.TextView
 import androidx.test.core.app.ApplicationProvider
 import org.junit.Assert.assertFalse
@@ -15,33 +17,55 @@ import org.robolectric.annotation.Config
 @Config(sdk = [35])
 class MainActivityTest {
 
-    @Test
-    fun `diagnostics update while activity stays visible`() {
+    @Test fun `diagnostics update while tile dashboard stays visible`() {
         val context = ApplicationProvider.getApplicationContext<android.content.Context>()
-        context.getSharedPreferences("diagnostics", android.content.Context.MODE_PRIVATE)
-            .edit()
-            .clear()
-            .commit()
+        val diagnostics = context.getSharedPreferences("diagnostics", android.content.Context.MODE_PRIVATE)
+        diagnostics.edit().clear().commit()
+        context.getSharedPreferences("dashboard_ui", android.content.Context.MODE_PRIVATE).edit().clear().commit()
 
         val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
         val activity = controller.get()
-        val text = activity.findViewById<android.view.ViewGroup>(android.R.id.content)
-            .getChildAt(0) as TextView
+        assertTrue(textOf(activity.findViewById(R.id.dashboard_sync_status)).contains("Keine Watch erreichbar"))
 
-        assertTrue(text.text.contains("Letzter gültiger Empfang: —"))
-        assertFalse(text.text.contains("AAPS_EXTENDED_STATUS_V1"))
-
-        context.getSharedPreferences("diagnostics", android.content.Context.MODE_PRIVATE)
-            .edit()
+        diagnostics.edit()
             .putLong("received", 1_000L)
             .putString("contract", "AAPS_EXTENDED_STATUS_V1")
+            .putString("sourceVersion", "4.0.0-dev-b")
+            .putInt("reachableWatches", 1)
             .putString("lastSyncStatus", "ok")
             .commit()
         shadowOf(android.os.Looper.getMainLooper()).idle()
 
-        assertTrue(text.text.contains("AAPS_EXTENDED_STATUS_V1"))
-        assertTrue(text.text.contains("Synchronisation: übertragen"))
+        assertTrue(textOf(activity.findViewById(R.id.dashboard_sync_status)).contains("Watch verbunden"))
+        activity.findViewById<View>(R.id.nav_settings).performClick()
+        shadowOf(android.os.Looper.getMainLooper()).idle()
+        val settingsText = textOf(activity.findViewById(R.id.dashboard_content))
+        assertTrue(settingsText.contains("AAPS_EXTENDED_STATUS_V1"))
+        assertTrue(settingsText.contains("4.0.0-dev-b"))
+        controller.pause().stop().destroy()
+    }
+
+    @Test fun `inline settings persist without submenu`() {
+        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+        val preferences = context.getSharedPreferences("dashboard_ui", android.content.Context.MODE_PRIVATE)
+        preferences.edit().clear().commit()
+        val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
+        val activity = controller.get()
+
+        activity.findViewById<View>(R.id.nav_settings).performClick()
+        shadowOf(android.os.Looper.getMainLooper()).idle()
+        val details = activity.findViewById<android.widget.Switch>(R.id.dashboard_details_switch)
+        assertTrue(details.isChecked)
+        details.performClick()
+        shadowOf(android.os.Looper.getMainLooper()).idle()
+        assertFalse(preferences.getBoolean("showDetails", true))
 
         controller.pause().stop().destroy()
+    }
+
+    private fun textOf(view: View): String = when (view) {
+        is TextView -> view.text.toString()
+        is ViewGroup -> (0 until view.childCount).joinToString(" ") { textOf(view.getChildAt(it)) }
+        else -> ""
     }
 }

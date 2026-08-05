@@ -1,0 +1,10 @@
+<resources>
+    <string name="app_name">AAPS Wear</string>
+    <string name="menu">Menü</string>
+    <string name="more">Weitere Optionen</string>
+    <string name="overview">Übersicht</string>
+    <string name="history">Verlauf</string>
+    <string name="data">Daten</string>
+    <string name="settings">Einstellungen</string>
+    <string name="read_only">Nur Anzeige · read-only</string>
+</resources>

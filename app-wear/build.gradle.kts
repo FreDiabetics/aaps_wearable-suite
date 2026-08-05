@@ -1,3 +1,3 @@
 plugins { id("com.android.application") }
-android { namespace="app.aapswear.wear"; compileSdk=36; defaultConfig { applicationId="app.aapswear"; minSdk=30; targetSdk=36; versionCode=3; versionName="0.3.0" } }
+android { namespace="app.aapswear.wear"; compileSdk=36; defaultConfig { applicationId="app.aapswear"; minSdk=30; targetSdk=36; versionCode=5; versionName="0.4.0" } }
 dependencies { implementation(project(":wear-protocol")); implementation(project(":wear-storage")); implementation(project(":complications")); implementation("com.google.android.gms:play-services-wearable:20.0.1"); implementation("androidx.wear.watchface:watchface-complications-data-source-ktx:1.2.1"); implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0"); implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.11.0") }

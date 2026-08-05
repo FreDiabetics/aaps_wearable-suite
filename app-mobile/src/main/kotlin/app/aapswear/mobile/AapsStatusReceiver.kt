@@ -10,6 +10,7 @@ import app.aapswear.storage.TherapyStateStore
 import com.google.android.gms.wearable.PutDataRequest
 import com.google.android.gms.wearable.Wearable
 import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.tasks.await
 
 class AapsStatusReceiver : BroadcastReceiver() {
@@ -31,22 +32,24 @@ class AapsStatusReceiver : BroadcastReceiver() {
                 }
                 val installation = AapsCapabilityDetector.detectInstallation(app)
                 val state = parsedState.copy(sourceVersion = installation?.versionName)
+                val store = TherapyStateStore(app)
+                val displayState = DisplayHistoryAccumulator.merge(store.state.first(), state, now)
 
                 // Persistence is deliberately completed before Data Layer I/O. A phone
                 // without a paired watch must never lose a valid AAPS status broadcast.
-                TherapyStateStore(app).save(state)
+                store.save(displayState)
                 app.diagnostics().edit()
                     .putLong("received", now)
-                    .putLong("measurement", state.glucose?.measuredAtEpochMs ?: 0L)
-                    .putString("contract", state.sourceContract)
-                    .putString("sourceVersion", state.sourceVersion)
+                    .putLong("measurement", displayState.glucose?.measuredAtEpochMs ?: 0L)
+                    .putString("contract", displayState.sourceContract)
+                    .putString("sourceVersion", displayState.sourceVersion)
                     .putString("sourcePackage", installation?.packageName)
                     .putLong("sourceVersionCode", installation?.versionCode ?: 0L)
                     .putString("lastSyncStatus", "pending")
                     .apply()
 
                 runCatching {
-                    withTimeout(4_000L) { publishState(app, state) }
+                    withTimeout(4_000L) { publishState(app, displayState) }
                 }.onSuccess {
                     app.diagnostics().edit()
                         .putLong("lastSyncAt", System.currentTimeMillis())

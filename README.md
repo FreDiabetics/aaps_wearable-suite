@@ -9,6 +9,8 @@ keine Telemetrie und keine Werbung. Das Projekt steht unter GNU AGPL v3.
 - Mobile Bridge für den offiziellen lokalen AAPS-Status-Broadcast
 - versioniertes, fehlertolerantes Datenmodell und Wear-Data-Layer-Protokoll
 - DataStore-Persistenz und klare Kennzeichnung aktueller/verzögerter/veralteter Daten
+- kachelbasiertes Smartphone-Dashboard mit echten AAPS-Graphdaten, flacher
+  Navigation und direkt erreichbaren Anzeigeeinstellungen
 - 27 frei auswählbare Complication-Provider
 - 23 veröffentlichbare, codefreie WFF-v1-Watchface-Pakete plus technisches Testface
 - sichere CWF-Analyse, degradationsbewusster WFF-Generator und PNG-Vergleichswerkzeug
@@ -22,6 +24,12 @@ Der aktuelle AndroidAPS-Kontrollstand ist `dev` bei
 `e1068e77db4f801c046340c8313cd7a2856f4e7c`. Die reproduzierbare 0.3.0-
 Release-Baseline bleibt `18101c8a2c0204a08d417f3d5fbac3e9ceae380f`.
 Details und der geprüfte Delta-Einfluss stehen in `docs/SOURCE_BASELINE.md`.
+
+Die Dashboard-Optik folgt der für das Projekt gelieferten Bildvorlage. Wo die
+Vorlage technische Graphdetails offenlässt, werden die Darstellungsprinzipien
+des lokal geprüften Nightscout Data Toolkits verwendet. GlucoDataHandler ist
+ausschließlich eine Referenz für Provider-/Hintergrundlogik und keine
+Designquelle.
 
 ## In Android Studio öffnen
 

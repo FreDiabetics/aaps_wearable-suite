@@ -2,7 +2,7 @@ package app.aapswear.protocol
 import app.aapswear.model.TherapyDisplayState
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
-@Serializable data class WearEnvelope(val protocolVersion:Int=CURRENT, val state:TherapyDisplayState) { companion object { const val CURRENT=2 } }
+@Serializable data class WearEnvelope(val protocolVersion:Int=CURRENT, val state:TherapyDisplayState) { companion object { const val CURRENT=3 } }
 object WearProtocol {
     const val STATE_PATH = "/aaps-display/v1/state"
     const val REQUEST_PATH = "/aaps-display/v1/request"

@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.4.0 - 2026-08-05
+
+- Smartphone-App als flaches, kachelbasiertes Dashboard nach der vorgegebenen
+  Bildvorlage umgesetzt: Übersicht, Verlauf, Daten und Inline-Einstellungen.
+- Feste Bild-Palette und Nightscout-Data-Toolkit-Graphprinzipien verwendet;
+  keine von GlucoDataHandler übernommene Optik und keine grenzwertabhängige
+  Farbwahl für den Glukosewert.
+- Reale AAPS-`predBGs` aus Suggested/Enacted fehlertolerant normalisiert; keine
+  eigenen oder erfundenen Prognosewerte.
+- Lokal empfangene Glukose-, IOB-, COB- und Basal-Anzeigepunkte auf höchstens
+  24 Stunden beziehungsweise 300 Punkte begrenzt und im letzten Zustand
+  gespeichert.
+- Datenmodell und Wear-Protokoll auf Schema 3 erweitert; Mobile- und Wear-App
+  auf 0.4.0/Code 5 angehoben.
+- Canvas-Regressionstests für Glukose-, Prognose-, IOB- und COB-Graphen sowie
+  Tests für Verlaufspuffer, Prognoseparser und Inline-Einstellungen ergänzt.
+
 ## 0.1.0 - 2026-08-02
 
 - AndroidAPS- und GlucoDataHandler-Baselines fixiert und Audits angelegt.

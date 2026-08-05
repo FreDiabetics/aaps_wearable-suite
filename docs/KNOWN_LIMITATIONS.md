@@ -25,3 +25,18 @@
   gebaut oder verteilt.
 - Das DIY-Vorschaupaket ist entwicklersigniert, nicht für Store-Veröffentlichung
   produktionssigniert und deshalb noch kein freigegebenes Version-1-Release.
+- Der öffentliche AAPS-Broadcast liefert keinen historischen Graphen. Der neue
+  Smartphone-Verlauf baut sich daher erst nach Installation aus real
+  empfangenen Statusmeldungen auf und kann keine Zeit vor der Installation
+  rekonstruieren.
+- AAPS-`predBGs` werden nur dargestellt, wenn sie im Suggested-/Enacted-Payload
+  vorhanden und gültig sind. Die App berechnet bewusst keine Ersatzprognosen.
+- Die Bildvorlage zeigt einen 24-Stunden-Insulin-Gesamtwert und einen Uhrenakku.
+  Beides ist im verwendeten öffentlichen Broadcast nicht zuverlässig
+  verfügbar; die App zeigt stattdessen Profil beziehungsweise belegten
+  Verbindungs-/Telefonstatus und erfindet keine Werte.
+- Der aktuelle 0.4.0-Build wurde auf dem physischen Smartphone installiert.
+  Der visuelle Vergleich auf genau diesem Gerät war blockiert, weil es während
+  der Aufnahme gesperrt war. Die Oberfläche wurde stattdessen vollständig auf
+  einem API-35-Phone-Emulator mit 1080×2400 Pixeln und 420 dpi geprüft; das
+  ersetzt nicht den noch offenen physischen Vergleich.

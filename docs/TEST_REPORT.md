@@ -1,5 +1,42 @@
 # Test Report
 
+## Smartphone-Dashboard 0.4.0, 2026-08-05
+
+Ausgeführt: `gradlew test assembleDebug --no-daemon --max-workers=1` sowie der
+vollständige Releaseweg. Ergebnis: **erfolgreich**; der Abschlusslauf meldete
+2.163 Aufgaben. Die aktuell erzeugten 14 JUnit-XML-Dateien enthalten 42 Tests,
+0 Fehler, 0 Fehlschläge und 0 übersprungene Tests.
+
+Neu abgedeckt sind der sichere AAPS-`predBGs`-Parser, fehlende/ungültige
+Prognosen, der auf 24 Stunden/300 Punkte begrenzte Verlaufspuffer, DataStore-
+Weiterverwendung, Live-Diagnose, persistente Inline-Einstellungen sowie native
+Canvas-Pixelprüfungen für feste grüne CGM-/Zielband-Darstellung, echte
+Prognoseserien und getrennte blaue IOB-/orange COB-Flächen. Die Farben stammen
+aus der vorgegebenen Bildvorlage; es gibt keine grenzwertabhängige
+Glukosefarbwahl.
+
+Zusätzlich wurde ein isolierter API-35-Phone-Emulator mit 1080×2400 Pixeln und
+420 dpi angelegt. Mit rein synthetischen Broadcastwerten wurden Übersicht,
+Verlauf, Daten und Einstellungen gerendert und über UI-Automator geprüft. Nach
+dem ersten Sichtlauf wurden Zielwert-Umbruch, Statusfarbhierarchie,
+Graphstandardhöhe, Statistik-Ellipsierung und die Überlagerung der
+Verbindungskachel korrigiert. Im letzten Lauf lag `80–160` in einer Zeile; die
+Verbindungskachel endete vollständig oberhalb der festen Navigation, und alle
+drei weiteren Bereiche waren über die flache Navigation erreichbar.
+
+Die Mobile-Debug-APK 0.4.0/Code 5 wurde erfolgreich auf dem Samsung SM-S948B
+installiert. Ein privater Screenshot wurde nicht archiviert. Das Gerät war beim
+Sichtvergleich gesperrt, weshalb kein bestandener pixelgenauer Realgeräte-
+Vergleich behauptet wird. Die Wear-App 0.4.0 konnte in diesem Lauf nicht auf die
+physische Uhr übertragen werden, weil sie von ADB nicht angeboten wurde.
+
+Der anschließende vollständige `tools/build-release.ps1`-Lauf war ebenfalls
+erfolgreich. Der gepinnte offizielle Validator akzeptierte 24 von 24 WFF-v1-
+Dateien; die Inhaltsprüfung bestätigte 24 von 24 Release-APKs ohne DEX. Das
+Paket `aaps-wear-watchfaces-0.4.0-diy-preview.zip` enthält 23 auslieferbare
+Watchfaces und besitzt die SHA-256-Prüfsumme
+`f7b72b03fc4d960412109a5b4c55e4e095d8e81afd79ac9818a42fdb6d44f3d4`.
+
 ## Reale Samsung-Telefon-/Uhr-Prüfung 2026-08-05
 
 - Smartphone: Samsung SM-S948B

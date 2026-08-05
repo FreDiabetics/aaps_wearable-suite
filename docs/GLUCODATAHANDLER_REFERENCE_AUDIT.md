@@ -13,3 +13,12 @@ Wesentliche Muster:
 - Fehlende/veraltete Daten werden in einer gemeinsamen Datenhaltung behandelt; Konfiguration beeinflusst Farben, Zielgrenzen, Einheit und Tap-Aktion.
 
 Es wurde kein GDH-Code kopiert. Der aktuelle Prototyp übernimmt nur das öffentlich erkennbare Produktmuster „semantische plus bildbasierte Provider“ und besitzt eigene Modelle/Implementierung. Falls später MIT-Code übernommen wird, werden Datei, Commit und Copyright in `LICENSES/` einzeln dokumentiert.
+
+## Verbindliche Designabgrenzung
+
+GlucoDataHandler ist keine Designquelle für Smartphone-Oberfläche, Graphen,
+Farben oder Kacheln. Die Mobile-Optik folgt ausschließlich der gelieferten
+Bildvorlage; fehlende technische Graphdetails werden anhand des Nightscout Data
+Toolkits ergänzt. Insbesondere werden keine GDH-Bereichsfarben oder
+grenzwertabhängigen Glukosefarben in das Dashboard übernommen. Die grüne
+CGM-Serie und das Zielband sind feste Bestandteile der Bildvorlage.

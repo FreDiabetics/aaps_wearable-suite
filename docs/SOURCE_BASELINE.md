@@ -2,6 +2,10 @@
 
 ## Kontrollstand vom 2026-08-05
 
+Für das Dashboard-/Protokoll-3-Arbeitspaket wurde `refs/heads/dev` am
+2026-08-05 um 23:33 +02:00 erneut abgefragt. Der SHA blieb unverändert; damit
+ist auch der reproduzierbare 0.4.0-Build dem folgenden Stand zugeordnet.
+
 - Repository: `nightscout/AndroidAPS`
 - Branch: `dev`
 - aktueller öffentlicher Commit:

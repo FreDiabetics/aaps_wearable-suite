@@ -1,5 +1,38 @@
 # Implementation Log
 
+## 2026-08-05, 23:34 +02:00, Smartphone-Kacheldashboard und Graphvertrag 0.4.0
+
+- Geändert: `app-mobile`-Dashboard, Navigation, Ressourcen, Graph-Canvas,
+  Inline-Einstellungen, AAPS-Prognoseparser, begrenzter Displayverlauf,
+  `core-model`, Wear-Protokoll, Mobile-/Wear-Versionen, Tests und Dokumentation.
+- Zweck: die vorgegebene Smartphone-Bildvorlage mit möglichst wenigen
+  Untermenüs umsetzen und echte, ausschließlich lesend empfangene AAPS-Daten
+  für Verlauf und Prognosen nutzbar machen.
+- Umsetzung: vier flache Bereiche (Übersicht, Verlauf, Daten, Einstellungen),
+  feste Bild-Palette, Nightscout-Data-Toolkit-Prinzipien für Skalen/Flächen,
+  echte Suggested-/Enacted-`predBGs`, 24-Stunden-/300-Punkte-Puffer im letzten
+  Zustand. GlucoDataHandler wurde nur als Provider-/Hintergrundreferenz
+  betrachtet; weder Design noch Code wurden übernommen. Der Glukosewert erhält
+  keine Hypo-/Ziel-/Hyper-abhängige Farbe.
+- Tests: vollständiger Release-Lauf erfolgreich; 2.163 Aufgaben, 42 Tests aus
+  14 JUnit-Dateien, keine Fehler/Fehlschläge/Überspringungen.
+  Mobile-APK 0.4.0/Code 5 auf SM-S948B installiert. Vollständiger Release-Lauf
+  erfolgreich; 24/24 WFF-Dateien gültig, 24/24 WFF-APKs ohne DEX. Das
+  0.4.0-DIY-ZIP wurde samt externer SHA-256-Datei erzeugt.
+- Sichtprüfung: eigener API-35-Phone-Emulator (1080×2400, 420 dpi) mit
+  synthetischen Daten. Zielwert und Statistiktexte auf eine Zeile begrenzt,
+  feste Statusfarbhierarchie hergestellt und kompakte Graphhöhen so angepasst,
+  dass die Verbindungskachel oberhalb der festen Navigation liegt. Übersicht,
+  Verlauf, Daten und Inline-Einstellungen per UI-Automator erreicht.
+- Baseline: AndroidAPS `dev` unmittelbar vor Dokumentation unverändert bei
+  `e1068e77db4f801c046340c8313cd7a2856f4e7c`; GlucoDataHandler unverändert bei
+  `114460bc29973c78580095e2e9b0f212eed9df20`.
+- Einschränkungen: physischer Sichtvergleich wegen gesperrtem Telefon noch
+  offen; Watch in diesem Lauf nicht per ADB sichtbar; Verlauf baut sich erst
+  aus zukünftigen realen Broadcasts auf.
+- Nächster Schritt: entsperrten Realgeräte-Screenshot prüfen, Wear-App 0.4.0
+  installieren und anschließend den kontrollierten Git-Stand veröffentlichen.
+
 ## 2026-08-02, initiales Arbeitspaket
 
 - Geändert: Projektaufbau, Kernmodell, AAPS-Adapter, Wear-Protokoll, mobile/watch Apps, DataStore, Complication, WFF-Testmodul und Audit-Dokumente.
