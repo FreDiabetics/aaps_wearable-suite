@@ -1,5 +1,7 @@
 package app.aapswear.mobile
 
+import android.graphics.Color
+import android.provider.Settings
 import android.view.View
 import android.view.ViewGroup
 import android.widget.TextView
@@ -19,6 +21,16 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [35])
 class MainActivityTest {
+
+    @Test fun `app surfaces are neutral gray and system accent follows the icon`() {
+        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+        listOf(R.color.app_background, R.color.app_surface, R.color.app_surface_high, R.color.app_surface_raised, R.color.app_surface_selected).forEach { colorId ->
+            val color = context.getColor(colorId)
+            assertEquals(Color.red(color), Color.green(color))
+            assertEquals(Color.green(color), Color.blue(color))
+        }
+        assertEquals(Color.rgb(109, 232, 146), context.getColor(R.color.app_accent))
+    }
 
     @Test fun `diagnostics update while tile dashboard stays visible`() {
         val context = ApplicationProvider.getApplicationContext<android.content.Context>()
@@ -63,6 +75,12 @@ class MainActivityTest {
         shadowOf(android.os.Looper.getMainLooper()).idle()
         assertFalse(preferences.getBoolean("showDetails", true))
 
+        val live = activity.findViewById<android.widget.Switch>(R.id.dashboard_live_notification_switch)
+        assertFalse(live.isChecked)
+        live.performClick()
+        shadowOf(android.os.Looper.getMainLooper()).idle()
+        assertTrue(preferences.getBoolean(PersistentBridgeService.PREFERENCE_LIVE_NOTIFICATION, false))
+
         controller.pause().stop().destroy()
     }
 
@@ -100,6 +118,7 @@ class MainActivityTest {
         assertEquals(R.id.dropdown_panel, sectionPanel.id)
         assertEquals(4, sectionPanel.childCount)
         assertNotNull(sectionPanel.findViewById<View>(R.id.dropdown_overview).background)
+        assertEquals(activity.getColor(R.color.app_accent), sectionPanel.findViewById<TextView>(R.id.dropdown_overview).currentTextColor)
         sectionPanel.findViewById<View>(R.id.dropdown_settings).performClick()
         shadowOf(android.os.Looper.getMainLooper()).idle()
         assertNull(activity.activeDropdown)
@@ -111,6 +130,26 @@ class MainActivityTest {
         assertNotNull(morePanel.findViewById<View>(R.id.dropdown_app_info).background)
         activity.activeDropdown?.dismiss()
 
+        controller.pause().stop().destroy()
+    }
+
+    @Test
+    @Config(sdk = [36])
+    fun `live notification switch opens the Android 16 promotion permission when needed`() {
+        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+        context.getSharedPreferences("dashboard_ui", android.content.Context.MODE_PRIVATE).edit().clear().commit()
+        val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
+        val activity = controller.get()
+
+        activity.findViewById<View>(R.id.nav_settings).performClick()
+        activity.findViewById<View>(R.id.dashboard_live_notification_switch).performClick()
+        shadowOf(android.os.Looper.getMainLooper()).idle()
+
+        assertTrue(context.getSharedPreferences("dashboard_ui", android.content.Context.MODE_PRIVATE)
+            .getBoolean(PersistentBridgeService.PREFERENCE_LIVE_NOTIFICATION, false))
+        val settingsIntent = shadowOf(activity).nextStartedActivity
+        assertEquals(Settings.ACTION_APP_NOTIFICATION_PROMOTION_SETTINGS, settingsIntent.action)
+        assertEquals(activity.packageName, settingsIntent.getStringExtra(Settings.EXTRA_APP_PACKAGE))
         controller.pause().stop().destroy()
     }
 

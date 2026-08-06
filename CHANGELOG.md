@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.5.1 - 2026-08-07
+
+- Smartphone- und Wear-Oberfläche auf neutrale Grautöne mit dem Grün des
+  FreDiabetics-Icons als Systemakzent umgestellt; farbige Kartenumrandungen
+  entfernt und Menüs, Auswahlfelder sowie Navigation pillenförmig abgerundet.
+- Die gelieferten farbigen und monochromen FreDiabetics-Assets integriert.
+  Das farbige Asset dient der sichtbaren Marke, das monochrome Asset dem vom
+  System eingefärbten Benachrichtigungssymbol.
+- Eine normale, laufende Hintergrund-Benachrichtigung als Standard ergänzt.
+  Der zugehörige `specialUse`-Foreground-Service hält den ausschließlich
+  lokalen, lesenden AndroidAPS-Empfang und die Wear-Verbindung sichtbar aktiv
+  und wird nach Neustart beziehungsweise App-Update erneut angefordert.
+- In den Inline-Einstellungen einen optionalen Live-Benachrichtigungsmodus für
+  Android 16/One UI 8.5 ergänzt. Er fordert den offiziellen Promoted-Ongoing-
+  Status an, zeigt nur Verbindungsdiagnose ohne Therapiewerte und fällt auf
+  älteren oder nicht freigeschalteten Systemen auf die normale Benachrichtigung
+  zurück.
+- Mobile- und Wear-Version auf 0.5.1/Code 7 angehoben; Service-, Neustart-,
+  Einstellungs-, Berechtigungs- und Palettenregressionen ergänzt.
+
 ## 0.5.0 - 2026-08-06
 
 - Sichtbaren Produktnamen systemweit auf **Sugarlicious** umgestellt; stabile

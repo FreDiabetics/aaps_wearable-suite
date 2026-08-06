@@ -1,5 +1,32 @@
 # AndroidAPS Source Baseline
 
+## Kontrollstand vom 2026-08-07
+
+Vor dem Sugarlicious-0.5.1-Abschlusslauf wurde `refs/heads/dev` erneut direkt
+über `nightscout/AndroidAPS` abgefragt.
+
+- Commit: `7fc8205e9a73259cec2982fc199f3d2055f84347`
+- Commit-Datum: 2026-08-06 15:43:52 +02:00
+- Nachricht: `Fix scenes expiration`
+- Delta gegen die vorherige Basis `e1068e77…`: ein Commit
+
+Das gesamte Delta umfasst sieben Dateien. Für den geforderten Wear-/Datenaudit
+relevant ist ausschließlich
+`plugins/sync/.../wear/wearintegration/DataHandlerMobile.kt`: Die interne
+AAPS-Wear-Szenenlogik verwendet für den Stop-Status nun `hasSceneToStop()`
+anstelle von `isAnySceneActive()`. Dadurch bleibt eine abgelaufene, aber noch
+nicht quittierte Szene von der AAPS-Wear-App stoppbar. Weitere Änderungen
+betreffen die interne Szenen-API, deren Implementierung und Tests.
+
+Nicht geändert wurden `wear`, `wear/watchfacepush`, die Complication-Provider,
+WFF-Ressourcen, der externe Status-Payload und dessen Sender
+`plugins/sync/.../tizen/TizenPlugin.kt`. Der Git-Blob des Tizen-Senders ist in
+beiden Ständen identisch:
+`86e4337f037e403cb402cfb68d26a00475b63a1d`. Sugarlicious liest keine AAPS-
+Szenensteuerung und bleibt strikt read-only; Datenadapter, Capability-Matrix
+und Übertragungsprotokoll benötigen für dieses Delta deshalb keine Änderung.
+Der 0.5.1-Build wird der neuen Dev-Basis fest zugeordnet.
+
 ## Kontrollstand vom 2026-08-06
 
 Vor dem Sugarlicious-0.5.0-Arbeitspaket wurde `refs/heads/dev` am 2026-08-06

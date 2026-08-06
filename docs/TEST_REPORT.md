@@ -1,5 +1,39 @@
 # Test Report
 
+## Sugarlicious 0.5.1, 2026-08-07
+
+- AndroidAPS-`dev` bei `7fc8205e9a73259cec2982fc199f3d2055f84347`
+  fixiert und das Ein-Commit-Delta vollständig geprüft. Der externe Tizen-
+  Statussender blieb byteidentisch; geändert wurde nur interne AAPS-Szenen-
+  und Wear-Steuerlogik.
+- Gezielter Lauf `:app-mobile:testDebugUnitTest :app-mobile:assembleDebug`:
+  13 Tests aus vier Suites, keine Fehler, Fehlschläge oder Überspringungen.
+- Gezielter Lauf `:app-wear:testDebugUnitTest :app-wear:assembleDebug`: ein
+  Test aus einer Suite, kein Fehler, Fehlschlag oder Skip.
+- Neue Regressionen prüfen die normale laufende Standardbenachrichtigung,
+  `START_STICKY`, den Low-Importance-Kanal, den Boot-Empfänger, den optionalen
+  API-36-Promoted-Ongoing-Status ohne Glukosewert, die Inline-Umschaltung und
+  die offizielle Promotion-Einstellung. Palette und Systemakzent werden als
+  konkrete RGB-Werte geprüft.
+- Eine visuelle Prüfung der Live-Darstellung auf realer One-UI-8.5-Hardware
+  wurde noch nicht ausgeführt und wird nicht als bestanden behauptet.
+
+Der vollständige `tools/build-release.ps1`-Abschlusslauf war erfolgreich:
+
+- 2.314 Gradle-Tasks: 2 ausgeführt, 2.312 aktuell
+- 16 JUnit-XML-Suites: 50 Tests, 0 Fehler, 0 Fehlschläge, 0 übersprungen
+- 26 von 26 WFF-XML-Dateien im offiziellen gepinnten Validator gültig
+- 26 von 26 WFF-Release-APKs ohne `classes*.dex`
+- Mobile-Debug-APK: `app.aapswear`, Version 0.5.1/Code 7
+- Wear-Debug-APK: `app.aapswear`, Version 0.5.1/Code 7
+- Mobile-Manifest enthält `FOREGROUND_SERVICE`,
+  `FOREGROUND_SERVICE_SPECIAL_USE`, `POST_NOTIFICATIONS`,
+  `POST_PROMOTED_NOTIFICATIONS` und `RECEIVE_BOOT_COMPLETED`; keine
+  `INTERNET`-Berechtigung. Service-Typ, nicht exportierter Service und
+  dokumentierter `specialUse`-Untertyp wurden im gemergten Manifest geprüft.
+- DIY-Paket: `dist/sugarlicious-0.5.1-diy-preview.zip`; die maßgebliche
+  Prüfsumme steht in der daneben erzeugten `.sha256`-Datei.
+
 ## Sugarlicious 0.5.0, 2026-08-06
 
 - AndroidAPS-`dev` vor Arbeitsbeginn unverändert bei `e1068e77…` bestätigt.

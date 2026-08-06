@@ -11,6 +11,10 @@ keine Telemetrie und keine Werbung. Das Projekt steht unter GNU AGPL v3.
 - DataStore-Persistenz und klare Kennzeichnung aktueller/verzögerter/veralteter Daten
 - kachelbasiertes Smartphone-Dashboard mit echten AAPS-Graphdaten, flacher
   Navigation und direkt erreichbaren Anzeigeeinstellungen
+- neutrale graue Tile-Oberfläche mit FreDiabetics-Grün als Systemakzent,
+  pillenförmigen Menüs und ohne farbige Kartenumrandungen
+- normale dauerhafte Hintergrund-Benachrichtigung sowie optionaler
+  Android-16-/One-UI-8.5-Live-Status ohne Gesundheitswerte
 - 27 frei auswählbare Complication-Provider
 - 25 veröffentlichbare, codefreie WFF-v1-Watchface-Pakete plus technisches Testface
 - zwei originale Sugarlicious-Watchfaces: Digital mit Graph-Tile und Analog mit
@@ -23,12 +27,14 @@ Der Datenfluss lautet:
 `AndroidAPS External Companion Apps → Mobile Bridge → DataClient → Watch DataStore → Complications → WFF`
 
 Der aktuelle AndroidAPS-Kontrollstand ist `dev` bei
-`e1068e77db4f801c046340c8313cd7a2856f4e7c`. Die reproduzierbare 0.3.0-
+`7fc8205e9a73259cec2982fc199f3d2055f84347`. Die reproduzierbare 0.3.0-
 Release-Baseline bleibt `18101c8a2c0204a08d417f3d5fbac3e9ceae380f`.
 Details und der geprüfte Delta-Einfluss stehen in `docs/SOURCE_BASELINE.md`.
 
-Die Smartphone- und Wear-App tragen das FreDiabetics-Logo und dieselbe feste
-Tile-Palette. Die Dashboard-Optik folgt der für das Projekt gelieferten Bildvorlage. Wo die
+Die Smartphone- und Wear-App tragen das FreDiabetics-Logo und dieselbe neutrale
+Graustufen-Tile-Palette. Das Icon-Grün kennzeichnet Systemaktionen und aktive
+Auswahlen; Datenserien behalten ihre semantischen Graphfarben. Die Dashboard-
+Optik folgt der für das Projekt gelieferten Bildvorlage. Wo die
 Vorlage technische Graphdetails offenlässt, werden die Darstellungsprinzipien
 des lokal geprüften Nightscout Data Toolkits verwendet. GlucoDataHandler ist
 ausschließlich eine Referenz für Provider-/Hintergrundlogik und keine

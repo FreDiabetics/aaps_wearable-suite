@@ -1,5 +1,19 @@
 # Known Limitations
 
+- Der Foreground-Service erhöht mit einer sichtbaren laufenden Benachrichtigung
+  die Hintergrundpriorität und fordert nach Neustart beziehungsweise App-Update
+  einen Wiederanlauf an. Android kann den Prozess bei Systemdruck trotzdem
+  beenden; ein erzwungener App-Stopp durch den Nutzer verhindert den Neustart.
+  Die Funktion ist daher kein absolutes „unkillable“-Versprechen.
+- Der Live-Status verwendet die offizielle Android-16-Promoted-Ongoing-
+  Schnittstelle. Ob One UI 8.5 ihn tatsächlich als Live-Benachrichtigung
+  hervorhebt, hängt von Systemfreigabe und OEM-Kriterien ab. Die Logik ist per
+  API-36-Test abgedeckt, aber noch nicht visuell auf realer One-UI-8.5-Hardware
+  abgenommen.
+- Der Foreground-Service-Typ `specialUse` benötigt bei einer späteren
+  Google-Play-Veröffentlichung eine passende Deklaration und Überprüfung in der
+  Play Console. Das lokale DIY-/ADB-Paket ist davon nicht blockiert.
+
 - Der öffentliche AAPS-Broadcast liefert Zielgrenzen, aber keinen verlässlich
   gekennzeichneten temporären Zielzustand und keinen vollständigen
   offen/geschlossen/pausiert-Loopmodus. Suggested/Enacted wird nur angezeigt.

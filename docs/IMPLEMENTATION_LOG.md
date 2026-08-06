@@ -1,5 +1,39 @@
 # Implementation Log
 
+## 2026-08-07, 00:17 +02:00, neutrale Oberfläche und zweistufige Hintergrund-Benachrichtigung
+
+- Geändert: Mobile-/Wear-Palette, Karten-, Chip-, Navigations- und Dropdown-
+  Ressourcen, FreDiabetics-Assets, Mobile-Manifest, neuer Foreground-Service
+  samt Boot-Empfänger, Inline-Einstellung, Versionen, Tests, Release-Skript und
+  Dokumentation.
+- Zweck: die Oberfläche auf echtes neutrales Grau mit Icon-Grün als
+  Systemfarbe umstellen und den lokalen AndroidAPS-/Wear-Empfang sichtbar im
+  Hintergrund priorisieren. Standard bleibt eine normale Benachrichtigung;
+  Live ist eine ausdrückliche Option.
+- Umsetzung: farbige Rahmen durch tonale Grauflächen ersetzt, alle Menüs und
+  Auswahlen stark abgerundet. `PersistentBridgeService` läuft als
+  `specialUse`-Foreground-Service mit stillem Low-Importance-Kanal und
+  `START_STICKY`. Er wird aus der App sowie nach Boot/App-Update angefordert.
+  Ab API 36 setzt der optionale Modus den offiziellen
+  `android.requestPromotedOngoing`-Hinweis, bietet „Live beenden“ an und zeigt
+  ausschließlich AAPS-/Watch-Verbindungsstatus ohne Therapiewerte. Fehlt die
+  Systemfreigabe, wird die offizielle Promotion-Einstellungsseite geöffnet.
+- Tests: gezielte Mobile- und Wear-Unit-Tests sowie Debug-Assemblies liefen vor
+  der Dokumentation erfolgreich. Abgedeckt sind normaler/laufender Standard,
+  API-36-Live-Anforderung ohne Therapiedaten, Boot-Wiederanlauf, persistente
+  Inline-Umschaltung, Promotion-Einstellung und neutrale RGB-Palette. Der
+  vollständige Release-Abschlusslauf ist im aktuellen `TEST_REPORT.md`
+  protokolliert.
+- Baseline: AndroidAPS `dev` auf `7fc8205e…` aktualisiert. Das Ein-Commit-Delta
+  ändert nur interne Szenen-/Wear-Steuerlogik; der gelesene Tizen-Broadcast ist
+  byteidentisch.
+- Einschränkungen: kein Foreground-Service kann erzwungenes Stoppen absolut
+  verhindern. Die One-UI-8.5-Darstellung muss noch auf realer Hardware visuell
+  bestätigt werden; Betriebssystem/OEM entscheiden über die Live-Hervorhebung.
+- Nächster Schritt: die Live-Hervorhebung und den Neustartpfad auf realer
+  One-UI-8.5-Hardware sichten; anschließend den kontrollierten Stand als
+  öffentliche DIY-Vorschau kennzeichnen.
+
 ## 2026-08-06, 15:07 +02:00, Sugarlicious-Branding, Wear Tiles und zwei Original-WFFs
 
 - Geändert: sichtbare Namen und Versionen von `app-mobile`/`app-wear`, Adaptive

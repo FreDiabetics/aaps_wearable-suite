@@ -33,6 +33,7 @@ data class DashboardUiPreferences(
     val showPredictions: Boolean = true,
     val compact: Boolean = true,
     val graphHours: Int = 6,
+    val liveNotification: Boolean = false,
 ) {
     fun unitFor(state: TherapyDisplayState?): GlucoseUnit = when (unit) {
         DisplayUnitPreference.AAPS -> state?.glucose?.displayUnit ?: GlucoseUnit.MG_DL
@@ -47,6 +48,7 @@ data class DashboardUiPreferences(
             showPredictions = preferences.getBoolean("showPredictions", true),
             compact = preferences.getBoolean("compact", true),
             graphHours = preferences.getInt("graphHours", 6).takeIf { it in listOf(6, 12, 24) } ?: 6,
+            liveNotification = preferences.getBoolean(PersistentBridgeService.PREFERENCE_LIVE_NOTIFICATION, false),
         )
     }
 }
@@ -86,6 +88,7 @@ data class DashboardCallbacks(
     val setShowDetails: (Boolean) -> Unit,
     val setShowPredictions: (Boolean) -> Unit,
     val setCompact: (Boolean) -> Unit,
+    val setLiveNotification: (Boolean) -> Unit,
     val syncNow: () -> Unit,
     val openContactEmail: () -> Unit,
     val openGithub: () -> Unit,
@@ -100,6 +103,7 @@ class DashboardViewFactory(
     private val secondary = context.getColor(R.color.app_text_secondary)
     private val green = context.getColor(R.color.app_green)
     private val cyan = context.getColor(R.color.app_cyan)
+    private val accent = context.getColor(R.color.app_accent)
     private val blue = context.getColor(R.color.app_blue)
     private val orange = context.getColor(R.color.app_orange)
     private val purple = context.getColor(R.color.app_purple)
@@ -220,6 +224,7 @@ class DashboardViewFactory(
         display.addView(switchRow("Therapiedetails anzeigen", "IOB, COB, Basal und Profil auf der Übersicht", prefs.showDetails, R.id.dashboard_details_switch, callbacks.setShowDetails))
         display.addView(switchRow("Prognosen im Graph", "Nur vorhandene AAPS-predBGs, keine eigene Berechnung", prefs.showPredictions, R.id.dashboard_predictions_switch, callbacks.setShowPredictions))
         display.addView(switchRow("Kompakte Übersicht", "Kleinere Graph-Tiles und Abstände", prefs.compact, R.id.dashboard_compact_switch, callbacks.setCompact))
+        display.addView(switchRow("Live-Benachrichtigung (One UI 8.5)", "Optionaler Android-16-Live-Status; auf anderen Systemen bleibt die normale Benachrichtigung aktiv", prefs.liveNotification, R.id.dashboard_live_notification_switch, callbacks.setLiveNotification))
         parent.addView(display, cardParams())
 
         val graph = tile("GRAPH-ZEITRAUM")
@@ -264,7 +269,7 @@ class DashboardViewFactory(
             orientation = LinearLayout.VERTICAL
             setPadding(12.dp, 0, 0, 0)
             addView(value("Sugarlicious", text, 20f, 1))
-            addView(helper("Version 0.5.0 · FreDiabetics · Open Source", 2, cyan))
+            addView(helper("Version 0.5.1 · FreDiabetics · Open Source", 2, accent))
             addView(helper("Lokale, strikt read-only AndroidAPS-Anzeige", 2))
         }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
         addView(header)
@@ -359,7 +364,7 @@ class DashboardViewFactory(
     }
 
     private fun chip(label: String, selected: Boolean, click: () -> Unit) = TextView(context).apply {
-        text = label; textSize = 11f; minHeight = 36.dp; setTextColor(if (selected) cyan else secondary); setBackgroundResource(if (selected) R.drawable.bg_chip_selected else R.drawable.bg_chip); gravity = Gravity.CENTER; isClickable = true; isFocusable = true; setOnClickListener { click() }
+        text = label; textSize = 11f; minHeight = 36.dp; setTextColor(if (selected) accent else secondary); setBackgroundResource(if (selected) R.drawable.bg_chip_selected else R.drawable.bg_chip); gravity = Gravity.CENTER; isClickable = true; isFocusable = true; setOnClickListener { click() }
     }
 
     private fun tile(title: String?): LinearLayout = LinearLayout(context).apply {

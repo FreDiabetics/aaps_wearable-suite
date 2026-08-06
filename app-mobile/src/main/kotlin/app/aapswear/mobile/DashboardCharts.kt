@@ -104,20 +104,20 @@ class GlucoseDashboardChart @JvmOverloads constructor(
     }
 
     private fun drawGrid(canvas: Canvas, plot: RectF, start: Long, end: Long, yMin: Double, yMax: Double) {
-        linePaint.color = Color.rgb(50, 66, 75)
+        linePaint.color = Color.rgb(70, 70, 70)
         linePaint.strokeWidth = 0.8f.dp
         linePaint.pathEffect = DashPathEffect(floatArrayOf(3f.dp, 3f.dp), 0f)
         repeat(5) { index ->
             val y = plot.top + plot.height() * index / 4f
             canvas.drawLine(plot.left, y, plot.right, y, linePaint)
             val value = yMax - (yMax - yMin) * index / 4.0
-            drawText(canvas, glucoseLabel(value), plot.right + 5f.dp, y + 3f.dp, 9f, Color.rgb(210, 218, 222), Paint.Align.LEFT)
+            drawText(canvas, glucoseLabel(value), plot.right + 5f.dp, y + 3f.dp, 9f, Color.rgb(210, 210, 210), Paint.Align.LEFT)
         }
         repeat(4) { index ->
             val x = plot.left + plot.width() * index / 3f
             canvas.drawLine(x, plot.top, x, plot.bottom, linePaint)
             val time = start + (end - start) * index / 3
-            drawText(canvas, timeFormat.format(Date(time)), x, plot.bottom + 15f.dp, 9f, Color.rgb(200, 209, 214), Paint.Align.CENTER)
+            drawText(canvas, timeFormat.format(Date(time)), x, plot.bottom + 15f.dp, 9f, Color.rgb(200, 200, 200), Paint.Align.CENTER)
         }
         linePaint.pathEffect = null
     }
@@ -145,7 +145,7 @@ class GlucoseDashboardChart @JvmOverloads constructor(
     }
 
     private fun glucoseLabel(valueMgDl: Double): String = if (unit == GlucoseUnit.MMOL_L) String.format(Locale.getDefault(), "%.1f", valueMgDl / 18.0) else valueMgDl.toInt().toString()
-    private fun drawEmptyMessage(canvas: Canvas, plot: RectF, message: String) = drawText(canvas, message, plot.centerX(), plot.centerY(), 10f, Color.rgb(145, 158, 166), Paint.Align.CENTER)
+    private fun drawEmptyMessage(canvas: Canvas, plot: RectF, message: String) = drawText(canvas, message, plot.centerX(), plot.centerY(), 10f, Color.rgb(150, 150, 150), Paint.Align.CENTER)
     private fun mapX(time: Long, start: Long, end: Long, plot: RectF) = plot.left + ((time - start).toDouble() / (end - start).coerceAtLeast(1L) * plot.width()).toFloat()
     private fun mapY(value: Double, min: Double, max: Double, plot: RectF) = plot.bottom - ((value - min) / (max - min).coerceAtLeast(1.0) * plot.height()).toFloat()
     private fun drawText(canvas: Canvas, value: String, x: Float, y: Float, sizeSp: Float, color: Int, align: Paint.Align) { textPaint.textSize = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, sizeSp, resources.displayMetrics); textPaint.color = color; textPaint.textAlign = align; canvas.drawText(value, x, y, textPaint) }
@@ -175,9 +175,9 @@ class MetabolicDashboardChart @JvmOverloads constructor(context: Context, attrs:
         drawLane(canvas, cobPlot, points, start, now, false)
         repeat(4) { index ->
             val x = left + (right - left) * index / 3f
-            drawText(canvas, timeFormat.format(Date(start + (now - start) * index / 3)), x, bottom + 15f.dp, 9f, Color.rgb(200, 209, 214), Paint.Align.CENTER)
+            drawText(canvas, timeFormat.format(Date(start + (now - start) * index / 3)), x, bottom + 15f.dp, 9f, Color.rgb(200, 200, 200), Paint.Align.CENTER)
         }
-        if (points.size < 2) drawText(canvas, "IOB/COB-Verlauf baut sich lokal auf", (left + right) / 2f, (top + bottom) / 2f, 10f, Color.rgb(145, 158, 166), Paint.Align.CENTER)
+        if (points.size < 2) drawText(canvas, "IOB/COB-Verlauf baut sich lokal auf", (left + right) / 2f, (top + bottom) / 2f, 10f, Color.rgb(150, 150, 150), Paint.Align.CENTER)
     }
 
     private fun drawLane(canvas: Canvas, plot: RectF, points: List<TherapyHistorySample>, start: Long, end: Long, iob: Boolean) {
@@ -186,11 +186,11 @@ class MetabolicDashboardChart @JvmOverloads constructor(context: Context, attrs:
         val color = if (iob) Color.rgb(100, 191, 255) else Color.rgb(255, 157, 24)
         val title = if (iob) "IOB (IE)" else "COB (g)"
         drawText(canvas, title, plot.left, plot.top - 6f.dp, 9f, color, Paint.Align.LEFT)
-        linePaint.color = Color.rgb(50, 66, 75); linePaint.strokeWidth = 0.7f.dp; linePaint.pathEffect = DashPathEffect(floatArrayOf(3f.dp, 3f.dp), 0f)
+        linePaint.color = Color.rgb(70, 70, 70); linePaint.strokeWidth = 0.7f.dp; linePaint.pathEffect = DashPathEffect(floatArrayOf(3f.dp, 3f.dp), 0f)
         repeat(3) { index ->
             val y = plot.top + plot.height() * index / 2f
             canvas.drawLine(plot.left, y, plot.right, y, linePaint)
-            drawText(canvas, format(maxValue * (2 - index) / 2.0, if (iob) 1 else 0), plot.right + 5f.dp, y + 3f.dp, 8f, Color.rgb(210, 218, 222), Paint.Align.LEFT)
+            drawText(canvas, format(maxValue * (2 - index) / 2.0, if (iob) 1 else 0), plot.right + 5f.dp, y + 3f.dp, 8f, Color.rgb(210, 210, 210), Paint.Align.LEFT)
         }
         linePaint.pathEffect = null
         val actual = points.mapNotNull { point -> (if (iob) point.totalIob else point.cobGrams)?.let { point.measuredAtEpochMs to it } }

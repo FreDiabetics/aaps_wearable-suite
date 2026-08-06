@@ -1,17 +1,22 @@
 package app.aapswear.mobile
 
+import android.Manifest
 import android.app.Activity
+import android.app.NotificationManager
 import android.content.ActivityNotFoundException
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
+import android.content.pm.PackageManager
 import android.content.res.ColorStateList
 import android.graphics.Color
 import android.graphics.drawable.ColorDrawable
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
+import android.provider.Settings
 import android.text.SpannableString
 import android.text.Spanned
 import android.text.style.ForegroundColorSpan
@@ -67,6 +72,7 @@ class MainActivity : Activity() {
             setShowDetails = { uiPreferences.edit().putBoolean("showDetails", it).apply() },
             setShowPredictions = { uiPreferences.edit().putBoolean("showPredictions", it).apply() },
             setCompact = { uiPreferences.edit().putBoolean("compact", it).apply() },
+            setLiveNotification = ::setLiveNotification,
             syncNow = ::syncNow,
             openContactEmail = ::openContactEmail,
             openGithub = ::openGithub,
@@ -74,6 +80,8 @@ class MainActivity : Activity() {
         bindNavigation()
         findViewById<View>(R.id.menu_button).setOnClickListener(::showSectionMenu)
         findViewById<View>(R.id.more_button).setOnClickListener(::showMoreMenu)
+        PersistentBridgeService.start(this)
+        requestNotificationPermissionIfNeeded()
         scope.launch {
             TherapyStateStore(this@MainActivity).state.collectLatest {
                 state = it
@@ -140,7 +148,7 @@ class MainActivity : Activity() {
             Triple(DashboardScreen.SETTINGS, R.id.nav_settings_icon, R.id.nav_settings_label),
         )
         entries.forEach { (target, iconId, labelId) ->
-            val color = getColor(if (screen == target) R.color.app_cyan else R.color.app_text_secondary)
+            val color = getColor(if (screen == target) R.color.app_accent else R.color.app_text_secondary)
             findViewById<ImageView>(iconId).imageTintList = ColorStateList.valueOf(color)
             findViewById<TextView>(labelId).setTextColor(color)
         }
@@ -148,7 +156,7 @@ class MainActivity : Activity() {
 
     private fun styleTitle() {
         val value = SpannableString(getString(R.string.app_name))
-        value.setSpan(ForegroundColorSpan(getColor(R.color.app_cyan)), 5, value.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+        value.setSpan(ForegroundColorSpan(getColor(R.color.app_accent)), 5, value.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
         findViewById<TextView>(R.id.app_title).text = value
     }
 
@@ -183,7 +191,7 @@ class MainActivity : Activity() {
                 id = item.id
                 text = item.label
                 textSize = 14f
-                setTextColor(getColor(if (item.selected) R.color.app_cyan else R.color.app_text))
+                setTextColor(getColor(if (item.selected) R.color.app_accent else R.color.app_text))
                 gravity = Gravity.CENTER_VERTICAL
                 minHeight = 46.dp
                 setPadding(18.dp, 0, 18.dp, 0)
@@ -242,10 +250,30 @@ class MainActivity : Activity() {
         }
     }
 
+    private fun setLiveNotification(enabled: Boolean) {
+        uiPreferences.edit().putBoolean(PersistentBridgeService.PREFERENCE_LIVE_NOTIFICATION, enabled).apply()
+        PersistentBridgeService.refresh(this)
+        if (!enabled) return
+        if (Build.VERSION.SDK_INT < 36) {
+            Toast.makeText(this, "Live-Status benötigt Android 16; normale Benachrichtigung bleibt aktiv", Toast.LENGTH_LONG).show()
+            return
+        }
+        val manager = getSystemService(NotificationManager::class.java)
+        if (!manager.canPostPromotedNotifications()) {
+            openExternal(Intent(Settings.ACTION_APP_NOTIFICATION_PROMOTION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE, packageName))
+        }
+    }
+
+    private fun requestNotificationPermissionIfNeeded() {
+        if (Build.VERSION.SDK_INT >= 33 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), NOTIFICATION_PERMISSION_REQUEST)
+        }
+    }
+
     private fun copyDiagnostics() {
         val d = DiagnosticsSnapshot.read(diagnostics)
         val report = buildString {
-            appendLine("Sugarlicious 0.5.0")
+            appendLine("Sugarlicious 0.5.1")
             appendLine("Quelle: ${d.sourcePackage ?: "—"}")
             appendLine("AAPS: ${d.sourceVersion ?: "—"}")
             appendLine("Vertrag: ${d.sourceContract ?: "—"}")
@@ -284,4 +312,8 @@ class MainActivity : Activity() {
     )
 
     private val Int.dp get() = (this * resources.displayMetrics.density).toInt()
+
+    companion object {
+        private const val NOTIFICATION_PERMISSION_REQUEST = 4102
+    }
 }

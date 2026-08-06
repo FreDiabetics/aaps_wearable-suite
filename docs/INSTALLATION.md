@@ -28,6 +28,18 @@ Watchfaces verwenden; deren Layout wird dann vom jeweiligen Watchface bestimmt.
    das betreffende Watchface-Paket entfernen und nach der Wear-App erneut
    installieren oder die AAPS-Complications einmal manuell zuweisen.
 
+Beim ersten Öffnen fragt Sugarlicious ab Android 13 nach der Erlaubnis für
+Benachrichtigungen. Sie sollte zugelassen werden, damit die normale laufende
+Hintergrund-Benachrichtigung sichtbar bleibt. Sie enthält keine Glukose- oder
+Therapiewerte, sondern kennzeichnet nur den lokalen Empfangsdienst.
+
+Unter **Einstellungen → Anzeige → Live-Benachrichtigung (One UI 8.5)** kann
+auf Android 16 ein Live-Status angefordert werden. Wenn das System eine weitere
+Freigabe verlangt, öffnet Sugarlicious die offizielle App-Einstellung dafür.
+Der Live-Status enthält nur, ob AndroidAPS erkannt und eine Watch erreichbar
+ist. Auf älteren oder nicht freigeschalteten Systemen bleibt automatisch die
+normale Benachrichtigung aktiv.
+
 ## Erwartete Anzeige
 
 - bis 6 Minuten Messalter: `aktuell`

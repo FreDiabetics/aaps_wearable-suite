@@ -2,7 +2,7 @@ plugins { id("com.android.application") }
 android {
     namespace="app.aapswear.wear"
     compileSdk=36
-    defaultConfig { applicationId="app.aapswear"; minSdk=30; targetSdk=36; versionCode=6; versionName="0.5.0" }
+    defaultConfig { applicationId="app.aapswear"; minSdk=30; targetSdk=36; versionCode=7; versionName="0.5.1" }
     testOptions { unitTests.isIncludeAndroidResources = true }
 }
 dependencies {

@@ -1,5 +1,5 @@
 param(
-    [string]$Version = "0.5.0-diy-preview",
+    [string]$Version = "0.5.1-diy-preview",
     [switch]$SkipBuild
 )
 
@@ -60,7 +60,7 @@ Copy-Item -Path (Join-Path $projectRoot "LICENSES\*") -Destination (Join-Path $t
 $report = [ordered]@{
     release = $Version
     generatedAt = (Get-Date).ToString("o")
-    androidApsDevCommit = "e1068e77db4f801c046340c8313cd7a2856f4e7c"
+    androidApsDevCommit = "7fc8205e9a73259cec2982fc199f3d2055f84347"
     watchfaceCount = $watchFaces.Count
     applicationSigning = "debug/development signing only"
     publishingReady = $false
