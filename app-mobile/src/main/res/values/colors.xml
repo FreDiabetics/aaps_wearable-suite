@@ -12,4 +12,5 @@
     <color name="app_yellow">#F4DE00</color>
     <color name="app_purple">#D69AFF</color>
     <color name="app_red">#FF5C69</color>
+    <color name="launcher_background">#050B10</color>
 </resources>

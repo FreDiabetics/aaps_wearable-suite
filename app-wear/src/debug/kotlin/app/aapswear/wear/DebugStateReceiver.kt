@@ -6,46 +6,36 @@ import android.content.Context
 import android.content.Intent
 import androidx.wear.watchface.complications.datasource.ComplicationDataSourceUpdateRequester
 import app.aapswear.complications.AllProviders
-import app.aapswear.model.*
+import app.aapswear.model.BasalState
+import app.aapswear.model.CarbState
+import app.aapswear.model.DataCapability
+import app.aapswear.model.DeviceState
+import app.aapswear.model.GlucoseSample
+import app.aapswear.model.GlucoseState
+import app.aapswear.model.GlucoseUnit
+import app.aapswear.model.InsulinState
+import app.aapswear.model.LoopState
+import app.aapswear.model.ProfileState
+import app.aapswear.model.PumpState
+import app.aapswear.model.TargetState
+import app.aapswear.model.TherapyDisplayState
+import app.aapswear.model.Trend
 import app.aapswear.storage.TherapyStateStore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import kotlin.math.sin
 
-/** ADB-only synthetic state injection. This class exists only in debug APKs. */
+/** Emulator-only synthetic state injection. This class is absent from release APKs. */
 class DebugStateReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
-        if (intent.action != ACTION) return
         val pending = goAsync()
-        val app = context.applicationContext
         CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
             try {
-                val now = System.currentTimeMillis()
-                val value = intent.getDoubleExtra("glucose", 123.0)
-                val unit = if (intent.getBooleanExtra("mmol", false)) GlucoseUnit.MMOL_L else GlucoseUnit.MG_DL
-                val history = listOf(112.0, 116.0, 119.0, 117.0, 121.0, value).mapIndexed { index, sample ->
-                    GlucoseSample(sample, now - (5L - index) * 5 * 60_000L)
-                }
-                val state = TherapyDisplayState(
-                    sourceVersion = "AAPS dev test",
-                    sourceContract = "AAPS_EXTENDED_STATUS_V1",
-                    receivedAtEpochMs = now,
-                    glucose = GlucoseState(value, unit, Trend.FORTY_FIVE_UP, now, 4.0, 2.3),
-                    glucoseHistory = history,
-                    insulin = InsulinState(1.25, 0.8, 0.45),
-                    carbs = CarbState(18.0, 0.0),
-                    basal = BasalState(0.9, 1.08, 120, now - 10 * 60_000L, 30, now + 20 * 60_000L, "120%"),
-                    target = TargetState(70.0, 180.0, false),
-                    loop = LoopState("enacted", now - 2 * 60_000L, enactedAtEpochMs = now - 2 * 60_000L),
-                    pump = PumpState("OK", 118.0, 76),
-                    device = DeviceState(82, 90),
-                    profile = ProfileState("Default"),
-                    capabilities = DataCapability.entries.toSet(),
-                )
-                TherapyStateStore(app).save(state)
+                TherapyStateStore(context).save(syntheticState(intent.getStringExtra("mode") ?: "current"))
                 AllProviders.classes.forEach { provider ->
-                    ComplicationDataSourceUpdateRequester.create(app, ComponentName(app, provider)).requestUpdateAll()
+                    ComplicationDataSourceUpdateRequester.create(context, ComponentName(context, provider)).requestUpdateAll()
                 }
             } finally {
                 pending.finish()
@@ -53,5 +43,31 @@ class DebugStateReceiver : BroadcastReceiver() {
         }
     }
 
-    companion object { const val ACTION = "app.aapswear.DEBUG_INJECT_STATE" }
+    private fun syntheticState(mode: String): TherapyDisplayState {
+        val now = System.currentTimeMillis()
+        val measuredAt = if (mode == "stale") now - 25 * 60_000L else now - 2 * 60_000L
+        val history = (0 until 30).map { index ->
+            val minutesAgo = (29 - index) * 5L
+            GlucoseSample(
+                valueMgDl = 118.0 + sin(index / 3.0) * 20.0 + index * 0.3,
+                measuredAtEpochMs = now - minutesAgo * 60_000L,
+            )
+        }
+        return TherapyDisplayState(
+            receivedAtEpochMs = now,
+            sourceVersion = "4.0.0-dev synthetic",
+            sourceContract = "AAPS_EXTENDED_STATUS_V1",
+            glucose = if (mode == "none") null else GlucoseState(129.0, GlucoseUnit.MG_DL, Trend.FLAT, measuredAt, 6.0, 4.0),
+            glucoseHistory = history,
+            insulin = InsulinState(2.45, 1.65, 0.80),
+            carbs = CarbState(36.0, 0.0),
+            basal = BasalState(0.95, tempPercent = 110, displayText = "110%"),
+            target = TargetState(80.0, 160.0),
+            loop = LoopState("Aktiv", now - 3 * 60_000L),
+            pump = PumpState("OK", 119.0, 82),
+            device = DeviceState(78, 90),
+            profile = ProfileState("Standard"),
+            capabilities = DataCapability.entries.toSet(),
+        )
+    }
 }

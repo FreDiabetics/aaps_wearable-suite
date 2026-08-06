@@ -6,4 +6,6 @@
     <item name="dashboard_details_switch" type="id"/>
     <item name="dashboard_compact_switch" type="id"/>
     <item name="dashboard_predictions_switch" type="id"/>
+    <item name="dashboard_contact_email" type="id"/>
+    <item name="dashboard_github" type="id"/>
 </resources>

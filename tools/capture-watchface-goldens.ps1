@@ -3,7 +3,8 @@ param(
     [string]$Adb = "$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe",
     [string]$OutputDirectory = "docs\test-artifacts\wear-os-6\watchfaces",
     [string[]]$Names = @(),
-    [switch]$Reinstall
+    [switch]$Reinstall,
+    [switch]$InjectSyntheticState
 )
 
 $ErrorActionPreference = "Stop"
@@ -36,6 +37,8 @@ $watchFaces = [ordered]@{
     "robby" = "app.aapswear.watchface.robby"
     "simple-digital" = "app.aapswear.watchface.simpledigital"
     "steam-punk" = "app.aapswear.watchface.steampunk"
+    "sugarlicious-digital" = "app.aapswear.watchface.sugarlicious.digital"
+    "sugarlicious-analog" = "app.aapswear.watchface.sugarlicious.analog"
 }
 
 if ($Names.Count -gt 0) {
@@ -88,6 +91,14 @@ $results = foreach ($entry in $watchFaces.GetEnumerator()) {
     # Close any launcher/app overlay. The declarative runtime can briefly render
     # a black transition surface after activation, so wait for the stable frame.
     & $Adb -s $Serial shell input keyevent 4 | Out-Null
+    Start-Sleep -Milliseconds 400
+    & $Adb -s $Serial shell input keyevent 4 | Out-Null
+    if ($InjectSyntheticState) {
+        & $Adb -s $Serial shell am broadcast `
+            -n app.aapswear/app.aapswear.wear.DebugStateReceiver `
+            -a app.aapswear.DEBUG_INJECT_STATE `
+            --es mode current | Out-Null
+    }
     Start-Sleep -Seconds 7
 
     $activePath = Join-Path $OutputDirectory "$name-active.png"

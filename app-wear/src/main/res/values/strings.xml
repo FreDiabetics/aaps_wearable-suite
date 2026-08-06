@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">Sugarlicious</string>
+    <string name="brand_logo">FreDiabetics-Logo</string>
+    <string name="read_only">Nur Anzeige · read-only</string>
+</resources>

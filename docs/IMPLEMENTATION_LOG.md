@@ -1,5 +1,33 @@
 # Implementation Log
 
+## 2026-08-06, 15:07 +02:00, Sugarlicious-Branding, Wear Tiles und zwei Original-WFFs
+
+- Geändert: sichtbare Namen und Versionen von `app-mobile`/`app-wear`, Adaptive
+  Icons, Logoressourcen, Smartphone-App-Info, Kontaktaktionen, Wear-Layout,
+  Debug-Testdatenquelle, zwei neue WFF-Module, Release-/Screenshot-Skripte,
+  Tests und Dokumentation.
+- Zweck: das Produkt als Sugarlicious kennzeichnen, die Watch-App an die
+  vorgegebene Tile-Optik angleichen und je ein digitales sowie analoges
+  eigenständiges Watchface liefern.
+- Umsetzung: bestehende Paket-ID `app.aapswear` erhalten; Logo im dunklen
+  Material-Adaptive-Icon eingebettet; E-Mail/GitHub ohne INTERNET-Berechtigung
+  per System-Intent geöffnet; Wear-Werte weiterhin nur bei aktuell/verzögert
+  sichtbar. Beide Watchfaces sind WFF v1, deklarativ, separat installierbar und
+  besitzen je acht frei belegbare Slots. Die schlanken, innen dunkel
+  abgesetzten Analogzeiger wurden neu als Vektoren gezeichnet und verwenden
+  keine Apple-Datei oder kopierte Apple-Geometrie.
+- Tests: vollständiger Release-Lauf erfolgreich: 2.314 Gradle-Tasks, 44 Tests
+  aus 15 XML-Suites ohne Fehler/Fehlschlag/Skip, 26/26 WFF-Dokumente gültig und
+  26/26 WFF-APKs codefrei. Runder Wear-OS-6-Emulator 480×480: Wear-App,
+  Digital/Analog, aktive Darstellung und echtes Doze/AOD mit synthetischen
+  Daten aufgenommen. Wear-Release-Manifest enthält den Debugempfänger nicht.
+- Einschränkungen: veröffentlichte Goldens belegen den Emulatorstand; erneuter
+  physischer Sichttest auf One UI Watch 8 für diese beiden neuen Designs steht
+  noch aus. Complication-Favoriten können nach umgekehrter Installationsfolge
+  zunächst leere Slots behalten.
+- Nächster Schritt: kontrollierten Git-Stand committen und in das bestehende
+  GitHub-Repository pushen; danach neue Designs auf One UI Watch 8 sichten.
+
 ## 2026-08-05, 23:34 +02:00, Smartphone-Kacheldashboard und Graphvertrag 0.4.0
 
 - Geändert: `app-mobile`-Dashboard, Navigation, Ressourcen, Graph-Canvas,

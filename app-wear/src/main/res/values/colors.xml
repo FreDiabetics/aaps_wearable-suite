@@ -1,0 +1,13 @@
+<resources>
+    <color name="wear_background">#050B10</color>
+    <color name="wear_surface">#091117</color>
+    <color name="wear_surface_high">#0D171D</color>
+    <color name="wear_border">#22313A</color>
+    <color name="wear_text">#F2F5F6</color>
+    <color name="wear_text_secondary">#A9B4BA</color>
+    <color name="wear_cyan">#19D7E8</color>
+    <color name="wear_green">#54DF30</color>
+    <color name="wear_orange">#FF9D18</color>
+    <color name="wear_red">#FF5C69</color>
+    <color name="launcher_background">#050B10</color>
+</resources>

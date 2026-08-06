@@ -4,7 +4,7 @@ dependencyResolutionManagement {
     repositories { google(); mavenCentral() }
 }
 
-rootProject.name = "aaps-wear-watchfaces"
+rootProject.name = "Sugarlicious"
 
 include(
     ":core-model",
@@ -39,6 +39,8 @@ include(
     ":watchfaces:robby",
     ":watchfaces:simple-digital",
     ":watchfaces:steam-punk",
+    ":watchfaces:sugarlicious-digital",
+    ":watchfaces:sugarlicious-analog",
     ":tools:aaps-cwf-parser",
     ":tools:wff-generator",
     ":tools:screenshot-comparator",

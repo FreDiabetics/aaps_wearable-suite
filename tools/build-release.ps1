@@ -1,5 +1,5 @@
 param(
-    [string]$Version = "0.4.0-diy-preview",
+    [string]$Version = "0.5.0-diy-preview",
     [switch]$SkipBuild
 )
 
@@ -11,7 +11,7 @@ $watchFaces = @(
     "aaps-big-chart", "aaps-large", "aaps-no-chart", "aaps-cockpit", "aaps-v2-tt-dark",
     "aaps-community", "aimico", "analog-g-watch", "blue-ring", "digital-big-graph",
     "digital-g-watch", "gears", "gota", "lucky-loop-koeln", "p-zero", "robby",
-    "simple-digital", "steam-punk"
+    "simple-digital", "steam-punk", "sugarlicious-digital", "sugarlicious-analog"
 )
 
 if (-not $SkipBuild) {
@@ -28,7 +28,7 @@ if (-not $SkipBuild) {
 }
 
 $distRoot = Join-Path $projectRoot "dist"
-$target = Join-Path $distRoot "aaps-wear-watchfaces-$Version"
+$target = Join-Path $distRoot "sugarlicious-$Version"
 if (Test-Path -LiteralPath $target) {
     $resolvedTarget = (Resolve-Path -LiteralPath $target).Path
     if (-not $resolvedTarget.StartsWith($distRoot, [StringComparison]::OrdinalIgnoreCase)) {
@@ -38,8 +38,8 @@ if (Test-Path -LiteralPath $target) {
 }
 New-Item -ItemType Directory -Force -Path (Join-Path $target "apps"), (Join-Path $target "watchfaces"), (Join-Path $target "docs"), (Join-Path $target "LICENSES") | Out-Null
 
-Copy-Item -LiteralPath (Join-Path $projectRoot "app-mobile\build\outputs\apk\debug\app-mobile-debug.apk") -Destination (Join-Path $target "apps\aaps-display-mobile-debug.apk")
-Copy-Item -LiteralPath (Join-Path $projectRoot "app-wear\build\outputs\apk\debug\app-wear-debug.apk") -Destination (Join-Path $target "apps\aaps-display-wear-debug.apk")
+Copy-Item -LiteralPath (Join-Path $projectRoot "app-mobile\build\outputs\apk\debug\app-mobile-debug.apk") -Destination (Join-Path $target "apps\sugarlicious-mobile-debug.apk")
+Copy-Item -LiteralPath (Join-Path $projectRoot "app-wear\build\outputs\apk\debug\app-wear-debug.apk") -Destination (Join-Path $target "apps\sugarlicious-wear-debug.apk")
 foreach ($name in $watchFaces) {
     $source = Join-Path $projectRoot "watchfaces\$name\build\outputs\apk\release\$name-release.apk"
     if (-not (Test-Path -LiteralPath $source)) {
@@ -74,7 +74,7 @@ $hashLines = Get-ChildItem -LiteralPath $target -Recurse -File | Sort-Object Ful
 }
 $hashLines | Set-Content -LiteralPath (Join-Path $target "SHA256SUMS.txt") -Encoding ascii
 
-$zip = Join-Path $distRoot "aaps-wear-watchfaces-$Version.zip"
+$zip = Join-Path $distRoot "sugarlicious-$Version.zip"
 if (Test-Path -LiteralPath $zip) { Remove-Item -LiteralPath $zip -Force }
 Compress-Archive -Path (Join-Path $target "*") -DestinationPath $zip -CompressionLevel Optimal
 $zipHash = (Get-FileHash -LiteralPath $zip -Algorithm SHA256).Hash.ToLowerInvariant()

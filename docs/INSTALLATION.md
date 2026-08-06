@@ -17,8 +17,8 @@ Watchfaces verwenden; deren Layout wird dann vom jeweiligen Watchface bestimmt.
 
 ## Reihenfolge
 
-1. `apps/aaps-display-mobile-debug.apk` auf dem Telefon installieren.
-2. `apps/aaps-display-wear-debug.apk` auf der gekoppelten Uhr installieren.
+1. `apps/sugarlicious-mobile-debug.apk` auf dem Telefon installieren.
+2. `apps/sugarlicious-wear-debug.apk` auf der gekoppelten Uhr installieren.
 3. AndroidAPS öffnen und unter Konfiguration **External Companion Apps**
    aktivieren.
 4. AndroidAPS einen aktuellen Status erzeugen lassen und die Mobile Bridge
@@ -45,6 +45,12 @@ In der Watchface-Konfiguration können die Provider `1 Glucose compact` bis
 sind semantisch; Farbe, Schrift und Anordnung bestimmt das fremde Watchface.
 Für kontrollierte Optik stehen die Bild-/Graph-Provider und die mitgelieferten
 WFF-Pakete bereit.
+
+Die beiden neuen Originalpakete heißen `sugarlicious-digital.apk` und
+`sugarlicious-analog.apk`. Digital zeigt Zeit, Glukose/Trend/Delta, Graph und
+vier Status-Tiles. Analog zeigt Glukose im oberen Tile, schlanke eigene Zeiger
+und sechs kompakte Statusbereiche. Alle acht Slots sind über die normale
+Watchface-Konfiguration austauschbar.
 
 ## DIY-Hinweis
 

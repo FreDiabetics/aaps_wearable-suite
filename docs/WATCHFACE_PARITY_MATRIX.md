@@ -29,6 +29,8 @@ synthetischen Daten auf Wear OS 6.
 | Robby | funktional gleichwertig | generische deklarative Zeiger |
 | SimpleDigital | teilweise abweichend | Split-Zeit in WFF-DigitalClock zusammengeführt |
 | SteamPunk | funktional gleichwertig | Originalbilder plus deklarative Zeiger/Slots |
+| Sugarlicious Digital | identisch | neues Originaldesign; keine Portierung |
+| Sugarlicious Analog | identisch | neues Originaldesign; eigenständige deklarative Zeiger |
 | PinkFloydTheWall | blockiert | geschützte Drittmotive/Marke ungeklärt |
 
 | Complications | Status |

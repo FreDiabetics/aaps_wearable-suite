@@ -1,11 +1,14 @@
 package app.aapswear.mobile
 
 import android.app.Activity
+import android.content.ActivityNotFoundException
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import android.content.Intent
 import android.content.SharedPreferences
 import android.content.res.ColorStateList
+import android.net.Uri
 import android.os.Bundle
 import android.text.SpannableString
 import android.text.Spanned
@@ -59,6 +62,8 @@ class MainActivity : Activity() {
             setShowPredictions = { uiPreferences.edit().putBoolean("showPredictions", it).apply() },
             setCompact = { uiPreferences.edit().putBoolean("compact", it).apply() },
             syncNow = ::syncNow,
+            openContactEmail = ::openContactEmail,
+            openGithub = ::openGithub,
         ))
         bindNavigation()
         findViewById<View>(R.id.menu_button).setOnClickListener(::showSectionMenu)
@@ -135,8 +140,8 @@ class MainActivity : Activity() {
     }
 
     private fun styleTitle() {
-        val value = SpannableString("AndroidAPS")
-        value.setSpan(ForegroundColorSpan(getColor(R.color.app_cyan)), 7, 10, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+        val value = SpannableString(getString(R.string.app_name))
+        value.setSpan(ForegroundColorSpan(getColor(R.color.app_cyan)), 5, value.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
         findViewById<TextView>(R.id.app_title).text = value
     }
 
@@ -201,7 +206,7 @@ class MainActivity : Activity() {
     private fun copyDiagnostics() {
         val d = DiagnosticsSnapshot.read(diagnostics)
         val report = buildString {
-            appendLine("AAPS Wear 0.4")
+            appendLine("Sugarlicious 0.5.0")
             appendLine("Quelle: ${d.sourcePackage ?: "—"}")
             appendLine("AAPS: ${d.sourceVersion ?: "—"}")
             appendLine("Vertrag: ${d.sourceContract ?: "—"}")
@@ -210,7 +215,25 @@ class MainActivity : Activity() {
             appendLine("Uhren erreichbar: ${d.reachableWatches}")
             appendLine("Sync: ${d.syncStatus ?: "—"}")
         }
-        (getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager).setPrimaryClip(ClipData.newPlainText("AAPS Wear Diagnose", report))
+        (getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager).setPrimaryClip(ClipData.newPlainText("Sugarlicious Diagnose", report))
         Toast.makeText(this, "Diagnose ohne Therapiewerte kopiert", Toast.LENGTH_SHORT).show()
+    }
+
+    private fun openGithub() {
+        openExternal(Intent(Intent.ACTION_VIEW, Uri.parse(getString(R.string.github_url))))
+    }
+
+    private fun openContactEmail() {
+        val intent = Intent(Intent.ACTION_SENDTO, Uri.fromParts("mailto", getString(R.string.contact_email), null))
+            .putExtra(Intent.EXTRA_SUBJECT, "Sugarlicious")
+        openExternal(intent)
+    }
+
+    private fun openExternal(intent: Intent) {
+        try {
+            startActivity(intent)
+        } catch (_: ActivityNotFoundException) {
+            Toast.makeText(this, "Keine passende App installiert", Toast.LENGTH_SHORT).show()
+        }
     }
 }

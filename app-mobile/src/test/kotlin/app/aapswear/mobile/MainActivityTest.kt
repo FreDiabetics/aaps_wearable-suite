@@ -6,6 +6,7 @@ import android.widget.TextView
 import androidx.test.core.app.ApplicationProvider
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
+import org.junit.Assert.assertEquals
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.Robolectric
@@ -60,6 +61,29 @@ class MainActivityTest {
         shadowOf(android.os.Looper.getMainLooper()).idle()
         assertFalse(preferences.getBoolean("showDetails", true))
 
+        controller.pause().stop().destroy()
+    }
+
+    @Test fun `Sugarlicious about tile exposes project and contact links`() {
+        val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
+        val activity = controller.get()
+
+        activity.findViewById<View>(R.id.nav_settings).performClick()
+        shadowOf(android.os.Looper.getMainLooper()).idle()
+        val settingsText = textOf(activity.findViewById(R.id.dashboard_content))
+        assertTrue(settingsText.contains("Sugarlicious"))
+        assertTrue(settingsText.contains("typ1.diafreddy@gmail.com"))
+        assertTrue(settingsText.contains("FreDiabetics/aaps_wearable-suite"))
+
+        activity.findViewById<View>(R.id.dashboard_github).performClick()
+        assertEquals(
+            "https://github.com/FreDiabetics/aaps_wearable-suite",
+            shadowOf(activity).nextStartedActivity.dataString,
+        )
+        activity.findViewById<View>(R.id.dashboard_contact_email).performClick()
+        val emailIntent = shadowOf(activity).nextStartedActivity
+        assertEquals("mailto", emailIntent.data?.scheme)
+        assertEquals("typ1.diafreddy@gmail.com", emailIntent.data?.schemeSpecificPart)
         controller.pause().stop().destroy()
     }
 

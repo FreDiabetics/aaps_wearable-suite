@@ -12,7 +12,7 @@
 - Wear OS 6 im runden 454×454-Emulator und One UI Watch 8 auf einer Samsung
   SM-L705F sind installiert getestet. Ein zweites reales Nicht-Samsung-Gerät
   war nicht verfügbar und wird nicht als bestanden behauptet.
-- 23 Watchfaces besitzen aktive und echte Doze/AOD-Goldens mit synthetischen
+- 25 Watchfaces besitzen aktive und echte Doze/AOD-Goldens mit synthetischen
   Daten. Das belegt Rendering und Daten-Slots, aber noch keinen pixelgenauen
   1:1-Vergleich mit jedem Original auf identischer Hardware.
 - WFF unterstützt höchstens acht Complication-Slots. CWF-`dynPref`, `dynData`,
@@ -40,3 +40,9 @@
   der Aufnahme gesperrt war. Die Oberfläche wurde stattdessen vollständig auf
   einem API-35-Phone-Emulator mit 1080×2400 Pixeln und 420 dpi geprüft; das
   ersetzt nicht den noch offenen physischen Vergleich.
+- Die beiden Sugarlicious-0.5.0-Watchfaces wurden aktiv und in Doze/AOD auf
+  Wear OS 6 (480×480 rund) geprüft. Der erneute visuelle Realgerätetest dieser
+  neuen Designs auf One UI Watch 8 ist noch offen und wird nicht behauptet.
+- Die Analogzeiger sind bewusst eigenständig gezeichnet. Eine exakte Kopie von
+  Apple-Watch-Ressourcen oder Apple-Trade-Dress ist weder enthalten noch als
+  Zielparität deklariert.

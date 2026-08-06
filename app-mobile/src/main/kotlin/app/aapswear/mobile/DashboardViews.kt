@@ -87,6 +87,8 @@ data class DashboardCallbacks(
     val setShowPredictions: (Boolean) -> Unit,
     val setCompact: (Boolean) -> Unit,
     val syncNow: () -> Unit,
+    val openContactEmail: () -> Unit,
+    val openGithub: () -> Unit,
 )
 
 class DashboardViewFactory(
@@ -241,9 +243,40 @@ class DashboardViewFactory(
         )), cardParams())
         parent.addView(infoCard("UMFANG", listOf(
             "Complication-Provider" to "27",
-            "WFF-Pakete" to "23",
+            "WFF-Pakete" to "25",
             "AAPS-Quelle" to (state?.sourceVersion ?: diagnostics.sourceVersion).orDash(),
         )), cardParams())
+        parent.addView(aboutCard(), cardParams(bottom = 10))
+    }
+
+    private fun aboutCard(): View = tile("ÜBER SUGARLICIOUS").apply {
+        val header = LinearLayout(context).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(0, 8.dp, 0, 8.dp)
+        }
+        header.addView(ImageView(context).apply {
+            setImageResource(R.drawable.frediabetics_logo)
+            contentDescription = context.getString(R.string.brand_logo)
+            scaleType = ImageView.ScaleType.FIT_CENTER
+        }, LinearLayout.LayoutParams(58.dp, 58.dp))
+        header.addView(LinearLayout(context).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(12.dp, 0, 0, 0)
+            addView(value("Sugarlicious", text, 20f, 1))
+            addView(helper("Version 0.5.0 · FreDiabetics · Open Source", 2, cyan))
+            addView(helper("Lokale, strikt read-only AndroidAPS-Anzeige", 2))
+        }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+        addView(header)
+        addView(infoRow("Kontakt", context.getString(R.string.contact_email)))
+        addView(infoRow("GitHub", "FreDiabetics/aaps_wearable-suite"))
+        addView(chipRow(listOf(
+            Triple("E-MAIL", true) { callbacks.openContactEmail() },
+            Triple("GITHUB", true) { callbacks.openGithub() },
+        )).also { row ->
+            row.getChildAt(0).id = R.id.dashboard_contact_email
+            row.getChildAt(1).id = R.id.dashboard_github
+        })
     }
 
     private fun glucoseGraphCard(state: TherapyDisplayState?, prefs: DashboardUiPreferences, compact: Boolean, large: Boolean = false): View {

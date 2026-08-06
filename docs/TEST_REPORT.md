@@ -1,5 +1,44 @@
 # Test Report
 
+## Sugarlicious 0.5.0, 2026-08-06
+
+- AndroidAPS-`dev` vor Arbeitsbeginn unverändert bei `e1068e77…` bestätigt.
+- `app-mobile:assembleDebug`, `app-wear:assembleDebug` und beide neuen
+  WFF-Release-APKs erfolgreich gebaut.
+- Neue Robolectric-Fälle prüfen die Sugarlicious-App-Info samt GitHub-/Mail-
+  Intents sowie den sicheren datenlosen Start des Wear-Tile-Dashboards. Der
+  gemeinsame Mobile-/Wear-Testlauf war erfolgreich.
+- Der gepinnte offizielle Google-WFF-Validator akzeptierte
+  `sugarlicious-digital` und `sugarlicious-analog` als WFF v1.
+- Wear-OS-6-Emulator: Android 16/API 36, 480×480 rund. Wear-App mit rein
+  synthetischem aktuellen Zustand und Scrollbereich sichtbar geprüft. Beide
+  Watchfaces installiert, aktiviert sowie aktiv und in echtem Doze/AOD
+  aufgenommen; Report und PNGs liegen unter
+  `docs/test-artifacts/wear-os-6/sugarlicious-0.5.0/`.
+- Kein echter Gesundheitswert wurde für diese Screenshots verwendet. Der
+  Empfänger `DebugStateReceiver` liegt ausschließlich unter `src/debug` und
+  ist im Release-Build nicht vorhanden.
+
+Der vollständige `tools/build-release.ps1`-Abschlusslauf war erfolgreich:
+
+- 2.314 Gradle-Tasks: 254 ausgeführt, 2.060 aktuell
+- 15 JUnit-XML-Suites: 44 Tests, 0 Fehler, 0 Fehlschläge, 0 übersprungen
+- 26 von 26 WFF-XML-Dateien gültig (25 auslieferbare Pakete plus Testface)
+- 26 von 26 WFF-Release-APKs ohne `classes*.dex`
+- Wear-Release-Manifest separat geprüft: kein `DebugStateReceiver` und keine
+  Aktion `app.aapswear.DEBUG_INJECT_STATE`
+- DIY-Paket: `dist/sugarlicious-0.5.0-diy-preview.zip`
+- ZIP-SHA-256:
+  `9ff8786ca7d3f73a374f9a545783460fa24b564718ac7b09069aac0a9440ca0d`
+  (maßgeblich ist die daneben erzeugte `.sha256`-Datei)
+
+Der zusätzlich gestartete API-35-Phone-Emulator zeigte beim Kaltstart einen
+plattformseitigen `Pixel Launcher isn't responding`-Dialog über jeder App.
+Diese überlagerten Bilder wurden entfernt und nicht als Smartphone-Sichttest
+gewertet. Mobile-Build, Ressourcen, App-Info und externe Intents sind durch den
+erfolgreichen Abschlusslauf und Robolectric abgedeckt; ein neuer unverdeckter
+0.5.0-Phone-Golden wird nicht behauptet.
+
 ## Smartphone-Dashboard 0.4.0, 2026-08-05
 
 Ausgeführt: `gradlew test assembleDebug --no-daemon --max-workers=1` sowie der

@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.5.0 - 2026-08-06
+
+- Sichtbaren Produktnamen systemweit auf **Sugarlicious** umgestellt; stabile
+  Application-ID zur Update- und Complication-Kompatibilität beibehalten.
+- FreDiabetics-Logo als Material-Adaptive-Icon, Smartphone-Header,
+  Wear-App-Branding und App-Info integriert; Kontaktmail und GitHub direkt in
+  der Einstellungs-Kachel verlinkt.
+- Wear-App als runde, scrollbare Tile-Oberfläche in der festen Smartphone-
+  Palette umgesetzt, einschließlich sicherer Frischelogik, Verbindung und
+  Read-only-Hinweis.
+- `Sugarlicious Digital` und `Sugarlicious Analog` als getrennte codefreie
+  WFF-v1-Pakete mit je acht Slots und AOD erstellt. Die analogen Zeiger sind
+  eigene Originalgrafiken; keine Apple-Ressource wurde verwendet.
+- Emulator-only Testdatenempfänger im Debug-Quellset und reproduzierbare
+  Wear-/Watchface-Goldens ergänzt; Release-APK enthält den Empfänger nicht.
+
 ## 0.4.0 - 2026-08-05
 
 - Smartphone-App als flaches, kachelbasiertes Dashboard nach der vorgegebenen

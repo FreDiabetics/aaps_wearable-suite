@@ -1,5 +1,14 @@
 # AndroidAPS Source Baseline
 
+## Kontrollstand vom 2026-08-06
+
+Vor dem Sugarlicious-0.5.0-Arbeitspaket wurde `refs/heads/dev` am 2026-08-06
+erneut direkt über das öffentliche Repository abgefragt. Der SHA blieb bei
+`e1068e77db4f801c046340c8313cd7a2856f4e7c`; gegenüber dem am 2026-08-05
+dokumentierten Stand existiert damit kein unbemerktes Upstream-Delta. Der
+öffentliche Statusvertrag und die zuvor auditierten Wear-/WFF-Auswirkungen
+mussten für dieses reine UI-/Watchface-Arbeitspaket nicht angepasst werden.
+
 ## Kontrollstand vom 2026-08-05
 
 Für das Dashboard-/Protokoll-3-Arbeitspaket wurde `refs/heads/dev` am

@@ -1,6 +1,6 @@
-# AAPS Wear Watchfaces & Complications
+# Sugarlicious
 
-Eigenständige, strikt lesende Android-/Wear-OS-Anwendung für lokal von
+Sugarlicious ist eine eigenständige, strikt lesende Android-/Wear-OS-Anwendung für lokal von
 AndroidAPS bereitgestellte Statusdaten. Keine Therapiekommandos, keine Cloud,
 keine Telemetrie und keine Werbung. Das Projekt steht unter GNU AGPL v3.
 
@@ -12,7 +12,9 @@ keine Telemetrie und keine Werbung. Das Projekt steht unter GNU AGPL v3.
 - kachelbasiertes Smartphone-Dashboard mit echten AAPS-Graphdaten, flacher
   Navigation und direkt erreichbaren Anzeigeeinstellungen
 - 27 frei auswählbare Complication-Provider
-- 23 veröffentlichbare, codefreie WFF-v1-Watchface-Pakete plus technisches Testface
+- 25 veröffentlichbare, codefreie WFF-v1-Watchface-Pakete plus technisches Testface
+- zwei originale Sugarlicious-Watchfaces: Digital mit Graph-Tile und Analog mit
+  eigenständig gezeichneten, schlanken Zeigern
 - sichere CWF-Analyse, degradationsbewusster WFF-Generator und PNG-Vergleichswerkzeug
 - CI, gepinnter offizieller WFF-Validator, No-DEX-Prüfung und DIY-Release-Skript
 
@@ -25,7 +27,8 @@ Der aktuelle AndroidAPS-Kontrollstand ist `dev` bei
 Release-Baseline bleibt `18101c8a2c0204a08d417f3d5fbac3e9ceae380f`.
 Details und der geprüfte Delta-Einfluss stehen in `docs/SOURCE_BASELINE.md`.
 
-Die Dashboard-Optik folgt der für das Projekt gelieferten Bildvorlage. Wo die
+Die Smartphone- und Wear-App tragen das FreDiabetics-Logo und dieselbe feste
+Tile-Palette. Die Dashboard-Optik folgt der für das Projekt gelieferten Bildvorlage. Wo die
 Vorlage technische Graphdetails offenlässt, werden die Darstellungsprinzipien
 des lokal geprüften Nightscout Data Toolkits verwendet. GlucoDataHandler ist
 ausschließlich eine Referenz für Provider-/Hintergrundlogik und keine
@@ -70,3 +73,6 @@ gebliebene Hardwarepunkte: `docs/TEST_REPORT.md` und
 
 PinkFloydTheWall ist wegen ungeklärter Rechte an Drittmotiven bewusst nicht
 enthalten. Nichtkommerzielle Nutzung ersetzt keine erforderliche Erlaubnis.
+
+Kontakt: `typ1.diafreddy@gmail.com` ·
+[GitHub](https://github.com/FreDiabetics/aaps_wearable-suite)

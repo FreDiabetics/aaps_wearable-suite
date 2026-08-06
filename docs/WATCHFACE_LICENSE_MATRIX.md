@@ -7,6 +7,9 @@
 | 19 Austausch-Watchfaces | versionierte Dateien im AGPL-3.0-Repository AndroidAPSdocs | enthalten unter AGPL-3.0 mit Autor-, Blob- und SHA-Nachweis |
 | PinkFloydTheWall | AndroidAPSdocs, erkennbarer Drittmarken-/Motivbezug | blockiert und nicht enthalten |
 | GlucoDataHandler | MIT | nur analysiert; kein Code oder Asset kopiert |
+| Sugarlicious Digital | Eigenentwicklung, AGPL-3.0 | enthalten; Originaldesign |
+| Sugarlicious Analog | Eigenentwicklung, AGPL-3.0 | enthalten; eigenständig gezeichnete Zeiger, keine Apple-Assets |
+| FreDiabetics-Logo | vom Projektinhaber bereitgestellt | in App-Branding enthalten; Herkunft in `LICENSES/FreDiabetics-Logo.md` |
 
 Die vollständige Zuordnung steht in
 `LICENSES/AndroidAPSdocs-Community-Watchfaces.md`. Die Repository-Lizenz ist die
