@@ -8,15 +8,19 @@ import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
 import android.content.res.ColorStateList
+import android.graphics.Color
+import android.graphics.drawable.ColorDrawable
 import android.net.Uri
 import android.os.Bundle
 import android.text.SpannableString
 import android.text.Spanned
 import android.text.style.ForegroundColorSpan
+import android.view.Gravity
 import android.view.View
+import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.LinearLayout
-import android.widget.PopupMenu
+import android.widget.PopupWindow
 import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
@@ -41,6 +45,8 @@ class MainActivity : Activity() {
     private var state: app.aapswear.model.TherapyDisplayState? = null
     private var screen = DashboardScreen.OVERVIEW
     private var clockJob: Job? = null
+    internal var activeDropdown: PopupWindow? = null
+        private set
 
     private val diagnosticsListener = SharedPreferences.OnSharedPreferenceChangeListener { _, _ -> runOnUiThread(::refresh) }
     private val uiListener = SharedPreferences.OnSharedPreferenceChangeListener { _, _ -> runOnUiThread(::refresh) }
@@ -86,6 +92,7 @@ class MainActivity : Activity() {
     }
 
     override fun onStop() {
+        activeDropdown?.dismiss()
         clockJob?.cancel(); clockJob = null
         diagnostics.unregisterOnSharedPreferenceChangeListener(diagnosticsListener)
         uiPreferences.unregisterOnSharedPreferenceChangeListener(uiListener)
@@ -146,30 +153,62 @@ class MainActivity : Activity() {
     }
 
     private fun showSectionMenu(anchor: View) {
-        PopupMenu(this, anchor).apply {
-            menu.add(0, 1, 0, "Übersicht")
-            menu.add(0, 2, 1, "Verlauf")
-            menu.add(0, 3, 2, "Daten")
-            menu.add(0, 4, 3, "Einstellungen")
-            setOnMenuItemClickListener { item ->
-                navigate(when (item.itemId) { 1 -> DashboardScreen.OVERVIEW; 2 -> DashboardScreen.HISTORY; 3 -> DashboardScreen.DATA; else -> DashboardScreen.SETTINGS })
-                true
-            }
-            show()
-        }
+        showPillDropdown(anchor, alignEnd = false, listOf(
+            PillMenuItem(R.id.dropdown_overview, "Übersicht", screen == DashboardScreen.OVERVIEW) { navigate(DashboardScreen.OVERVIEW) },
+            PillMenuItem(R.id.dropdown_history, "Verlauf", screen == DashboardScreen.HISTORY) { navigate(DashboardScreen.HISTORY) },
+            PillMenuItem(R.id.dropdown_data, "Daten", screen == DashboardScreen.DATA) { navigate(DashboardScreen.DATA) },
+            PillMenuItem(R.id.dropdown_settings, "Einstellungen", screen == DashboardScreen.SETTINGS) { navigate(DashboardScreen.SETTINGS) },
+        ))
     }
 
     private fun showMoreMenu(anchor: View) {
-        PopupMenu(this, anchor).apply {
-            menu.add(0, 1, 0, "Jetzt synchronisieren")
-            menu.add(0, 2, 1, "Diagnose kopieren")
-            menu.add(0, 3, 2, "Datenschutz & App-Info")
-            setOnMenuItemClickListener { item ->
-                when (item.itemId) { 1 -> syncNow(); 2 -> copyDiagnostics(); 3 -> navigate(DashboardScreen.SETTINGS) }
-                true
-            }
-            show()
+        showPillDropdown(anchor, alignEnd = true, listOf(
+            PillMenuItem(R.id.dropdown_sync, "Jetzt synchronisieren", action = ::syncNow),
+            PillMenuItem(R.id.dropdown_diagnostics, "Diagnose kopieren", action = ::copyDiagnostics),
+            PillMenuItem(R.id.dropdown_app_info, "Datenschutz & App-Info") { navigate(DashboardScreen.SETTINGS) },
+        ))
+    }
+
+    private fun showPillDropdown(anchor: View, alignEnd: Boolean, items: List<PillMenuItem>) {
+        activeDropdown?.dismiss()
+        val panel = LinearLayout(this).apply {
+            id = R.id.dropdown_panel
+            orientation = LinearLayout.VERTICAL
+            setPadding(8.dp, 8.dp, 8.dp, 8.dp)
+            setBackgroundResource(R.drawable.bg_dropdown_panel)
         }
+        lateinit var popup: PopupWindow
+        items.forEachIndexed { index, item ->
+            panel.addView(TextView(this).apply {
+                id = item.id
+                text = item.label
+                textSize = 14f
+                setTextColor(getColor(if (item.selected) R.color.app_cyan else R.color.app_text))
+                gravity = Gravity.CENTER_VERTICAL
+                minHeight = 46.dp
+                setPadding(18.dp, 0, 18.dp, 0)
+                setBackgroundResource(if (item.selected) R.drawable.bg_dropdown_pill_selected else R.drawable.bg_dropdown_pill)
+                isClickable = true
+                isFocusable = true
+                setOnClickListener {
+                    popup.dismiss()
+                    item.action()
+                }
+            }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
+                if (index > 0) topMargin = 6.dp
+            })
+        }
+        val menuWidth = 232.dp
+        popup = PopupWindow(panel, menuWidth, ViewGroup.LayoutParams.WRAP_CONTENT, true).apply {
+            setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
+            isOutsideTouchable = true
+            elevation = 16.dp.toFloat()
+            inputMethodMode = PopupWindow.INPUT_METHOD_NOT_NEEDED
+            setOnDismissListener { if (activeDropdown === this) activeDropdown = null }
+        }
+        activeDropdown = popup
+        val xOffset = if (alignEnd) anchor.width - menuWidth else 0
+        popup.showAsDropDown(anchor, xOffset, 4.dp)
     }
 
     private fun cycleUnit() {
@@ -236,4 +275,13 @@ class MainActivity : Activity() {
             Toast.makeText(this, "Keine passende App installiert", Toast.LENGTH_SHORT).show()
         }
     }
+
+    private data class PillMenuItem(
+        val id: Int,
+        val label: String,
+        val selected: Boolean = false,
+        val action: () -> Unit,
+    )
+
+    private val Int.dp get() = (this * resources.displayMetrics.density).toInt()
 }

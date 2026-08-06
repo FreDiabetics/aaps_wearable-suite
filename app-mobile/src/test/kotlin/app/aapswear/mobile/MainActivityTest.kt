@@ -7,6 +7,8 @@ import androidx.test.core.app.ApplicationProvider
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.Robolectric
@@ -84,6 +86,31 @@ class MainActivityTest {
         val emailIntent = shadowOf(activity).nextStartedActivity
         assertEquals("mailto", emailIntent.data?.scheme)
         assertEquals("typ1.diafreddy@gmail.com", emailIntent.data?.schemeSpecificPart)
+        controller.pause().stop().destroy()
+    }
+
+    @Test fun `header menus use pill dropdowns and keep their actions inline`() {
+        val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
+        val activity = controller.get()
+
+        activity.findViewById<View>(R.id.menu_button).performClick()
+        val sectionPopup = activity.activeDropdown
+        assertNotNull(sectionPopup)
+        val sectionPanel = sectionPopup!!.contentView as ViewGroup
+        assertEquals(R.id.dropdown_panel, sectionPanel.id)
+        assertEquals(4, sectionPanel.childCount)
+        assertNotNull(sectionPanel.findViewById<View>(R.id.dropdown_overview).background)
+        sectionPanel.findViewById<View>(R.id.dropdown_settings).performClick()
+        shadowOf(android.os.Looper.getMainLooper()).idle()
+        assertNull(activity.activeDropdown)
+        assertTrue(textOf(activity.findViewById(R.id.dashboard_content)).contains("Einstellungen"))
+
+        activity.findViewById<View>(R.id.more_button).performClick()
+        val morePanel = activity.activeDropdown!!.contentView as ViewGroup
+        assertEquals(3, morePanel.childCount)
+        assertNotNull(morePanel.findViewById<View>(R.id.dropdown_app_info).background)
+        activity.activeDropdown?.dismiss()
+
         controller.pause().stop().destroy()
     }
 

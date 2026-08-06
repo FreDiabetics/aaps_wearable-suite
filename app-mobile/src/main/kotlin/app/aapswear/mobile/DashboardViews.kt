@@ -359,11 +359,11 @@ class DashboardViewFactory(
     }
 
     private fun chip(label: String, selected: Boolean, click: () -> Unit) = TextView(context).apply {
-        text = label; textSize = 11f; setTextColor(if (selected) cyan else secondary); setBackgroundResource(if (selected) R.drawable.bg_chip_selected else R.drawable.bg_chip); gravity = Gravity.CENTER; isClickable = true; isFocusable = true; setOnClickListener { click() }
+        text = label; textSize = 11f; minHeight = 36.dp; setTextColor(if (selected) cyan else secondary); setBackgroundResource(if (selected) R.drawable.bg_chip_selected else R.drawable.bg_chip); gravity = Gravity.CENTER; isClickable = true; isFocusable = true; setOnClickListener { click() }
     }
 
     private fun tile(title: String?): LinearLayout = LinearLayout(context).apply {
-        orientation = LinearLayout.VERTICAL; setPadding(12.dp, 11.dp, 12.dp, 11.dp); setBackgroundResource(R.drawable.bg_tile)
+        orientation = LinearLayout.VERTICAL; setPadding(12.dp, 11.dp, 12.dp, 11.dp); setBackgroundResource(R.drawable.bg_tile); clipToOutline = true
         title?.let { addView(sectionLabel(it)) }
     }
 
