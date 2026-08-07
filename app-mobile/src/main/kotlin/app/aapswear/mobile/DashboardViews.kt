@@ -24,7 +24,7 @@ import java.text.NumberFormat
 import java.util.Date
 import java.util.Locale
 
-enum class DashboardScreen { OVERVIEW, HISTORY, DATA, SETTINGS }
+enum class DashboardScreen { OVERVIEW, WATCH, SETTINGS }
 enum class DisplayUnitPreference { AAPS, MG_DL, MMOL_L }
 
 data class DashboardUiPreferences(
@@ -98,6 +98,9 @@ data class DashboardCallbacks(
     val setCompact: (Boolean) -> Unit,
     val setLiveNotification: (Boolean) -> Unit,
     val syncNow: () -> Unit,
+    val configureNightscout: () -> Unit,
+    val syncNightscout: () -> Unit,
+    val copyDiagnostics: () -> Unit,
     val openContactEmail: () -> Unit,
     val openGithub: () -> Unit,
 )
@@ -127,8 +130,7 @@ class DashboardViewFactory(
         parent.removeAllViews()
         when (screen) {
             DashboardScreen.OVERVIEW -> renderOverview(parent, state, diagnostics, preferences, now)
-            DashboardScreen.HISTORY -> renderHistory(parent, state, preferences)
-            DashboardScreen.DATA -> renderData(parent, state, diagnostics, preferences, now)
+            DashboardScreen.WATCH -> renderWatch(parent, state, diagnostics, now)
             DashboardScreen.SETTINGS -> renderSettings(parent, state, diagnostics, preferences)
         }
     }
@@ -153,6 +155,23 @@ class DashboardViewFactory(
         val freshness = FreshnessPolicy.classify(state?.glucose?.measuredAtEpochMs, now)
         val current = freshness == Freshness.CURRENT || freshness == Freshness.DELAYED
         parent.addView(connectionCard(state, diagnostics, current), cardParams(top = 8))
+    }
+
+    private fun renderWatch(parent: LinearLayout, state: TherapyDisplayState?, diagnostics: DiagnosticsSnapshot, now: Long) {
+        val composeView = androidx.compose.ui.platform.ComposeView(context).apply {
+            setViewCompositionStrategy(androidx.compose.ui.platform.ViewCompositionStrategy.DisposeOnDetachedFromWindow)
+            setContent {
+                app.aapswear.mobile.ui.theme.SugarliciousTheme {
+                    SugarliciousWatchScreen(
+                        state = state,
+                        diagnostics = diagnostics,
+                        now = now,
+                        onSyncNow = callbacks.syncNow,
+                    )
+                }
+            }
+        }
+        parent.addView(composeView, fullWidth())
     }
 
     private fun renderHistory(parent: LinearLayout, state: TherapyDisplayState?, prefs: DashboardUiPreferences) {
@@ -211,47 +230,67 @@ class DashboardViewFactory(
     }
 
     private fun renderSettings(parent: LinearLayout, state: TherapyDisplayState?, diagnostics: DiagnosticsSnapshot, prefs: DashboardUiPreferences) {
-        parent.addView(screenTitle("Einstellungen", "Direkt hier ändern – ohne Untermenüs"))
-        val display = tile("ANZEIGE")
-        display.addView(sectionLabel("Vorschau-Einheit"))
+        parent.addView(screenTitle("Einstellungen", "Sugarlicious als AndroidAPS → Wear OS Bridge konfigurieren"))
+
+        parent.addView(infoCard("BRIDGE-STATUS", listOf(
+            "AndroidAPS" to diagnostics.sourceVersion.orDash(),
+            "Datenvertrag" to diagnostics.sourceContract.orDash(),
+            "Watch erreichbar" to if (diagnostics.reachableWatches > 0) "${diagnostics.reachableWatches}" else "nein",
+            "Letzte Übertragung" to diagnostics.lastSyncAt.takeIf { it > 0L }.asDateTime(),
+            "Sync-Status" to syncText(diagnostics.syncStatus),
+        ), action = "JETZT AN WATCH SENDEN" to callbacks.syncNow), cardParams())
+
+        val display = tile("SMARTPHONE-VORSCHAU")
+        display.addView(sectionLabel("Glukose-Einheit"))
         display.addView(chipRow(listOf(
             Triple("AAPS", prefs.unit == DisplayUnitPreference.AAPS) { callbacks.setUnit(DisplayUnitPreference.AAPS) },
             Triple("mg/dL", prefs.unit == DisplayUnitPreference.MG_DL) { callbacks.setUnit(DisplayUnitPreference.MG_DL) },
             Triple("mmol/L", prefs.unit == DisplayUnitPreference.MMOL_L) { callbacks.setUnit(DisplayUnitPreference.MMOL_L) },
         )))
-        display.addView(helper("Wirkt auf die Smartphone-Vorschau; AAPS bleibt die Datenquelle."))
+        display.addView(helper("Die Smartphone-App bleibt eine Vorschau der Wear-Bridge. AndroidAPS ist die Live-Datenquelle."))
         display.addView(switchRow("Therapiedetails anzeigen", "IOB, COB, Basal und Profil auf der Übersicht", prefs.showDetails, R.id.dashboard_details_switch, callbacks.setShowDetails))
-        display.addView(switchRow("Prognosen im Graph", "Nur vorhandene AAPS-predBGs, keine eigene Berechnung", prefs.showPredictions, R.id.dashboard_predictions_switch, callbacks.setShowPredictions))
-        display.addView(switchRow("Kompakte Übersicht", "Kleinere Graph-Tiles und Abstände", prefs.compact, R.id.dashboard_compact_switch, callbacks.setCompact))
-        display.addView(switchRow("Live-Benachrichtigung (One UI 8.5)", "Optionaler Android-16-Live-Status; auf anderen Systemen bleibt die normale Benachrichtigung aktiv", prefs.liveNotification, R.id.dashboard_live_notification_switch, callbacks.setLiveNotification))
+        display.addView(switchRow("AAPS-Prognosen anzeigen", "Nur vorhandene predBGs; Sugarlicious berechnet keine Therapieprognose", prefs.showPredictions, R.id.dashboard_predictions_switch, callbacks.setShowPredictions))
+        display.addView(switchRow("Kompakte Übersicht", "Dichte Darstellung für die Bridge-Übersicht", prefs.compact, R.id.dashboard_compact_switch, callbacks.setCompact))
+        display.addView(switchRow("Live-Benachrichtigung", "Optionaler Android-16-Live-Status; normale Benachrichtigung bleibt sonst aktiv", prefs.liveNotification, R.id.dashboard_live_notification_switch, callbacks.setLiveNotification))
+        display.addView(sectionLabel("Graph-Zeitraum"))
+        display.addView(chipRow(listOf(6, 12, 24).map { hours ->
+            Triple("$hours h", prefs.graphHours == hours) { callbacks.setGraphHours(hours) }
+        }))
         parent.addView(display, cardParams())
 
-        val graph = tile("GRAPH-ZEITRAUM")
-        graph.addView(chipRow(listOf(6, 12, 24).map { hours -> Triple("$hours h", prefs.graphHours == hours) { callbacks.setGraphHours(hours) } }))
-        graph.addView(helper("Der lokale Anzeigepuffer ist auf 24 Stunden und 300 Punkte begrenzt."))
-        parent.addView(graph, cardParams())
+        val nightscoutConfig = NightscoutConfigStore.load(context)
+        val nightscout = tile("NIGHTSCOUT · HISTORISCHER BACKFILL")
+        nightscout.addView(infoRow("Konfiguration", nightscoutConfig?.baseUrl ?: "nicht eingerichtet"))
+        nightscout.addView(infoRow("Access Token", if (nightscoutConfig?.accessToken != null) "verschlüsselt gespeichert" else "nicht gesetzt"))
+        nightscout.addView(infoRow("Status", backfillText(diagnostics)))
+        nightscout.addView(infoRow("Punkte im 24h-Puffer", diagnostics.historyBackfillPointCount.toString()))
+        nightscout.addView(infoRow("Letzter Backfill", diagnostics.historyBackfillReceivedAt.takeIf { it > 0L }.asDateTime()))
+        nightscout.addView(helper("Nightscout dient nur für 24h-Historie und Gap-Reparatur. Live-Daten kommen weiterhin aus AndroidAPS.", 3))
+        nightscout.addView(chipRow(listOf(
+            Triple(if (nightscoutConfig == null) "EINRICHTEN" else "BEARBEITEN", true) { callbacks.configureNightscout() },
+            Triple("24H AKTUALISIEREN", nightscoutConfig != null) { callbacks.syncNightscout() },
+        )))
+        parent.addView(nightscout, cardParams())
 
-        parent.addView(infoCard("VERBINDUNG", listOf(
-            "AndroidAPS" to diagnostics.sourceVersion.orDash(),
-            "Datenvertrag" to diagnostics.sourceContract.orDash(),
-            "Uhren erreichbar" to diagnostics.reachableWatches.toString(),
-            "Synchronisation" to syncText(diagnostics.syncStatus),
-            "24h-Historie" to backfillText(diagnostics),
-            "Backfill zuletzt" to diagnostics.historyBackfillReceivedAt.takeIf { it > 0L }.asDateTime(),
-        ), action = "JETZT SYNCHRONISIEREN" to callbacks.syncNow), cardParams())
+        parent.addView(infoCard("DIAGNOSE", listOf(
+            "AAPS-Paket" to diagnostics.sourcePackage.orDash(),
+            "AAPS-Version" to diagnostics.sourceVersion.orDash(),
+            "Vertrag" to diagnostics.sourceContract.orDash(),
+            "Schema" to (state?.schemaVersion?.toString() ?: "—"),
+            "Fähigkeiten" to (state?.capabilities?.size?.toString() ?: "0"),
+            "Letzter AAPS-Empfang" to diagnostics.receivedAt.takeIf { it > 0L }.asDateTime(),
+            "Letzter Messwert" to diagnostics.measuredAt.takeIf { it > 0L }.asDateTime(),
+            "Sync-Fehler" to diagnostics.syncError.orDash(),
+        ), action = "DIAGNOSE KOPIEREN" to callbacks.copyDiagnostics), cardParams())
 
         parent.addView(infoCard("DATENSCHUTZ & SICHERHEIT", listOf(
             "Betriebsart" to "strikt read-only",
-            "Übertragung" to "AAPS/Wear lokal · Nightscout nur lesend",
-            "Internet" to "nur für konfigurierten Nightscout-Backfill",
-            "Cloud / Telemetrie" to "keine Telemetrie · kein Upload durch Sugarlicious",
-            "Datenhaltung" to "letzter Zustand + begrenzter Graphpuffer",
+            "Datenweg" to "AndroidAPS → Sugarlicious → Wear OS",
+            "Nightscout" to "nur lesend für Historie / Gap-Reparatur",
+            "Cloud / Telemetrie" to "keine Sugarlicious-Telemetrie",
+            "Token" to "Android Keystore · AES/GCM",
         )), cardParams())
-        parent.addView(infoCard("UMFANG", listOf(
-            "Complication-Provider" to "27",
-            "WFF-Pakete" to "25",
-            "AAPS-Quelle" to (state?.sourceVersion ?: diagnostics.sourceVersion).orDash(),
-        )), cardParams())
+
         parent.addView(aboutCard(), cardParams(bottom = 10))
     }
 
@@ -459,7 +498,7 @@ class DashboardViewFactory(
             isClickable = true
             isFocusable = true
             foreground = selectableForeground()
-            setOnClickListener { callbacks.navigate(DashboardScreen.DATA) }
+            setOnClickListener { callbacks.navigate(DashboardScreen.WATCH) }
         }
     }
 

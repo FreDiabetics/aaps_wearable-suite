@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<complications>
+    <complication type="SHORT_TEXT">
+        <text><plain value="aktiv"/></text>
+        <title><plain value="LOOP"/></title>
+    </complication>
+    <complication type="LONG_TEXT">
+        <text><plain value="Loop aktiv"/></text>
+        <title><plain value="Loop-Status"/></title>
+    </complication>
+</complications>

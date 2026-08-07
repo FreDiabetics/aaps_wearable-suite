@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<complications>
+    <complication type="SHORT_TEXT">
+        <text><plain value="0.4U"/></text>
+        <title><plain value="BAS-IOB"/></title>
+    </complication>
+    <complication type="LONG_TEXT">
+        <text><plain value="Basal IOB 0.4 U"/></text>
+        <title><plain value="Basal IOB"/></title>
+    </complication>
+</complications>

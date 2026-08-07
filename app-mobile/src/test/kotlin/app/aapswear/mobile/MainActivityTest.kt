@@ -116,7 +116,7 @@ class MainActivityTest {
         assertNotNull(sectionPopup)
         val sectionPanel = sectionPopup!!.contentView as ViewGroup
         assertEquals(R.id.dropdown_panel, sectionPanel.id)
-        assertEquals(4, sectionPanel.childCount)
+        assertEquals(3, sectionPanel.childCount)
         assertNotNull(sectionPanel.findViewById<View>(R.id.dropdown_overview).background)
         assertEquals(activity.getColor(R.color.app_accent), sectionPanel.findViewById<TextView>(R.id.dropdown_overview).currentTextColor)
         sectionPanel.findViewById<View>(R.id.dropdown_settings).performClick()
@@ -126,7 +126,7 @@ class MainActivityTest {
 
         activity.findViewById<View>(R.id.more_button).performClick()
         val morePanel = activity.activeDropdown!!.contentView as ViewGroup
-        assertEquals(5, morePanel.childCount)
+        assertEquals(3, morePanel.childCount)
         assertNotNull(morePanel.findViewById<View>(R.id.dropdown_app_info).background)
         activity.activeDropdown?.dismiss()
 

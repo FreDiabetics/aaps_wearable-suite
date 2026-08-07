@@ -6,6 +6,7 @@ import kotlinx.serialization.json.Json
 object WearProtocol {
     const val STATE_PATH = "/aaps-display/v1/state"
     const val REQUEST_PATH = "/aaps-display/v1/request"
+    const val COMPLICATION_PRESET_PATH = "/aaps-display/v1/complication-preset"
     const val CAPABILITY = "aaps_display"
     private val json = Json { ignoreUnknownKeys = true; explicitNulls = false }
 

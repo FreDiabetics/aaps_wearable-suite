@@ -80,6 +80,9 @@ class MainActivity : ComponentActivity() {
             setCompact = { uiPreferences.edit { putBoolean("compact", it) } },
             setLiveNotification = ::setLiveNotification,
             syncNow = ::syncNow,
+            configureNightscout = { showNightscoutSetup(firstRun = false) },
+            syncNightscout = { syncNightscout(force = true) },
+            copyDiagnostics = ::copyDiagnostics,
             openContactEmail = ::openContactEmail,
             openGithub = ::openGithub,
         ))
@@ -148,8 +151,7 @@ class MainActivity : ComponentActivity() {
 
     private fun bindNavigation() {
         findViewById<View>(R.id.nav_overview).setOnClickListener { navigate(DashboardScreen.OVERVIEW) }
-        findViewById<View>(R.id.nav_history).setOnClickListener { navigate(DashboardScreen.HISTORY) }
-        findViewById<View>(R.id.nav_data).setOnClickListener { navigate(DashboardScreen.DATA) }
+        findViewById<View>(R.id.nav_watch).setOnClickListener { navigate(DashboardScreen.WATCH) }
         findViewById<View>(R.id.nav_settings).setOnClickListener { navigate(DashboardScreen.SETTINGS) }
     }
 
@@ -163,8 +165,7 @@ class MainActivity : ComponentActivity() {
     private fun updateNavigation() {
         val entries = listOf(
             DashboardScreen.OVERVIEW to Triple(R.id.nav_overview, R.id.nav_overview_icon, R.id.nav_overview_label),
-            DashboardScreen.HISTORY to Triple(R.id.nav_history, R.id.nav_history_icon, R.id.nav_history_label),
-            DashboardScreen.DATA to Triple(R.id.nav_data, R.id.nav_data_icon, R.id.nav_data_label),
+            DashboardScreen.WATCH to Triple(R.id.nav_watch, R.id.nav_watch_icon, R.id.nav_watch_label),
             DashboardScreen.SETTINGS to Triple(R.id.nav_settings, R.id.nav_settings_icon, R.id.nav_settings_label),
         )
         entries.forEach { (target, views) ->
@@ -197,19 +198,16 @@ class MainActivity : ComponentActivity() {
     private fun showSectionMenu(anchor: View) {
         showPillDropdown(anchor, alignEnd = false, listOf(
             PillMenuItem(R.id.dropdown_overview, "Übersicht", screen == DashboardScreen.OVERVIEW) { navigate(DashboardScreen.OVERVIEW) },
-            PillMenuItem(R.id.dropdown_history, "Verlauf", screen == DashboardScreen.HISTORY) { navigate(DashboardScreen.HISTORY) },
-            PillMenuItem(R.id.dropdown_data, "Daten", screen == DashboardScreen.DATA) { navigate(DashboardScreen.DATA) },
+            PillMenuItem(View.generateViewId(), "Watch", screen == DashboardScreen.WATCH) { navigate(DashboardScreen.WATCH) },
             PillMenuItem(R.id.dropdown_settings, "Einstellungen", screen == DashboardScreen.SETTINGS) { navigate(DashboardScreen.SETTINGS) },
         ))
     }
 
     private fun showMoreMenu(anchor: View) {
         showPillDropdown(anchor, alignEnd = true, listOf(
-            PillMenuItem(R.id.dropdown_sync, "Jetzt synchronisieren", action = ::syncNow),
-            PillMenuItem(View.generateViewId(), "Nightscout einrichten", action = { showNightscoutSetup(firstRun = false) }),
-            PillMenuItem(View.generateViewId(), "24h-Backfill aktualisieren", action = { syncNightscout(force = true) }),
+            PillMenuItem(R.id.dropdown_sync, "Jetzt an Watch senden", action = ::syncNow),
             PillMenuItem(R.id.dropdown_diagnostics, "Diagnose kopieren", action = ::copyDiagnostics),
-            PillMenuItem(R.id.dropdown_app_info, "Datenschutz & App-Info") { navigate(DashboardScreen.SETTINGS) },
+            PillMenuItem(R.id.dropdown_app_info, "Einstellungen & App-Info") { navigate(DashboardScreen.SETTINGS) },
         ))
     }
 
