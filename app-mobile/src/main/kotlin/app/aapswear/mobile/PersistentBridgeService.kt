@@ -71,7 +71,7 @@ class PersistentBridgeService : Service(), SharedPreferences.OnSharedPreferenceC
             .setColor(getColor(R.color.app_accent))
             .setContentTitle(if (liveCapable) "Sugarlicious Live-Status" else "Sugarlicious ist aktiv")
             .setContentText(if (liveCapable) liveStatusText() else "AndroidAPS-Empfang und Watch-Verbindung bleiben bereit")
-            .setSubText("Read-only · ausschließlich lokal")
+            .setSubText("Read-only Â· ausschlieÃŸlich lokal")
             .setCategory(Notification.CATEGORY_SERVICE)
             .setContentIntent(openApp)
             .setOngoing(true)
@@ -86,7 +86,7 @@ class PersistentBridgeService : Service(), SharedPreferences.OnSharedPreferenceC
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
             )
             val disableAction = Notification.Action.Builder(
-                Icon.createWithResource(this, R.drawable.frediabetics_mono),
+                Icon.createWithResource(this, R.drawable.ic_notification),
                 "Live beenden",
                 disableLive,
             ).build()
@@ -110,7 +110,7 @@ class PersistentBridgeService : Service(), SharedPreferences.OnSharedPreferenceC
             1 -> "Watch verbunden"
             else -> "$watches Watches verbunden"
         }
-        return "$aaps · $watch"
+        return "$aaps Â· $watch"
     }
 
     private fun createNotificationChannel() {
@@ -119,7 +119,7 @@ class PersistentBridgeService : Service(), SharedPreferences.OnSharedPreferenceC
             "Hintergrundverbindung",
             NotificationManager.IMPORTANCE_LOW,
         ).apply {
-            description = "Hält den lokalen AndroidAPS- und Wear-Datenempfang sichtbar aktiv"
+            description = "HÃ¤lt den lokalen AndroidAPS- und Wear-Datenempfang sichtbar aktiv"
             setSound(null, null)
             enableVibration(false)
             setShowBadge(false)

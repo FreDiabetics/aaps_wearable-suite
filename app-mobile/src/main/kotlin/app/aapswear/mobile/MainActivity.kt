@@ -1,7 +1,8 @@
 package app.aapswear.mobile
 
+import androidx.activity.ComponentActivity
+
 import android.Manifest
-import android.app.Activity
 import android.app.NotificationManager
 import android.content.ActivityNotFoundException
 import android.content.ClipData
@@ -40,7 +41,7 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeout
 
-class MainActivity : Activity() {
+class MainActivity : ComponentActivity() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private val diagnostics by lazy { getSharedPreferences("diagnostics", MODE_PRIVATE) }
     private val uiPreferences by lazy { getSharedPreferences("dashboard_ui", MODE_PRIVATE) }
@@ -162,7 +163,7 @@ class MainActivity : Activity() {
 
     private fun showSectionMenu(anchor: View) {
         showPillDropdown(anchor, alignEnd = false, listOf(
-            PillMenuItem(R.id.dropdown_overview, "Übersicht", screen == DashboardScreen.OVERVIEW) { navigate(DashboardScreen.OVERVIEW) },
+            PillMenuItem(R.id.dropdown_overview, "Ãœbersicht", screen == DashboardScreen.OVERVIEW) { navigate(DashboardScreen.OVERVIEW) },
             PillMenuItem(R.id.dropdown_history, "Verlauf", screen == DashboardScreen.HISTORY) { navigate(DashboardScreen.HISTORY) },
             PillMenuItem(R.id.dropdown_data, "Daten", screen == DashboardScreen.DATA) { navigate(DashboardScreen.DATA) },
             PillMenuItem(R.id.dropdown_settings, "Einstellungen", screen == DashboardScreen.SETTINGS) { navigate(DashboardScreen.SETTINGS) },
@@ -233,7 +234,7 @@ class MainActivity : Activity() {
     private fun syncNow() {
         val latest = state
         if (latest == null) {
-            Toast.makeText(this, "Noch keine gültigen AAPS-Daten vorhanden", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "Noch keine gÃ¼ltigen AAPS-Daten vorhanden", Toast.LENGTH_SHORT).show()
             return
         }
         diagnostics.edit().putString("lastSyncStatus", "pending").apply()
@@ -241,7 +242,7 @@ class MainActivity : Activity() {
             runCatching { withTimeout(4_000L) { publishState(applicationContext, latest) } }
                 .onSuccess {
                     diagnostics.edit().putLong("lastSyncAt", System.currentTimeMillis()).putString("lastSyncStatus", "ok").remove("lastSyncError").apply()
-                    Toast.makeText(this@MainActivity, "An Watch übertragen", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(this@MainActivity, "An Watch Ã¼bertragen", Toast.LENGTH_SHORT).show()
                 }
                 .onFailure { error ->
                     diagnostics.edit().putString("lastSyncStatus", "unavailable").putString("lastSyncError", error.javaClass.simpleName).apply()
@@ -255,7 +256,7 @@ class MainActivity : Activity() {
         PersistentBridgeService.refresh(this)
         if (!enabled) return
         if (Build.VERSION.SDK_INT < 36) {
-            Toast.makeText(this, "Live-Status benötigt Android 16; normale Benachrichtigung bleibt aktiv", Toast.LENGTH_LONG).show()
+            Toast.makeText(this, "Live-Status benÃ¶tigt Android 16; normale Benachrichtigung bleibt aktiv", Toast.LENGTH_LONG).show()
             return
         }
         val manager = getSystemService(NotificationManager::class.java)
@@ -274,13 +275,13 @@ class MainActivity : Activity() {
         val d = DiagnosticsSnapshot.read(diagnostics)
         val report = buildString {
             appendLine("Sugarlicious 0.5.1")
-            appendLine("Quelle: ${d.sourcePackage ?: "—"}")
-            appendLine("AAPS: ${d.sourceVersion ?: "—"}")
-            appendLine("Vertrag: ${d.sourceContract ?: "—"}")
-            appendLine("Schema: ${state?.schemaVersion ?: "—"}")
-            appendLine("Fähigkeiten: ${state?.capabilities?.size ?: 0}")
+            appendLine("Quelle: ${d.sourcePackage ?: "â€”"}")
+            appendLine("AAPS: ${d.sourceVersion ?: "â€”"}")
+            appendLine("Vertrag: ${d.sourceContract ?: "â€”"}")
+            appendLine("Schema: ${state?.schemaVersion ?: "â€”"}")
+            appendLine("FÃ¤higkeiten: ${state?.capabilities?.size ?: 0}")
             appendLine("Uhren erreichbar: ${d.reachableWatches}")
-            appendLine("Sync: ${d.syncStatus ?: "—"}")
+            appendLine("Sync: ${d.syncStatus ?: "â€”"}")
         }
         (getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager).setPrimaryClip(ClipData.newPlainText("Sugarlicious Diagnose", report))
         Toast.makeText(this, "Diagnose ohne Therapiewerte kopiert", Toast.LENGTH_SHORT).show()
