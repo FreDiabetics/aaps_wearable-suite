@@ -134,80 +134,25 @@ class DashboardViewFactory(
     }
 
     private fun renderOverview(parent: LinearLayout, state: TherapyDisplayState?, diagnostics: DiagnosticsSnapshot, prefs: DashboardUiPreferences, now: Long) {
-        val metrics = DashboardLayoutMetrics.forScreenHeight(context.resources.configuration.screenHeightDp)
-        val unit = prefs.unitFor(state)
-        val glucose = state?.glucose
-        val freshness = FreshnessPolicy.classify(glucose?.measuredAtEpochMs, now)
+        val composeView = androidx.compose.ui.platform.ComposeView(context).apply {
+            setViewCompositionStrategy(androidx.compose.ui.platform.ViewCompositionStrategy.DisposeOnDetachedFromWindow)
+            setContent {
+                app.aapswear.mobile.ui.theme.SugarliciousTheme {
+                    SugarliciousOverviewScreen(
+                        state = state,
+                        diagnostics = diagnostics,
+                        preferences = prefs,
+                        now = now,
+                        callbacks = callbacks,
+                    )
+                }
+            }
+        }
+        parent.addView(composeView, fullWidth())
+
+        val freshness = FreshnessPolicy.classify(state?.glucose?.measuredAtEpochMs, now)
         val current = freshness == Freshness.CURRENT || freshness == Freshness.DELAYED
-        val glucoseText = if (glucose != null && current) glucose(glucose.valueMgDl, unit) else "—"
-        val delta = if (glucose != null && current) signedDelta(glucose.deltaMgDl, unit).ifBlank { "—" } else "—"
-        val age = glucose?.measuredAtEpochMs?.let { "${((now - it).coerceAtLeast(0L) / 60_000L)} min" } ?: "—"
-        val glucoseMeta = buildList {
-            add(unitLabel(unit))
-            if (delta != "—") add(delta)
-            add(age)
-        }.joinToString(" · ")
-
-        val top = LinearLayout(context).apply {
-            orientation = LinearLayout.HORIZONTAL
-            isBaselineAligned = false
-        }
-        top.addView(
-            glucoseTile(
-                glucoseText = glucoseText,
-                trend = if (current) glucose?.trend ?: Trend.UNKNOWN else Trend.UNKNOWN,
-                sub = glucoseMeta,
-                valueColor = when {
-                    !current || glucose == null -> text
-                    glucose.valueMgDl in 80.0..160.0 -> text
-                    else -> context.getColor(R.color.app_red)
-                },
-                minHeightDp = metrics.summaryTileHeight,
-            ),
-            weightedTileParams(metrics.summaryTileHeight, weight = 1.45f),
-        )
-        top.addView(
-            summaryTile(
-                "ZIEL",
-                if (current) TherapyDisplayFormatter.target(state?.target, unit) else "—",
-                unitLabel(unit),
-                text,
-                valueSize = 17f,
-                minHeightDp = metrics.summaryTileHeight,
-            ),
-            weightedTileParams(metrics.summaryTileHeight, weight = 0.85f),
-        )
-        val loopSub = when (state?.loop?.status) {
-            "enacted" -> "Ausgeführt"
-            "suggested" -> "Vorschlag"
-            else -> "Nicht verfügbar"
-        }
-        top.addView(
-            summaryTile(
-                "STATUS",
-                "Loop",
-                loopSub,
-                text,
-                R.id.dashboard_source_status,
-                subColor = if (state?.loop != null && current) green else secondary,
-                minHeightDp = metrics.summaryTileHeight,
-            ),
-            weightedTileParams(metrics.summaryTileHeight, weight = 0.85f),
-        )
-        parent.addView(top, fullWidth())
-
-        parent.addView(glucoseGraphCard(state, prefs, compact = prefs.compact, chartHeightDp = metrics.glucoseChartHeight), cardParams())
-        parent.addView(metabolicGraphCard(state, prefs, compact = prefs.compact, chartHeightDp = metrics.metabolicChartHeight), cardParams())
-
-        if (prefs.showDetails) {
-            val stats = LinearLayout(context).apply { orientation = LinearLayout.HORIZONTAL; isBaselineAligned = false }
-            stats.addView(statTile("IOB", decimal(state.takeIf { current }?.insulin?.totalIob, 2), "IE", blue, metrics.statTileHeight), weightedTileParams(metrics.statTileHeight))
-            stats.addView(statTile("COB", decimal(state.takeIf { current }?.carbs?.cobGrams, 0), "g", orange, metrics.statTileHeight), weightedTileParams(metrics.statTileHeight))
-            stats.addView(statTile("BASAL", decimal(state.takeIf { current }?.basal?.currentUnitsPerHour, 2), "IE/h", cyan, metrics.statTileHeight), weightedTileParams(metrics.statTileHeight))
-            stats.addView(statTile("PROFIL", state.takeIf { current }?.profile?.name ?: "—", "Aktuell", purple, metrics.statTileHeight), weightedTileParams(metrics.statTileHeight))
-            parent.addView(stats, cardParams(top = if (prefs.compact) 4 else 8))
-        }
-        parent.addView(connectionCard(state, diagnostics, current), cardParams())
+        parent.addView(connectionCard(state, diagnostics, current), cardParams(top = 8))
     }
 
     private fun renderHistory(parent: LinearLayout, state: TherapyDisplayState?, prefs: DashboardUiPreferences) {
@@ -450,19 +395,72 @@ class DashboardViewFactory(
     }
 
     private fun connectionCard(state: TherapyDisplayState?, diagnostics: DiagnosticsSnapshot, current: Boolean): View {
-        val card = tile(null).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
-        card.addView(ImageView(context).apply { setImageResource(R.drawable.ic_watch); contentDescription = "Smartwatch" }, LinearLayout.LayoutParams(42.dp, 42.dp))
-        val center = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL; setPadding(10.dp, 0, 0, 0) }
-        center.addView(label("VERBINDUNG"))
         val connected = diagnostics.reachableWatches > 0 && diagnostics.syncStatus == "ok"
-        center.addView(value(if (connected) "●  Watch verbunden" else "○  Keine Watch erreichbar", if (connected) green else secondary, 15f))
-        card.addView(center, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
-        val battery = state.takeIf { current }?.device?.phoneBatteryPercent
-        card.addView(helper(battery?.let { "Telefon: $it%" } ?: syncText(diagnostics.syncStatus), 1))
-        card.addView(ImageView(context).apply { setImageResource(R.drawable.ic_chevron); contentDescription = "Verbindungsdetails" }, LinearLayout.LayoutParams(28.dp, 28.dp))
-        card.id = R.id.dashboard_sync_status
-        card.isClickable = true; card.isFocusable = true; card.foreground = selectableForeground(); card.setOnClickListener { callbacks.navigate(DashboardScreen.DATA) }
-        return card
+        val nightscoutText = when (diagnostics.historyBackfillStatus) {
+            "ok" -> "${diagnostics.historyBackfillPointCount} Punkte"
+            "not_configured" -> "nicht eingerichtet"
+            null -> "—"
+            else -> diagnostics.historyBackfillStatus.orDash()
+        }
+
+        return LinearLayout(context).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(14.dp, 9.dp, 14.dp, 9.dp)
+            minimumHeight = 54.dp
+            setBackgroundResource(R.drawable.bg_connection_strip)
+
+            addView(View(context).apply {
+                background = android.graphics.drawable.GradientDrawable().apply {
+                    shape = android.graphics.drawable.GradientDrawable.OVAL
+                    setColor(if (connected) green else secondary)
+                }
+            }, LinearLayout.LayoutParams(9.dp, 9.dp))
+
+            val center = LinearLayout(context).apply {
+                orientation = LinearLayout.VERTICAL
+                setPadding(10.dp, 0, 0, 0)
+                addView(value(if (connected) "Watch verbunden" else "Keine Watch erreichbar", text, 14f, maxLines = 1))
+                addView(helper(syncText(diagnostics.syncStatus), 1))
+            }
+            addView(center, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+
+            val right = LinearLayout(context).apply {
+                orientation = LinearLayout.VERTICAL
+                gravity = Gravity.END
+                addView(TextView(context).apply {
+                    text = "NIGHTSCOUT"
+                    textSize = 9f
+                    setTextColor(secondary)
+                    gravity = Gravity.END
+                    letterSpacing = 0.04f
+                })
+                addView(TextView(context).apply {
+                    text = nightscoutText
+                    textSize = 11f
+                    setTextColor(if (diagnostics.historyBackfillStatus == "ok") accent else secondary)
+                    gravity = Gravity.END
+                    maxLines = 1
+                })
+            }
+            addView(right)
+
+            val battery = state.takeIf { current }?.device?.phoneBatteryPercent
+            if (battery != null) {
+                addView(TextView(context).apply {
+                    text = "  $battery%"
+                    textSize = 11f
+                    setTextColor(secondary)
+                    gravity = Gravity.CENTER_VERTICAL
+                })
+            }
+
+            id = R.id.dashboard_sync_status
+            isClickable = true
+            isFocusable = true
+            foreground = selectableForeground()
+            setOnClickListener { callbacks.navigate(DashboardScreen.DATA) }
+        }
     }
 
     private fun infoCard(title: String, rows: List<Pair<String, String>>, action: Pair<String, () -> Unit>? = null): View = tile(title).apply {
