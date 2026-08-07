@@ -11,7 +11,6 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.LinearLayout
-import android.widget.Space
 import android.widget.Switch
 import android.widget.TextView
 import app.aapswear.model.Freshness
@@ -63,6 +62,10 @@ data class DiagnosticsSnapshot(
     val lastSyncAt: Long,
     val syncStatus: String?,
     val syncError: String?,
+    val historyBackfillStatus: String?,
+    val historyBackfillPointCount: Int,
+    val historyBackfillRequestedAt: Long,
+    val historyBackfillReceivedAt: Long,
 ) {
     companion object {
         fun read(preferences: SharedPreferences) = DiagnosticsSnapshot(
@@ -75,6 +78,10 @@ data class DiagnosticsSnapshot(
             lastSyncAt = preferences.getLong("lastSyncAt", 0L),
             syncStatus = preferences.getString("lastSyncStatus", null),
             syncError = preferences.getString("lastSyncError", null),
+            historyBackfillStatus = preferences.getString("historyBackfillStatus", null),
+            historyBackfillPointCount = preferences.getInt("historyBackfillPointCount", 0),
+            historyBackfillRequestedAt = preferences.getLong("historyBackfillRequestedAt", 0L),
+            historyBackfillReceivedAt = preferences.getLong("historyBackfillReceivedAt", 0L),
         )
     }
 }
@@ -126,6 +133,7 @@ class DashboardViewFactory(
     }
 
     private fun renderOverview(parent: LinearLayout, state: TherapyDisplayState?, diagnostics: DiagnosticsSnapshot, prefs: DashboardUiPreferences, now: Long) {
+        val metrics = DashboardLayoutMetrics.forScreenHeight(context.resources.configuration.screenHeightDp)
         val unit = prefs.unitFor(state)
         val glucose = state?.glucose
         val freshness = FreshnessPolicy.classify(glucose?.measuredAtEpochMs, now)
@@ -134,23 +142,23 @@ class DashboardViewFactory(
         val delta = if (glucose != null && current) signedDelta(glucose.deltaMgDl, unit).ifBlank { "—" } else "—"
         val age = glucose?.measuredAtEpochMs?.let { "${((now - it).coerceAtLeast(0L) / 60_000L)} min" } ?: "—"
         val top = LinearLayout(context).apply { orientation = LinearLayout.HORIZONTAL; isBaselineAligned = false }
-        top.addView(summaryTile("GLUKOSE", glucoseText, unitLabel(unit), green, R.id.dashboard_glucose, callbacks.cycleUnit), weightedTileParams())
+        top.addView(summaryTile("GLUKOSE", glucoseText, unitLabel(unit), green, R.id.dashboard_glucose, callbacks.cycleUnit, minHeightDp = metrics.summaryTileHeight), weightedTileParams(metrics.summaryTileHeight))
         val deltaWithUnit = if (delta == "—") delta else "$delta ${unitLabel(unit)}"
-        top.addView(summaryTile("TREND", if (current) TherapyDisplayFormatter.trendArrow(glucose?.trend ?: app.aapswear.model.Trend.UNKNOWN).ifBlank { "—" } else "—", "$deltaWithUnit\n$age", text), weightedTileParams())
-        top.addView(summaryTile("ZIEL", if (current) TherapyDisplayFormatter.target(state?.target, unit) else "—", unitLabel(unit), text, valueSize = 17f), weightedTileParams())
+        top.addView(summaryTile("TREND", if (current) TherapyDisplayFormatter.trendArrow(glucose?.trend ?: app.aapswear.model.Trend.UNKNOWN).ifBlank { "—" } else "—", "$deltaWithUnit\n$age", text, minHeightDp = metrics.summaryTileHeight), weightedTileParams(metrics.summaryTileHeight))
+        top.addView(summaryTile("ZIEL", if (current) TherapyDisplayFormatter.target(state?.target, unit) else "—", unitLabel(unit), text, valueSize = 17f, minHeightDp = metrics.summaryTileHeight), weightedTileParams(metrics.summaryTileHeight))
         val loopSub = when (state?.loop?.status) { "enacted" -> "Ausgeführt"; "suggested" -> "Vorschlag"; else -> "Nicht verfügbar" }
-        top.addView(summaryTile("STATUS", "Loop", loopSub, text, R.id.dashboard_source_status, subColor = if (state?.loop != null && current) green else secondary), weightedTileParams())
+        top.addView(summaryTile("STATUS", "Loop", loopSub, text, R.id.dashboard_source_status, subColor = if (state?.loop != null && current) green else secondary, minHeightDp = metrics.summaryTileHeight), weightedTileParams(metrics.summaryTileHeight))
         parent.addView(top, fullWidth())
 
-        parent.addView(glucoseGraphCard(state, prefs, compact = prefs.compact), cardParams())
-        parent.addView(metabolicGraphCard(state, prefs, compact = prefs.compact), cardParams())
+        parent.addView(glucoseGraphCard(state, prefs, compact = prefs.compact, chartHeightDp = metrics.glucoseChartHeight), cardParams())
+        parent.addView(metabolicGraphCard(state, prefs, compact = prefs.compact, chartHeightDp = metrics.metabolicChartHeight), cardParams())
 
         if (prefs.showDetails) {
             val stats = LinearLayout(context).apply { orientation = LinearLayout.HORIZONTAL; isBaselineAligned = false }
-            stats.addView(statTile("IOB", decimal(state.takeIf { current }?.insulin?.totalIob, 2), "IE", blue), weightedTileParams(84))
-            stats.addView(statTile("COB", decimal(state.takeIf { current }?.carbs?.cobGrams, 0), "g", orange), weightedTileParams(84))
-            stats.addView(statTile("BASAL", decimal(state.takeIf { current }?.basal?.currentUnitsPerHour, 2), "IE/h", cyan), weightedTileParams(84))
-            stats.addView(statTile("PROFIL", state.takeIf { current }?.profile?.name ?: "—", "Aktuell", purple), weightedTileParams(84))
+            stats.addView(statTile("IOB", decimal(state.takeIf { current }?.insulin?.totalIob, 2), "IE", blue, metrics.statTileHeight), weightedTileParams(metrics.statTileHeight))
+            stats.addView(statTile("COB", decimal(state.takeIf { current }?.carbs?.cobGrams, 0), "g", orange, metrics.statTileHeight), weightedTileParams(metrics.statTileHeight))
+            stats.addView(statTile("BASAL", decimal(state.takeIf { current }?.basal?.currentUnitsPerHour, 2), "IE/h", cyan, metrics.statTileHeight), weightedTileParams(metrics.statTileHeight))
+            stats.addView(statTile("PROFIL", state.takeIf { current }?.profile?.name ?: "—", "Aktuell", purple, metrics.statTileHeight), weightedTileParams(metrics.statTileHeight))
             parent.addView(stats, cardParams(top = if (prefs.compact) 4 else 8))
         }
         parent.addView(connectionCard(state, diagnostics, current), cardParams())
@@ -237,6 +245,8 @@ class DashboardViewFactory(
             "Datenvertrag" to diagnostics.sourceContract.orDash(),
             "Uhren erreichbar" to diagnostics.reachableWatches.toString(),
             "Synchronisation" to syncText(diagnostics.syncStatus),
+            "24h-Historie" to backfillText(diagnostics),
+            "Backfill zuletzt" to diagnostics.historyBackfillReceivedAt.takeIf { it > 0L }.asDateTime(),
         ), action = "JETZT SYNCHRONISIEREN" to callbacks.syncNow), cardParams())
 
         parent.addView(infoCard("DATENSCHUTZ & SICHERHEIT", listOf(
@@ -284,7 +294,7 @@ class DashboardViewFactory(
         })
     }
 
-    private fun glucoseGraphCard(state: TherapyDisplayState?, prefs: DashboardUiPreferences, compact: Boolean, large: Boolean = false): View {
+    private fun glucoseGraphCard(state: TherapyDisplayState?, prefs: DashboardUiPreferences, compact: Boolean, large: Boolean = false, chartHeightDp: Int? = null): View {
         val card = tile(null)
         val header = LinearLayout(context).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
         header.addView(sectionLabel("GLUKOSEVERLAUF"), LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
@@ -293,14 +303,14 @@ class DashboardViewFactory(
         card.addView(legendRow())
         card.addView(GlucoseDashboardChart(context).apply {
             bind(state, prefs.unitFor(state), prefs.showPredictions, prefs.graphHours)
-        }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, (if (large) 370 else if (compact) 160 else 220).dp))
+        }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, (chartHeightDp ?: if (large) 370 else if (compact) 160 else 220).dp))
         return card
     }
 
-    private fun metabolicGraphCard(state: TherapyDisplayState?, prefs: DashboardUiPreferences, compact: Boolean, large: Boolean = false): View {
+    private fun metabolicGraphCard(state: TherapyDisplayState?, prefs: DashboardUiPreferences, compact: Boolean, large: Boolean = false, chartHeightDp: Int? = null): View {
         val card = tile(null)
         card.addView(sectionLabel("INSULIN & KOHLENHYDRATE"))
-        card.addView(MetabolicDashboardChart(context).apply { bind(state, prefs.graphHours) }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, (if (large) 390 else if (compact) 175 else 245).dp))
+        card.addView(MetabolicDashboardChart(context).apply { bind(state, prefs.graphHours) }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, (chartHeightDp ?: if (large) 390 else if (compact) 175 else 245).dp))
         return card
     }
 
@@ -310,18 +320,18 @@ class DashboardViewFactory(
     }
 
     private fun legend(symbol: String, label: String, color: Int) = TextView(context).apply {
-        text = "$symbol  $label"; textSize = 10f; setTextColor(color); setPadding(0, 3.dp, 14.dp, 4.dp)
+        text = context.getString(R.string.legend_item, symbol, label); textSize = 10f; setTextColor(color); setPadding(0, 3.dp, 14.dp, 4.dp)
     }
 
-    private fun summaryTile(title: String, value: String, sub: String, valueColor: Int, id: Int = View.NO_ID, click: (() -> Unit)? = null, valueSize: Float = 26f, subColor: Int = secondary) = tile(null).apply {
+    private fun summaryTile(title: String, value: String, sub: String, valueColor: Int, id: Int = View.NO_ID, click: (() -> Unit)? = null, valueSize: Float = 26f, subColor: Int = secondary, minHeightDp: Int = 104) = tile(null).apply {
         if (id != View.NO_ID) this.id = id
-        minimumHeight = 104.dp
+        minimumHeight = minHeightDp.dp
         addView(label(title)); addView(value(value, valueColor, valueSize, maxLines = 1)); addView(helper(sub, maxLines = 2, color = subColor))
         if (click != null) { isClickable = true; isFocusable = true; foreground = selectableForeground(); setOnClickListener { click() } }
     }
 
-    private fun statTile(title: String, value: String, suffix: String, color: Int) = tile(null).apply {
-        minimumHeight = 84.dp; addView(label(title, color)); addView(value(value, text, 19f, maxLines = 1)); addView(helper(suffix, 1))
+    private fun statTile(title: String, value: String, suffix: String, color: Int, minHeightDp: Int = 84) = tile(null).apply {
+        minimumHeight = minHeightDp.dp; addView(label(title, color)); addView(value(value, text, 19f, maxLines = 1)); addView(helper(suffix, 1))
     }
 
     private fun connectionCard(state: TherapyDisplayState?, diagnostics: DiagnosticsSnapshot, current: Boolean): View {
@@ -398,5 +408,10 @@ class DashboardViewFactory(
     private fun Long?.asDateTime() = if (this == null || this <= 0L) "—" else DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT).format(Date(this))
     private fun remaining(end: Long?, now: Long) = end?.takeIf { it > now }?.let { "${(it - now) / 60_000L} min" } ?: "—"
     private fun syncText(status: String?) = when (status) { "ok" -> "übertragen"; "pending" -> "wird übertragen"; "unavailable" -> "keine Uhr erreichbar"; "invalid_payload" -> "ungültige Nachricht"; else -> "noch nicht versucht" }
+    private fun backfillText(diagnostics: DiagnosticsSnapshot) = when (diagnostics.historyBackfillStatus) {
+        "ok" -> "${diagnostics.historyBackfillPointCount} Punkte · 24 h synchronisiert"
+        "requested" -> "wird synchronisiert"
+        else -> "noch nicht konfiguriert"
+    }
     private val Int.dp get() = (this * density).toInt()
 }

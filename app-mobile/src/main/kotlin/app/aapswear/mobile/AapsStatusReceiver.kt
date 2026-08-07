@@ -1,17 +1,24 @@
 package app.aapswear.mobile
+
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
-import app.aapswear.datasource.aaps.AapsPayloadAdapter
+import androidx.core.content.edit
 import app.aapswear.datasource.aaps.AapsCapabilityDetector
+import app.aapswear.datasource.aaps.AapsPayloadAdapter
 import app.aapswear.model.TherapyDisplayState
 import app.aapswear.protocol.WearProtocol
 import app.aapswear.storage.TherapyStateStore
 import com.google.android.gms.wearable.PutDataRequest
 import com.google.android.gms.wearable.Wearable
-import kotlinx.coroutines.*
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.withTimeout
+import kotlin.time.Duration.Companion.seconds
 
 class AapsStatusReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
@@ -24,10 +31,10 @@ class AapsStatusReceiver : BroadcastReceiver() {
                 val now = System.currentTimeMillis()
                 val parsedState = intent.extras?.let { AapsPayloadAdapter.parse(it, now) }
                 if (parsedState == null) {
-                    app.diagnostics().edit()
-                        .putLong("invalidReceived", now)
-                        .putString("lastSyncStatus", "invalid_payload")
-                        .apply()
+                    app.diagnostics().edit {
+                        putLong("invalidReceived", now)
+                        putString("lastSyncStatus", "invalid_payload")
+                    }
                     return@launch
                 }
                 val installation = AapsCapabilityDetector.detectInstallation(app)
@@ -38,29 +45,29 @@ class AapsStatusReceiver : BroadcastReceiver() {
                 // Persistence is deliberately completed before Data Layer I/O. A phone
                 // without a paired watch must never lose a valid AAPS status broadcast.
                 store.save(displayState)
-                app.diagnostics().edit()
-                    .putLong("received", now)
-                    .putLong("measurement", displayState.glucose?.measuredAtEpochMs ?: 0L)
-                    .putString("contract", displayState.sourceContract)
-                    .putString("sourceVersion", displayState.sourceVersion)
-                    .putString("sourcePackage", installation?.packageName)
-                    .putLong("sourceVersionCode", installation?.versionCode ?: 0L)
-                    .putString("lastSyncStatus", "pending")
-                    .apply()
+                app.diagnostics().edit {
+                    putLong("received", now)
+                    putLong("measurement", displayState.glucose?.measuredAtEpochMs ?: 0L)
+                    putString("contract", displayState.sourceContract)
+                    putString("sourceVersion", displayState.sourceVersion)
+                    putString("sourcePackage", installation?.packageName)
+                    putLong("sourceVersionCode", installation?.versionCode ?: 0L)
+                    putString("lastSyncStatus", "pending")
+                }
 
                 runCatching {
-                    withTimeout(4_000L) { publishState(app, displayState) }
+                    withTimeout(4.seconds) { publishState(app, displayState) }
                 }.onSuccess {
-                    app.diagnostics().edit()
-                        .putLong("lastSyncAt", System.currentTimeMillis())
-                        .putString("lastSyncStatus", "ok")
-                        .remove("lastSyncError")
-                        .apply()
+                    app.diagnostics().edit {
+                        putLong("lastSyncAt", System.currentTimeMillis())
+                        putString("lastSyncStatus", "ok")
+                        remove("lastSyncError")
+                    }
                 }.onFailure { error ->
-                    app.diagnostics().edit()
-                        .putString("lastSyncStatus", "unavailable")
-                        .putString("lastSyncError", error.javaClass.simpleName)
-                        .apply()
+                    app.diagnostics().edit {
+                        putString("lastSyncStatus", "unavailable")
+                        putString("lastSyncError", error.javaClass.simpleName)
+                    }
                 }
             } finally {
                 pending.finish()
@@ -81,7 +88,7 @@ suspend fun publishState(context: Context, state: TherapyDisplayState) {
         )
         .await()
         .nodes
-    context.diagnostics().edit().putInt("reachableWatches", nodes.size).apply()
+    context.diagnostics().edit { putInt("reachableWatches", nodes.size) }
 }
 
 private fun Context.diagnostics() = getSharedPreferences("diagnostics", Context.MODE_PRIVATE)

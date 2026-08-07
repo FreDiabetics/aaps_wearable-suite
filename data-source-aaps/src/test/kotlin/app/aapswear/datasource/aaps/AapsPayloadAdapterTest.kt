@@ -13,4 +13,5 @@ class AapsPayloadAdapterTest {
  }
  @Test fun missingOptionalAndInvalidBatteryDoNotCrash() { val state=assertNotNull(AapsPayloadAdapter.parse(mapOf("glucoseMgdl" to 90.0,"glucoseTimeStamp" to 1L,"pumpBattery" to 150),2)); assertNull(state.pump); assertTrue(DataCapability.PUMP_BATTERY !in state.capabilities) }
  @Test fun rejectsImplausibleFutureTimestamp() { assertNull(AapsPayloadAdapter.parse(mapOf("glucoseMgdl" to 100.0,"glucoseTimeStamp" to 400_001L),100_000L)) }
+
 }

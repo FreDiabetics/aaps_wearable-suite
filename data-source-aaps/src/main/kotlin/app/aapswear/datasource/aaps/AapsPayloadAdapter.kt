@@ -5,7 +5,11 @@ import app.aapswear.model.*
 
 object AapsPayloadAdapter {
  const val ACTION = "info.nightscout.androidaps.status"
- fun parse(bundle: Bundle, receivedAtEpochMs: Long): TherapyDisplayState? = parse(bundle.keySet().associateWith { bundle.get(it) }, receivedAtEpochMs)
+
+ @Suppress("DEPRECATION")
+ fun parse(bundle: Bundle, receivedAtEpochMs: Long): TherapyDisplayState? =
+  parse(bundle.keySet().associateWith { key -> bundle.get(key) }, receivedAtEpochMs)
+
  fun parse(values: Map<String, Any?>, receivedAtEpochMs: Long): TherapyDisplayState? {
   if (!AapsPayloadValidator().isValid(values, receivedAtEpochMs)) return null
   val value = values.number("glucoseMgdl") ?: return null
@@ -44,6 +48,16 @@ object AapsPayloadAdapter {
    if(profile!=null)add(DataCapability.PROFILE); if(suggestedAt!=null||enactedAt!=null)add(DataCapability.LOOP); if(pumpStatus!=null)add(DataCapability.PUMP); if(reservoir!=null)add(DataCapability.RESERVOIR); if(pumpBattery!=null)add(DataCapability.PUMP_BATTERY); if(phoneBattery!=null)add(DataCapability.PHONE_BATTERY)
   }
   val detectedContract=AapsCapabilityDetector.detectContract(values).id
+  val loopState = if (suggestedAt != null || enactedAt != null) {
+   LoopState(
+    status = if (enactedAt != null) "enacted" else "suggested",
+    lastRunAtEpochMs = enactedAt ?: suggestedAt,
+    suggestedAtEpochMs = suggestedAt,
+    enactedAtEpochMs = enactedAt,
+    suggestedPayload = suggestedPayload,
+    enactedPayload = enactedPayload,
+   )
+  } else null
   return TherapyDisplayState(
    receivedAtEpochMs=receivedAtEpochMs, sourceContract=detectedContract,
    glucose=GlucoseState(value,unit,trend,measured,delta,averageDelta),
@@ -52,7 +66,7 @@ object AapsPayloadAdapter {
    carbs=if(cob!=null||futureCarbs!=null) CarbState(cob,futureCarbs) else null,
    basal=if(baseBasal!=null||tempStart!=null||tempAbsolute!=null||tempPercent!=null) BasalState(baseBasal,tempAbsolute,tempPercent,tempStart,tempDuration,tempStart?.let{s->tempDuration?.let{d->s+d*60_000}},values["tempBasalString"] as? String) else null,
    target=if(low!=null||high!=null) TargetState(low,high) else null,
-   loop=if(suggestedAt!=null||enactedAt!=null) LoopState(status=when{enactedAt!=null->"enacted";suggestedAt!=null->"suggested";else->null},lastRunAtEpochMs=enactedAt?:suggestedAt,suggestedAtEpochMs=suggestedAt,enactedAtEpochMs=enactedAt,suggestedPayload=suggestedPayload,enactedPayload=enactedPayload) else null,
+   loop=loopState,
    pump=if(pumpStatus!=null||reservoir!=null||pumpBattery!=null) PumpState(pumpStatus,reservoir,pumpBattery) else null,
    device=if(phoneBattery!=null||rigBattery!=null) DeviceState(phoneBattery,rigBattery) else null,
    profile=profile?.let{ProfileState(it)}, capabilities=caps

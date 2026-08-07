@@ -39,10 +39,11 @@
   gebaut oder verteilt.
 - Das DIY-Vorschaupaket ist entwicklersigniert, nicht für Store-Veröffentlichung
   produktionssigniert und deshalb noch kein freigegebenes Version-1-Release.
-- Der öffentliche AAPS-Broadcast liefert keinen historischen Graphen. Der neue
-  Smartphone-Verlauf baut sich daher erst nach Installation aus real
-  empfangenen Statusmeldungen auf und kann keine Zeit vor der Installation
-  rekonstruieren.
+- Stock-AAPS liefert im öffentlichen Companion-Broadcast keinen historischen
+  Graphen. Sugarlicious patcht AndroidAPS nicht. Bis ein separater read-only
+  Backfill-Kanal konfiguriert ist, baut sich der lokale Verlauf deshalb aus neu
+  empfangenen Statusmeldungen auf. Fehlende CGM-Werte werden niemals erfunden
+  oder interpoliert.
 - AAPS-`predBGs` werden nur dargestellt, wenn sie im Suggested-/Enacted-Payload
   vorhanden und gültig sind. Die App berechnet bewusst keine Ersatzprognosen.
 - Die Bildvorlage zeigt einen 24-Stunden-Insulin-Gesamtwert und einen Uhrenakku.

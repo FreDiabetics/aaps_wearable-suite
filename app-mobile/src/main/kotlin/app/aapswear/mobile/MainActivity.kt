@@ -1,7 +1,5 @@
 package app.aapswear.mobile
 
-import androidx.activity.ComponentActivity
-
 import android.Manifest
 import android.app.NotificationManager
 import android.content.ActivityNotFoundException
@@ -13,7 +11,6 @@ import android.content.SharedPreferences
 import android.content.pm.PackageManager
 import android.content.res.ColorStateList
 import android.graphics.Color
-import android.graphics.drawable.ColorDrawable
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -30,6 +27,10 @@ import android.widget.PopupWindow
 import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
+import androidx.activity.ComponentActivity
+import androidx.core.content.edit
+import androidx.core.graphics.drawable.toDrawable
+import androidx.core.net.toUri
 import app.aapswear.storage.TherapyStateStore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -40,6 +41,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeout
+import kotlin.time.Duration.Companion.seconds
 
 class MainActivity : ComponentActivity() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
@@ -68,11 +70,11 @@ class MainActivity : ComponentActivity() {
             navigate = ::navigate,
             cycleUnit = ::cycleUnit,
             cycleGraphHours = ::cycleGraphHours,
-            setGraphHours = { uiPreferences.edit().putInt("graphHours", it).apply() },
-            setUnit = { uiPreferences.edit().putString("unit", it.name).apply() },
-            setShowDetails = { uiPreferences.edit().putBoolean("showDetails", it).apply() },
-            setShowPredictions = { uiPreferences.edit().putBoolean("showPredictions", it).apply() },
-            setCompact = { uiPreferences.edit().putBoolean("compact", it).apply() },
+            setGraphHours = { uiPreferences.edit { putInt("graphHours", it) } },
+            setUnit = { uiPreferences.edit { putString("unit", it.name) } },
+            setShowDetails = { uiPreferences.edit { putBoolean("showDetails", it) } },
+            setShowPredictions = { uiPreferences.edit { putBoolean("showPredictions", it) } },
+            setCompact = { uiPreferences.edit { putBoolean("compact", it) } },
             setLiveNotification = ::setLiveNotification,
             syncNow = ::syncNow,
             openContactEmail = ::openContactEmail,
@@ -96,7 +98,7 @@ class MainActivity : ComponentActivity() {
         super.onStart()
         diagnostics.registerOnSharedPreferenceChangeListener(diagnosticsListener)
         uiPreferences.registerOnSharedPreferenceChangeListener(uiListener)
-        clockJob = scope.launch { while (true) { delay(30_000L); refresh() } }
+        clockJob = scope.launch { while (true) { delay(30.seconds); refresh() } }
         refresh()
     }
 
@@ -163,7 +165,7 @@ class MainActivity : ComponentActivity() {
 
     private fun showSectionMenu(anchor: View) {
         showPillDropdown(anchor, alignEnd = false, listOf(
-            PillMenuItem(R.id.dropdown_overview, "Ãœbersicht", screen == DashboardScreen.OVERVIEW) { navigate(DashboardScreen.OVERVIEW) },
+            PillMenuItem(R.id.dropdown_overview, "Übersicht", screen == DashboardScreen.OVERVIEW) { navigate(DashboardScreen.OVERVIEW) },
             PillMenuItem(R.id.dropdown_history, "Verlauf", screen == DashboardScreen.HISTORY) { navigate(DashboardScreen.HISTORY) },
             PillMenuItem(R.id.dropdown_data, "Daten", screen == DashboardScreen.DATA) { navigate(DashboardScreen.DATA) },
             PillMenuItem(R.id.dropdown_settings, "Einstellungen", screen == DashboardScreen.SETTINGS) { navigate(DashboardScreen.SETTINGS) },
@@ -209,7 +211,7 @@ class MainActivity : ComponentActivity() {
         }
         val menuWidth = 232.dp
         popup = PopupWindow(panel, menuWidth, ViewGroup.LayoutParams.WRAP_CONTENT, true).apply {
-            setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
+            setBackgroundDrawable(Color.TRANSPARENT.toDrawable())
             isOutsideTouchable = true
             elevation = 16.dp.toFloat()
             inputMethodMode = PopupWindow.INPUT_METHOD_NOT_NEEDED
@@ -223,40 +225,40 @@ class MainActivity : ComponentActivity() {
     private fun cycleUnit() {
         val current = DashboardUiPreferences.read(uiPreferences).unit
         val next = when (current) { DisplayUnitPreference.AAPS -> DisplayUnitPreference.MG_DL; DisplayUnitPreference.MG_DL -> DisplayUnitPreference.MMOL_L; DisplayUnitPreference.MMOL_L -> DisplayUnitPreference.AAPS }
-        uiPreferences.edit().putString("unit", next.name).apply()
+        uiPreferences.edit { putString("unit", next.name) }
     }
 
     private fun cycleGraphHours() {
         val current = DashboardUiPreferences.read(uiPreferences).graphHours
-        uiPreferences.edit().putInt("graphHours", when (current) { 6 -> 12; 12 -> 24; else -> 6 }).apply()
+        uiPreferences.edit { putInt("graphHours", when (current) { 6 -> 12; 12 -> 24; else -> 6 }) }
     }
 
     private fun syncNow() {
         val latest = state
         if (latest == null) {
-            Toast.makeText(this, "Noch keine gÃ¼ltigen AAPS-Daten vorhanden", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "Noch keine gültigen AAPS-Daten vorhanden", Toast.LENGTH_SHORT).show()
             return
         }
-        diagnostics.edit().putString("lastSyncStatus", "pending").apply()
+        diagnostics.edit { putString("lastSyncStatus", "pending") }
         scope.launch {
-            runCatching { withTimeout(4_000L) { publishState(applicationContext, latest) } }
+            runCatching { withTimeout(4.seconds) { publishState(applicationContext, latest) } }
                 .onSuccess {
-                    diagnostics.edit().putLong("lastSyncAt", System.currentTimeMillis()).putString("lastSyncStatus", "ok").remove("lastSyncError").apply()
-                    Toast.makeText(this@MainActivity, "An Watch Ã¼bertragen", Toast.LENGTH_SHORT).show()
+                    diagnostics.edit { putLong("lastSyncAt", System.currentTimeMillis()); putString("lastSyncStatus", "ok"); remove("lastSyncError") }
+                    Toast.makeText(this@MainActivity, "An Watch übertragen", Toast.LENGTH_SHORT).show()
                 }
                 .onFailure { error ->
-                    diagnostics.edit().putString("lastSyncStatus", "unavailable").putString("lastSyncError", error.javaClass.simpleName).apply()
+                    diagnostics.edit { putString("lastSyncStatus", "unavailable"); putString("lastSyncError", error.javaClass.simpleName) }
                     Toast.makeText(this@MainActivity, "Keine Watch erreichbar", Toast.LENGTH_SHORT).show()
                 }
         }
     }
 
     private fun setLiveNotification(enabled: Boolean) {
-        uiPreferences.edit().putBoolean(PersistentBridgeService.PREFERENCE_LIVE_NOTIFICATION, enabled).apply()
+        uiPreferences.edit { putBoolean(PersistentBridgeService.PREFERENCE_LIVE_NOTIFICATION, enabled) }
         PersistentBridgeService.refresh(this)
         if (!enabled) return
         if (Build.VERSION.SDK_INT < 36) {
-            Toast.makeText(this, "Live-Status benÃ¶tigt Android 16; normale Benachrichtigung bleibt aktiv", Toast.LENGTH_LONG).show()
+            Toast.makeText(this, "Live-Status benötigt Android 16; normale Benachrichtigung bleibt aktiv", Toast.LENGTH_LONG).show()
             return
         }
         val manager = getSystemService(NotificationManager::class.java)
@@ -275,20 +277,20 @@ class MainActivity : ComponentActivity() {
         val d = DiagnosticsSnapshot.read(diagnostics)
         val report = buildString {
             appendLine("Sugarlicious 0.5.1")
-            appendLine("Quelle: ${d.sourcePackage ?: "â€”"}")
-            appendLine("AAPS: ${d.sourceVersion ?: "â€”"}")
-            appendLine("Vertrag: ${d.sourceContract ?: "â€”"}")
-            appendLine("Schema: ${state?.schemaVersion ?: "â€”"}")
-            appendLine("FÃ¤higkeiten: ${state?.capabilities?.size ?: 0}")
+            appendLine("Quelle: ${d.sourcePackage ?: "—"}")
+            appendLine("AAPS: ${d.sourceVersion ?: "—"}")
+            appendLine("Vertrag: ${d.sourceContract ?: "—"}")
+            appendLine("Schema: ${state?.schemaVersion ?: "—"}")
+            appendLine("Fähigkeiten: ${state?.capabilities?.size ?: 0}")
             appendLine("Uhren erreichbar: ${d.reachableWatches}")
-            appendLine("Sync: ${d.syncStatus ?: "â€”"}")
+            appendLine("Sync: ${d.syncStatus ?: "—"}")
         }
-        (getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager).setPrimaryClip(ClipData.newPlainText("Sugarlicious Diagnose", report))
+        (getSystemService(CLIPBOARD_SERVICE) as ClipboardManager).setPrimaryClip(ClipData.newPlainText("Sugarlicious Diagnose", report))
         Toast.makeText(this, "Diagnose ohne Therapiewerte kopiert", Toast.LENGTH_SHORT).show()
     }
 
     private fun openGithub() {
-        openExternal(Intent(Intent.ACTION_VIEW, Uri.parse(getString(R.string.github_url))))
+        openExternal(Intent(Intent.ACTION_VIEW, getString(R.string.github_url).toUri()))
     }
 
     private fun openContactEmail() {

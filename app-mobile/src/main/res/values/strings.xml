@@ -10,4 +10,6 @@
     <string name="data">Daten</string>
     <string name="settings">Einstellungen</string>
     <string name="read_only">Nur Anzeige · read-only</string>
+    <string name="source_protected">Datenquelle geschützt</string>
+    <string name="legend_item">%1$s  %2$s</string>
 </resources>

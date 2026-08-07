@@ -43,11 +43,16 @@ Standardwerte und fehlen bei älteren Zuständen ohne Fehler.
 
 ## Anzeigeverlauf und Prognosen
 
-Der öffentliche Broadcast liefert keinen fertigen historischen Graphen. Die
-Mobile-App fügt deshalb ausschließlich die nacheinander real empfangenen
-Anzeigewerte zu einem begrenzten Verlauf zusammen: maximal 24 Stunden und 300
-Zeitpunkte, dedupliziert nach Messzeit. IOB, COB und Basal werden nur dann als
-Verlaufspunkt gespeichert, wenn der Broadcast den jeweiligen Wert enthält.
+Der unveränderte öffentliche AAPS-Broadcast liefert keinen fertigen historischen
+Graphen. Sugarlicious bleibt deshalb vollständig mit Stock-AAPS kompatibel und
+sammelt nacheinander real empfangene Anzeigewerte lokal: maximal 24 Stunden und
+300 Zeitpunkte, dedupliziert nach Messzeit. IOB, COB und Basal werden nur dann
+als Verlaufspunkt gespeichert, wenn der Broadcast den jeweiligen Wert enthält.
+
+Sugarlicious erweitert oder patcht AndroidAPS ausdrücklich nicht. Ein separater
+Backfill-Kanal darf ausschließlich bereits vorhandene historische Messwerte aus
+einer externen read-only Quelle ergänzen; erfundene oder interpolierte CGM-Werte
+sind nicht zulässig.
 
 Prognosen werden nicht lokal berechnet. Der Adapter liest optional das
 `predBGs`-Objekt aus dem vorhandenen Suggested-, ersatzweise Enacted-JSON,

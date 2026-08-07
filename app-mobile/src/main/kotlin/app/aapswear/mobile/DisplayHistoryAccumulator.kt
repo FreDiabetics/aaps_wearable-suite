@@ -8,6 +8,13 @@ import app.aapswear.model.TherapyHistorySample
 internal object DisplayHistoryAccumulator {
     const val WINDOW_MS = 24 * 60 * 60_000L
     const val MAX_POINTS = 300
+    const val GAP_THRESHOLD_MS = 7 * 60_000L + 30_000L
+
+    /** True when two persisted CGM points are farther apart than a normal 5-minute cycle. */
+    fun hasGap(history: List<GlucoseSample>): Boolean =
+        history.zipWithNext().any { (first, second) ->
+            second.measuredAtEpochMs - first.measuredAtEpochMs > GAP_THRESHOLD_MS
+        }
 
     fun merge(
         previous: TherapyDisplayState?,

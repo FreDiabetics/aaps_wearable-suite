@@ -1,15 +1,19 @@
 package app.aapswear.mobile
 
 import app.aapswear.model.CarbState
+import app.aapswear.model.GlucoseSample
 import app.aapswear.model.GlucoseState
 import app.aapswear.model.GlucoseUnit
 import app.aapswear.model.InsulinState
 import app.aapswear.model.TherapyDisplayState
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class DisplayHistoryAccumulatorTest {
-    @Test fun `deduplicates and bounds display history`() {
+    @Test
+    fun `deduplicates and bounds display history`() {
         val now = 2 * DisplayHistoryAccumulator.WINDOW_MS
         fun state(at: Long, glucose: Double) = TherapyDisplayState(
             receivedAtEpochMs = at,
@@ -25,5 +29,38 @@ class DisplayHistoryAccumulatorTest {
         val replaced = DisplayHistoryAccumulator.merge(second, state(now, 125.0), now)
         assertEquals(listOf(125.0), replaced.glucoseHistory.map { it.valueMgDl })
         assertEquals(1.25, replaced.therapyHistory.single().totalIob!!, 0.001)
+    }
+
+    @Test
+    fun `incoming backfill samples close an existing graph gap`() {
+        val minute = 60_000L
+        val now = 1000 * minute
+        val previous = TherapyDisplayState(
+            receivedAtEpochMs = now - 10 * minute,
+            glucose = GlucoseState(140.0, GlucoseUnit.MG_DL, measuredAtEpochMs = now - 10 * minute),
+            glucoseHistory = listOf(
+                GlucoseSample(120.0, now - 25 * minute),
+                GlucoseSample(140.0, now - 10 * minute),
+            ),
+        )
+        assertTrue(DisplayHistoryAccumulator.hasGap(previous.glucoseHistory))
+
+        val current = TherapyDisplayState(
+            receivedAtEpochMs = now,
+            glucose = GlucoseState(150.0, GlucoseUnit.MG_DL, measuredAtEpochMs = now),
+            glucoseHistory = listOf(
+                GlucoseSample(125.0, now - 20 * minute),
+                GlucoseSample(132.0, now - 15 * minute),
+                GlucoseSample(145.0, now - 5 * minute),
+            ),
+        )
+
+        val merged = DisplayHistoryAccumulator.merge(previous, current, now)
+
+        assertEquals(
+            listOf(-25L, -20L, -15L, -10L, -5L, 0L),
+            merged.glucoseHistory.map { (it.measuredAtEpochMs - now) / minute },
+        )
+        assertFalse(DisplayHistoryAccumulator.hasGap(merged.glucoseHistory))
     }
 }

@@ -9,11 +9,12 @@ The existing XML/View dashboard remains active, so this change is intentionally 
 
 - Compose Compiler Gradle plugin matching Kotlin `2.4.10`
 - Compose build feature in `:app-mobile`
-- Stable Compose BOM `2026.06.00`
+- Stable Compose BOM `2026.06.01`
 - Activity Compose `1.13.0`
 - Compose UI, Foundation, Material 3, preview/tooling dependencies
-- `SugarliciousTheme` matching the current dark Sugarlicious palette
-- Shared Compose spacing/icon-size tokens
+- centralized `SugarliciousColors`, `SugarliciousTypography`, `SugarliciousShapes` and `SugarliciousTheme`
+- shared Compose spacing, component, radius and icon-size tokens
+- matching XML color/dimension tokens while legacy Views remain active
 - `ComposeView.setSugarliciousContent(...)` interoperability bridge
 - A preview-only Compose foundation card to verify Android Studio previews
 
@@ -21,6 +22,10 @@ The existing XML/View dashboard remains active, so this change is intentionally 
 
 `MainActivity` now extends `ComponentActivity`. Its current XML layout and View-based behavior are unchanged.
 This gives Compose screens and `ComposeView` sections a lifecycle-aware host during the gradual migration.
+
+## Responsive overview baseline
+
+While the overview is still View-based, `DashboardLayoutMetrics` selects a compact logical-dp height profile from the current window height. The large-phone profile is budgeted to fit the full overview between the fixed top and bottom bars without requiring vertical scrolling; changing Samsung FHD+/QHD+ render resolution does not depend on raw pixels.
 
 ## Next migration step
 

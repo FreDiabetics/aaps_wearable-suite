@@ -7,6 +7,7 @@
         <item name="android:colorAccent">@color/app_accent</item>
         <item name="android:windowBackground">@color/app_background</item>
     </style>
+
     <style name="NavItem">
         <item name="android:layout_width">0dp</item>
         <item name="android:layout_height">match_parent</item>
@@ -17,16 +18,18 @@
         <item name="android:clickable">true</item>
         <item name="android:focusable">true</item>
     </style>
+
     <style name="NavIcon">
-        <item name="android:layout_width">27dp</item>
-        <item name="android:layout_height">27dp</item>
+        <item name="android:layout_width">@dimen/navigation_icon_size</item>
+        <item name="android:layout_height">@dimen/navigation_icon_size</item>
         <item name="android:layout_marginBottom">3dp</item>
     </style>
+
     <style name="NavLabel">
         <item name="android:layout_width">wrap_content</item>
         <item name="android:layout_height">wrap_content</item>
         <item name="android:textColor">@color/app_text_secondary</item>
-        <item name="android:textSize">11sp</item>
+        <item name="android:textSize">@dimen/text_nav_label</item>
         <item name="android:maxLines">1</item>
     </style>
 </resources>
