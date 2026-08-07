@@ -38,7 +38,6 @@ import app.aapswear.mobile.ui.theme.SugarliciousColors
 import app.aapswear.model.Freshness
 import app.aapswear.model.FreshnessPolicy
 import app.aapswear.model.GlucoseUnit
-import app.aapswear.model.TherapyDisplayFormatter
 import app.aapswear.model.TherapyDisplayState
 import app.aapswear.model.Trend
 import java.util.Locale
@@ -62,17 +61,13 @@ internal fun SugarliciousOverviewScreen(
     val glucoseText = if (displayable && glucose != null) formatGlucose(glucose.valueMgDl, unit) else "—"
     val glucoseColor = when {
         !displayable || glucose == null -> SugarliciousColors.TextPrimary
-        glucose.valueMgDl in 80.0..160.0 -> SugarliciousColors.TextPrimary
-        else -> SugarliciousColors.Red
+        glucose.valueMgDl < 80.0 -> SugarliciousColors.Red
+        glucose.valueMgDl > 160.0 -> Color(0xFFFFD040)
+        else -> SugarliciousColors.TextPrimary
     }
     val delta = if (displayable) formatDelta(glucose?.deltaMgDl, unit) else "—"
     val age = glucose?.measuredAtEpochMs?.let { "${((now - it).coerceAtLeast(0L) / 60_000L)} min" } ?: "—"
-    val target = TherapyDisplayFormatter.target(state?.target, unit)
-    val loopText = when (state?.loop?.status) {
-        "enacted" -> "Loop aktiv"
-        "suggested" -> "Loop Vorschlag"
-        else -> "Loop —"
-    }
+    val tirStats = calculateTirStats(state, now)
 
     Column(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 2.dp, vertical = 2.dp),
@@ -85,11 +80,8 @@ internal fun SugarliciousOverviewScreen(
             delta = delta,
             age = age,
             unitLabel = unitLabel(unit),
-            target = target,
-            loopText = loopText,
-            freshness = freshness,
-            sourceAvailable = diagnostics.sourceVersion != null,
-            heightDp = maxOf(metrics.summaryTileHeight + 28, 108),
+            tirStats = tirStats,
+            heightDp = maxOf(metrics.summaryTileHeight + 48, 136),
             onClick = callbacks.cycleUnit,
         )
 
@@ -100,14 +92,14 @@ internal fun SugarliciousOverviewScreen(
         GlucoseGraphSurface(
             state = state,
             preferences = preferences,
-            chartHeightDp = maxOf(metrics.glucoseChartHeight - 42, 86),
+            chartHeightDp = maxOf(metrics.glucoseChartHeight - 10, 108),
             onHoursClick = callbacks.cycleGraphHours,
         )
 
         MetabolicGraphSurface(
             state = state,
             preferences = preferences,
-            chartHeightDp = maxOf(metrics.metabolicChartHeight - 32, 82),
+            chartHeightDp = maxOf(metrics.metabolicChartHeight - 18, 96),
         )
     }
 }
@@ -120,25 +112,11 @@ private fun GlucoseHeroCard(
     delta: String,
     age: String,
     unitLabel: String,
-    target: String,
-    loopText: String,
-    freshness: Freshness,
-    sourceAvailable: Boolean,
+    tirStats: TirStats,
     heightDp: Int,
     onClick: () -> Unit,
 ) {
     val shape = RoundedCornerShape(28.dp)
-    val freshnessLabel = when (freshness) {
-        Freshness.CURRENT -> "LIVE"
-        Freshness.DELAYED -> "VERZÖGERT"
-        Freshness.STALE -> "ALT"
-        Freshness.NO_DATA -> "KEINE DATEN"
-    }
-    val freshnessColor = when (freshness) {
-        Freshness.CURRENT -> SugarliciousColors.Primary
-        Freshness.DELAYED -> SugarliciousColors.Yellow
-        Freshness.STALE, Freshness.NO_DATA -> SugarliciousColors.Red
-    }
 
     Box(
         modifier = Modifier
@@ -159,90 +137,171 @@ private fun GlucoseHeroCard(
             modifier = Modifier.fillMaxSize(),
             verticalArrangement = Arrangement.SpaceBetween,
         ) {
-            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    text = "GLUKOSE",
-                    color = SugarliciousColors.TextSecondary,
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    letterSpacing = 0.8.sp,
-                )
-                Spacer(Modifier.weight(1f))
-                StatusPill(
-                    text = if (sourceAvailable) "AAPS" else "AAPS —",
-                    foreground = if (sourceAvailable) SugarliciousColors.Primary else SugarliciousColors.TextSecondary,
-                )
-                Spacer(Modifier.width(6.dp))
-                StatusPill(text = freshnessLabel, foreground = freshnessColor)
-            }
+            Text(
+                text = "GLUKOSE",
+                color = SugarliciousColors.TextSecondary,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.SemiBold,
+                letterSpacing = 0.8.sp,
+            )
 
-            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    text = glucoseText,
-                    color = glucoseColor,
-                    fontSize = 40.sp,
-                    lineHeight = 42.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    letterSpacing = (-0.8).sp,
-                )
-                Spacer(Modifier.width(5.dp))
-                TrendIndicator(trend)
-                Spacer(Modifier.weight(1f))
-                DeltaPill(delta)
-            }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.Center,
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            text = glucoseText,
+                            color = glucoseColor,
+                            fontSize = 42.sp,
+                            lineHeight = 44.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            letterSpacing = (-0.8).sp,
+                        )
+                        Spacer(Modifier.width(6.dp))
+                        TrendIndicator(trend)
+                    }
 
-            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    text = "$age · $unitLabel",
-                    color = SugarliciousColors.TextSecondary,
-                    fontSize = 11.sp,
+                    Spacer(Modifier.height(5.dp))
+
+                    Text(
+                        text = "Δ $delta · $age · $unitLabel",
+                        color = SugarliciousColors.TextSecondary,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium,
+                    )
+                }
+
+                Spacer(Modifier.width(14.dp))
+
+                TirProgressColumn(
+                    stats = tirStats,
+                    modifier = Modifier.width(148.dp),
                 )
-                Spacer(Modifier.weight(1f))
-                MetaPill("Ziel $target")
-                Spacer(Modifier.width(5.dp))
-                MetaPill(loopText)
             }
         }
     }
 }
 
+private data class TirStats(
+    val inRange: Int?,
+    val below: Int?,
+    val above: Int?,
+)
+
+private fun calculateTirStats(
+    state: TherapyDisplayState?,
+    now: Long,
+): TirStats {
+    val start = now - 24L * 60L * 60_000L
+    val samples = buildList {
+        addAll(state?.glucoseHistory.orEmpty())
+        state?.glucose?.let {
+            add(
+                app.aapswear.model.GlucoseSample(
+                    valueMgDl = it.valueMgDl,
+                    measuredAtEpochMs = it.measuredAtEpochMs,
+                ),
+            )
+        }
+    }
+        .filter {
+            it.measuredAtEpochMs in start..(now + 5 * 60_000L) &&
+                it.valueMgDl in 20.0..1000.0
+        }
+        .associateBy { it.measuredAtEpochMs }
+        .values
+
+    if (samples.isEmpty()) {
+        return TirStats(null, null, null)
+    }
+
+    val total = samples.size.toDouble()
+    val below = samples.count { it.valueMgDl < 80.0 }
+    val inRange = samples.count { it.valueMgDl in 80.0..160.0 }
+    val above = samples.count { it.valueMgDl > 160.0 }
+
+    return TirStats(
+        inRange = (inRange / total * 100.0).roundToInt(),
+        below = (below / total * 100.0).roundToInt(),
+        above = (above / total * 100.0).roundToInt(),
+    )
+}
+
 @Composable
-private fun StatusPill(text: String, foreground: Color) {
-    Surface(shape = RoundedCornerShape(999.dp), color = SugarliciousColors.SurfaceRaised.copy(alpha = 0.92f)) {
+private fun TirProgressColumn(
+    stats: TirStats,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier,
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        TirProgress(Modifier.fillMaxWidth(), "TIR 24H", stats.inRange, SugarliciousColors.Primary)
+        TirProgress(Modifier.fillMaxWidth(), "<80", stats.below, SugarliciousColors.Red)
+        TirProgress(Modifier.fillMaxWidth(), ">160", stats.above, SugarliciousColors.Orange)
+    }
+}
+
+@Composable
+private fun TirProgress(
+    modifier: Modifier,
+    label: String,
+    percent: Int?,
+    accent: Color,
+) {
+    val progress = ((percent ?: 0).coerceIn(0, 100) / 100f)
+
+    Column(
+        modifier = modifier,
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
         Row(
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+            modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Box(Modifier.size(6.dp).background(foreground, CircleShape))
-            Spacer(Modifier.width(5.dp))
-            Text(text = text, color = foreground, fontSize = 9.sp, fontWeight = FontWeight.SemiBold)
+            Text(
+                text = label,
+                color = SugarliciousColors.TextSecondary,
+                fontSize = 9.sp,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Spacer(Modifier.weight(1f))
+            Text(
+                text = percent?.let { "$it%" } ?: "—",
+                color = SugarliciousColors.TextPrimary,
+                fontSize = 10.sp,
+                fontWeight = FontWeight.SemiBold,
+            )
         }
-    }
-}
 
-@Composable
-private fun DeltaPill(delta: String) {
-    Surface(shape = RoundedCornerShape(999.dp), color = SugarliciousColors.SurfaceRaised) {
-        Text(
-            text = delta,
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-            color = SugarliciousColors.TextPrimary,
-            fontSize = 13.sp,
-            fontWeight = FontWeight.Medium,
-        )
-    }
-}
-
-@Composable
-private fun MetaPill(text: String) {
-    Surface(shape = RoundedCornerShape(999.dp), color = SugarliciousColors.SurfaceHigh) {
-        Text(
-            text = text,
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-            color = SugarliciousColors.TextSecondary,
-            fontSize = 10.sp,
-            maxLines = 1,
-        )
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(10.dp)
+                .background(
+                    SugarliciousColors.SurfaceRaised,
+                    RoundedCornerShape(999.dp),
+                ),
+        ) {
+            if (progress > 0f) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth(progress)
+                        .height(10.dp)
+                        .background(
+                            accent,
+                            RoundedCornerShape(999.dp),
+                        ),
+                )
+            }
+        }
     }
 }
 
@@ -258,24 +317,39 @@ private fun TrendIndicator(trend: Trend) {
     }
     val copies = if (trend == Trend.DOUBLE_UP || trend == Trend.DOUBLE_DOWN) 2 else 1
 
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy((-4).dp)) {
-        repeat(copies) {
-            Image(
-                painter = painterResource(R.drawable.ic_trend_arrow),
-                contentDescription = null,
-                modifier = Modifier.size(16.dp).graphicsLayer(rotationZ = rotation),
-            )
+    Box(
+        modifier = Modifier.height(44.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy((-4).dp),
+        ) {
+            repeat(copies) {
+                Image(
+                    painter = painterResource(R.drawable.ic_trend_arrow),
+                    contentDescription = null,
+                    modifier = Modifier
+                        .size(28.dp)
+                        .graphicsLayer(
+                            rotationZ = rotation,
+                            translationY = 0f,
+                        ),
+                )
+            }
         }
     }
 }
 
 @Composable
-private fun QuickStatsRow(state: TherapyDisplayState?, heightDp: Int) {
-    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+private fun QuickStatsRow(
+    state: TherapyDisplayState?,
+    heightDp: Int,
+) {
+    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         QuickStatCard(Modifier.weight(1f), "IOB", formatNumber(state?.insulin?.totalIob, 2), "IE", SugarliciousColors.Blue, heightDp)
         QuickStatCard(Modifier.weight(1f), "COB", formatNumber(state?.carbs?.cobGrams, 0), "g", SugarliciousColors.Orange, heightDp)
         QuickStatCard(Modifier.weight(1f), "BASAL", formatNumber(state?.basal?.currentUnitsPerHour, 2), "IE/h", SugarliciousColors.Secondary, heightDp)
-        QuickStatCard(Modifier.weight(1f), "PROFIL", state?.profile?.name ?: "—", "Aktuell", SugarliciousColors.Purple, heightDp)
     }
 }
 
@@ -294,23 +368,34 @@ private fun QuickStatCard(
             .height(heightDp.dp)
             .background(SugarliciousColors.Surface, shape)
             .border(1.dp, SugarliciousColors.Border.copy(alpha = 0.72f), shape)
-            .padding(horizontal = 10.dp, vertical = 8.dp),
+            .padding(horizontal = 11.dp, vertical = 8.dp),
         verticalArrangement = Arrangement.SpaceBetween,
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.size(6.dp).background(accent, CircleShape))
-            Spacer(Modifier.width(5.dp))
-            Text(text = title, color = SugarliciousColors.TextSecondary, fontSize = 9.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
+            Box(Modifier.size(7.dp).background(accent, CircleShape))
+            Spacer(Modifier.width(6.dp))
+            Text(
+                text = title,
+                color = SugarliciousColors.TextSecondary,
+                fontSize = 10.sp,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+            )
         }
         Text(
             text = value,
             color = SugarliciousColors.TextPrimary,
-            fontSize = 16.sp,
+            fontSize = 20.sp,
             fontWeight = FontWeight.SemiBold,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
-        Text(text = suffix, color = SugarliciousColors.TextSecondary, fontSize = 9.sp, maxLines = 1)
+        Text(
+            text = suffix,
+            color = SugarliciousColors.TextSecondary,
+            fontSize = 10.sp,
+            maxLines = 1,
+        )
     }
 }
 
@@ -323,29 +408,29 @@ private fun GlucoseGraphSurface(
 ) {
     OverviewSurface {
         Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Column {
-                Text("Glukoseverlauf", color = SugarliciousColors.TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
-                Text("CGM · Nightscout Backfill · AAPS Prognose", color = SugarliciousColors.TextSecondary, fontSize = 9.sp)
-            }
+            Text(
+                "Glukoseverlauf",
+                color = SugarliciousColors.TextPrimary,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.SemiBold,
+            )
             Spacer(Modifier.weight(1f))
             Surface(
                 modifier = Modifier.clickable(onClick = onHoursClick),
                 shape = RoundedCornerShape(999.dp),
-                color = SugarliciousColors.SurfaceRaised,
+                color = SugarliciousColors.Surface,
             ) {
                 Text(
                     "${preferences.graphHours} h",
-                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
-                    color = SugarliciousColors.Primary,
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                    color = SugarliciousColors.TextSecondary,
+                    fontSize = 9.sp,
+                    fontWeight = FontWeight.Medium,
                 )
             }
         }
 
         Spacer(Modifier.height(5.dp))
-        GraphLegend()
-        Spacer(Modifier.height(2.dp))
 
         AndroidView(
             modifier = Modifier.fillMaxWidth().height(chartHeightDp.dp).clip(RoundedCornerShape(16.dp)),
@@ -363,15 +448,17 @@ private fun MetabolicGraphSurface(
 ) {
     OverviewSurface {
         Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Column {
-                Text("Insulin & Kohlenhydrate", color = SugarliciousColors.TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
-                Text("IOB und COB im selben Zeitfenster", color = SugarliciousColors.TextSecondary, fontSize = 9.sp)
-            }
+            Text(
+                "Insulin & Kohlenhydrate",
+                color = SugarliciousColors.TextPrimary,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.SemiBold,
+            )
             Spacer(Modifier.weight(1f))
-            Text("${preferences.graphHours} h", color = SugarliciousColors.TextSecondary, fontSize = 10.sp)
+            Text("${preferences.graphHours} h", color = SugarliciousColors.TextSecondary, fontSize = 9.sp)
         }
 
-        Spacer(Modifier.height(4.dp))
+        Spacer(Modifier.height(2.dp))
 
         AndroidView(
             modifier = Modifier.fillMaxWidth().height(chartHeightDp.dp).clip(RoundedCornerShape(16.dp)),

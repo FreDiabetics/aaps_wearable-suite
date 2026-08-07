@@ -261,7 +261,13 @@ class MainActivity : ComponentActivity() {
 
     private fun cycleGraphHours() {
         val current = DashboardUiPreferences.read(uiPreferences).graphHours
-        uiPreferences.edit { putInt("graphHours", when (current) { 6 -> 12; 12 -> 24; else -> 6 }) }
+        val next = when (current) {
+            3 -> 6
+            6 -> 12
+            12 -> 24
+            else -> 3
+        }
+        uiPreferences.edit().putInt("graphHours", next).apply()
     }
 
     private fun syncNow() {

@@ -30,9 +30,15 @@ class GlucoseDashboardChart @JvmOverloads constructor(
     attrs: AttributeSet? = null,
 ) : View(context, attrs) {
     private val density = resources.displayMetrics.density
-    private val linePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeCap = Paint.Cap.ROUND; strokeJoin = Paint.Join.ROUND }
+    private val linePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+        strokeCap = Paint.Cap.ROUND
+        strokeJoin = Paint.Join.ROUND
+    }
     private val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
-    private val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { typeface = android.graphics.Typeface.create("sans", android.graphics.Typeface.NORMAL) }
+    private val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        typeface = android.graphics.Typeface.create("sans", android.graphics.Typeface.NORMAL)
+    }
     private val timeFormat = SimpleDateFormat("HH", Locale.getDefault())
     private var state: TherapyDisplayState? = null
     private var unit = GlucoseUnit.MG_DL
@@ -51,76 +57,83 @@ class GlucoseDashboardChart @JvmOverloads constructor(
         super.onDraw(canvas)
         val plot = RectF(2f.dp, 16f.dp, width - 34f.dp, height - 24f.dp)
         if (plot.width() <= 20f || plot.height() <= 20f) return
+
         val now = System.currentTimeMillis()
-        val current = state?.glucose
         val history = buildList {
             addAll(state?.glucoseHistory.orEmpty())
-            current?.let { add(GlucoseSample(it.valueMgDl, it.measuredAtEpochMs)) }
-        }.associateBy { it.measuredAtEpochMs }.values.sortedBy { it.measuredAtEpochMs }
+            state?.glucose?.let { add(GlucoseSample(it.valueMgDl, it.measuredAtEpochMs)) }
+        }
+            .associateBy { it.measuredAtEpochMs }
+            .values
+            .sortedBy { it.measuredAtEpochMs }
+
         val predictions = if (showPredictions) state?.glucosePredictions.orEmpty() else emptyList()
         val start = now - durationHours * 60L * 60_000L
         val predictionEnd = predictions.flatMap { it.samples }.maxOfOrNull { it.measuredAtEpochMs } ?: now
         val end = max(now, predictionEnd).coerceAtLeast(start + 60_000L)
+
         val visibleHistory = history.filter { it.measuredAtEpochMs in start..end }
         val visiblePredictions = predictions.map { series ->
             series.copy(samples = series.samples.filter { it.measuredAtEpochMs in start..end })
-        }.filter { it.samples.size >= 2 }
+        }.filter { it.samples.isNotEmpty() }
 
         val dataValues = visibleHistory.map { it.valueMgDl } + visiblePredictions.flatMap { it.samples }.map { it.valueMgDl }
-        val targetLow = DISPLAY_RANGE_LOW_MGDL
-        val targetHigh = DISPLAY_RANGE_HIGH_MGDL
-        val minimum = min(40.0, listOfNotNull(dataValues.minOrNull(), targetLow).minOrNull() ?: 40.0) - 10.0
-        val maximum = max(200.0, listOfNotNull(dataValues.maxOrNull(), targetHigh).maxOrNull() ?: 200.0) + 10.0
+        val minimum = min(40.0, (dataValues.minOrNull() ?: 40.0)) - 10.0
+        val maximum = max(200.0, (dataValues.maxOrNull() ?: 200.0)) + 10.0
         val yMin = (minimum / 20.0).toInt() * 20.0
         val yMax = ceil(maximum / 20.0) * 20.0
 
-        val targetTop = mapY(targetHigh, yMin, yMax, plot)
-        val targetBottom = mapY(targetLow, yMin, yMax, plot)
+        val targetTop = mapY(DISPLAY_RANGE_HIGH_MGDL, yMin, yMax, plot)
+        val targetBottom = mapY(DISPLAY_RANGE_LOW_MGDL, yMin, yMax, plot)
         fillPaint.color = Color.rgb(10, 57, 28)
         canvas.drawRect(plot.left, targetTop, plot.right, targetBottom, fillPaint)
+
         drawGrid(canvas, plot, start, end, yMin, yMax)
 
-        if (visibleHistory.isNotEmpty()) {
-            drawGlucoseDots(canvas, visibleHistory, plot, start, end, yMin, yMax)
-            visibleHistory.lastOrNull()?.let { point ->
-                fillPaint.color = Color.WHITE
-                canvas.drawCircle(mapX(point.measuredAtEpochMs, start, end, plot), mapY(point.valueMgDl, yMin, yMax, plot), 3.8f.dp, fillPaint)
-                fillPaint.color = Color.argb(85, 255, 255, 255)
-                canvas.drawCircle(mapX(point.measuredAtEpochMs, start, end, plot), mapY(point.valueMgDl, yMin, yMax, plot), 7.2f.dp, fillPaint)
-            }
+        val dividerX = mapX(now, start, end, plot)
+        if (visiblePredictions.isNotEmpty()) {
+            linePaint.color = Color.argb(170, 125, 125, 125)
+            linePaint.strokeWidth = 1.0f.dp
+            linePaint.pathEffect = DashPathEffect(floatArrayOf(4f.dp, 4f.dp), 0f)
+            canvas.drawLine(dividerX, plot.top, dividerX, plot.bottom, linePaint)
+            linePaint.pathEffect = null
         }
+
+        drawHistoryDots(canvas, visibleHistory, plot, start, end, yMin, yMax, dividerX, visiblePredictions.isNotEmpty())
+        drawCurrentDot(canvas, visibleHistory.lastOrNull(), plot, start, end, yMin, yMax, dividerX, visiblePredictions.isNotEmpty())
+
         visiblePredictions.forEach { series ->
-            val color = when (series.kind) {
-                PredictionKind.IOB -> Color.rgb(82, 193, 255)
-                PredictionKind.COB, PredictionKind.ACOB -> Color.rgb(244, 222, 0)
-                PredictionKind.UAM -> Color.rgb(255, 174, 31)
-                PredictionKind.ZERO_TEMP -> Color.rgb(48, 219, 222)
-            }
-            drawPrediction(canvas, series, plot, start, end, yMin, yMax, color)
+            drawPredictionDots(canvas, series, plot, start, end, yMin, yMax, dividerX)
         }
-        if (visibleHistory.size < 2) drawEmptyMessage(canvas, plot, "Verlauf baut sich aus AAPS-Empfangsdaten auf")
+
+        if (visibleHistory.size < 2) {
+            drawEmptyMessage(canvas, plot, "Verlauf baut sich aus AAPS-Empfangsdaten auf")
+        }
     }
 
     private fun drawGrid(canvas: Canvas, plot: RectF, start: Long, end: Long, yMin: Double, yMax: Double) {
         linePaint.color = Color.rgb(70, 70, 70)
         linePaint.strokeWidth = 0.8f.dp
         linePaint.pathEffect = DashPathEffect(floatArrayOf(3f.dp, 3f.dp), 0f)
+
         repeat(5) { index ->
             val y = plot.top + plot.height() * index / 4f
             canvas.drawLine(plot.left, y, plot.right, y, linePaint)
             val value = yMax - (yMax - yMin) * index / 4.0
             drawText(canvas, glucoseLabel(value), plot.right + 5f.dp, y + 3f.dp, 9f, Color.rgb(210, 210, 210), Paint.Align.LEFT)
         }
+
         repeat(4) { index ->
             val x = plot.left + plot.width() * index / 3f
             canvas.drawLine(x, plot.top, x, plot.bottom, linePaint)
             val time = start + (end - start) * index / 3
             drawText(canvas, timeFormat.format(Date(time)), x, plot.bottom + 15f.dp, 9f, Color.rgb(200, 200, 200), Paint.Align.CENTER)
         }
+
         linePaint.pathEffect = null
     }
 
-    private fun drawGlucoseDots(
+    private fun drawHistoryDots(
         canvas: Canvas,
         points: List<GlucoseSample>,
         plot: RectF,
@@ -128,34 +141,97 @@ class GlucoseDashboardChart @JvmOverloads constructor(
         end: Long,
         yMin: Double,
         yMax: Double,
+        dividerX: Float,
+        pinCurrent: Boolean,
     ) {
-        points.forEach { point ->
-            fillPaint.color = if (point.valueMgDl in DISPLAY_RANGE_LOW_MGDL..DISPLAY_RANGE_HIGH_MGDL) {
-                Color.rgb(84, 223, 48)
-            } else {
-                Color.rgb(255, 92, 105)
-            }
-            canvas.drawCircle(
-                mapX(point.measuredAtEpochMs, start, end, plot),
-                mapY(point.valueMgDl, yMin, yMax, plot),
-                2.7f.dp,
-                fillPaint,
-            )
+        points.forEachIndexed { index, point ->
+            val rawX = mapX(point.measuredAtEpochMs, start, end, plot)
+            val x = if (pinCurrent && index == points.lastIndex) min(rawX, dividerX - 4f.dp) else rawX
+            val y = mapY(point.valueMgDl, yMin, yMax, plot)
+            fillPaint.color = glucoseDotColor(point.valueMgDl)
+            canvas.drawCircle(x, y, 2.7f.dp, fillPaint)
         }
     }
 
-    private fun drawPrediction(canvas: Canvas, series: GlucosePrediction, plot: RectF, start: Long, end: Long, yMin: Double, yMax: Double, color: Int) {
-        fillPaint.color = color
-        series.samples.forEach { point ->
-            canvas.drawCircle(mapX(point.measuredAtEpochMs, start, end, plot), mapY(point.valueMgDl, yMin, yMax, plot), 1.9f.dp, fillPaint)
+    private fun drawCurrentDot(
+        canvas: Canvas,
+        point: GlucoseSample?,
+        plot: RectF,
+        start: Long,
+        end: Long,
+        yMin: Double,
+        yMax: Double,
+        dividerX: Float,
+        pinCurrent: Boolean,
+    ) {
+        point ?: return
+        val rawX = mapX(point.measuredAtEpochMs, start, end, plot)
+        val x = if (pinCurrent) min(rawX, dividerX - 4f.dp) else rawX
+        val y = mapY(point.valueMgDl, yMin, yMax, plot)
+
+        fillPaint.color = Color.BLACK
+        canvas.drawCircle(x, y, 4.8f.dp, fillPaint)
+
+        fillPaint.color = glucoseDotColor(point.valueMgDl)
+        canvas.drawCircle(x, y, 3.3f.dp, fillPaint)
+    }
+
+    private fun drawPredictionDots(
+        canvas: Canvas,
+        series: GlucosePrediction,
+        plot: RectF,
+        start: Long,
+        end: Long,
+        yMin: Double,
+        yMax: Double,
+        dividerX: Float,
+    ) {
+        series.samples.forEachIndexed { index, point ->
+            val rawX = mapX(point.measuredAtEpochMs, start, end, plot)
+            val x = if (index == 0) max(rawX, dividerX + 4f.dp) else rawX
+            val y = mapY(point.valueMgDl, yMin, yMax, plot)
+            fillPaint.color = glucoseDotColor(point.valueMgDl)
+            canvas.drawCircle(x, y, 1.9f.dp, fillPaint)
         }
     }
 
-    private fun glucoseLabel(valueMgDl: Double): String = if (unit == GlucoseUnit.MMOL_L) String.format(Locale.getDefault(), "%.1f", valueMgDl / 18.0) else valueMgDl.toInt().toString()
-    private fun drawEmptyMessage(canvas: Canvas, plot: RectF, message: String) = drawText(canvas, message, plot.centerX(), plot.centerY(), 10f, Color.rgb(150, 150, 150), Paint.Align.CENTER)
-    private fun mapX(time: Long, start: Long, end: Long, plot: RectF) = plot.left + ((time - start).toDouble() / (end - start).coerceAtLeast(1L) * plot.width()).toFloat()
-    private fun mapY(value: Double, min: Double, max: Double, plot: RectF) = plot.bottom - ((value - min) / (max - min).coerceAtLeast(1.0) * plot.height()).toFloat()
-    private fun drawText(canvas: Canvas, value: String, x: Float, y: Float, sizeSp: Float, color: Int, align: Paint.Align) { textPaint.textSize = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, sizeSp, resources.displayMetrics); textPaint.color = color; textPaint.textAlign = align; canvas.drawText(value, x, y, textPaint) }
+    private fun glucoseDotColor(valueMgDl: Double): Int = when {
+        valueMgDl < DISPLAY_RANGE_LOW_MGDL -> Color.rgb(255, 92, 105)
+        valueMgDl > DISPLAY_RANGE_HIGH_MGDL -> Color.rgb(255, 208, 64)
+        else -> Color.WHITE
+    }
+
+    private fun glucoseLabel(valueMgDl: Double): String =
+        if (unit == GlucoseUnit.MMOL_L) {
+            String.format(Locale.getDefault(), "%.1f", valueMgDl / 18.0)
+        } else {
+            valueMgDl.toInt().toString()
+        }
+
+    private fun drawEmptyMessage(canvas: Canvas, plot: RectF, message: String) =
+        drawText(canvas, message, plot.centerX(), plot.centerY(), 10f, Color.rgb(150, 150, 150), Paint.Align.CENTER)
+
+    private fun mapX(time: Long, start: Long, end: Long, plot: RectF) =
+        plot.left + ((time - start).toDouble() / (end - start).coerceAtLeast(1L) * plot.width()).toFloat()
+
+    private fun mapY(value: Double, min: Double, max: Double, plot: RectF) =
+        plot.bottom - ((value - min) / (max - min).coerceAtLeast(1.0) * plot.height()).toFloat()
+
+    private fun drawText(
+        canvas: Canvas,
+        value: String,
+        x: Float,
+        y: Float,
+        sizeSp: Float,
+        color: Int,
+        align: Paint.Align,
+    ) {
+        textPaint.textSize = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, sizeSp, resources.displayMetrics)
+        textPaint.color = color
+        textPaint.textAlign = align
+        canvas.drawText(value, x, y, textPaint)
+    }
+
     private companion object {
         const val DISPLAY_RANGE_LOW_MGDL = 80.0
         const val DISPLAY_RANGE_HIGH_MGDL = 160.0
