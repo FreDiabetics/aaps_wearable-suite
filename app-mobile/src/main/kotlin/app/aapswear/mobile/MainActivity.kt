@@ -1,6 +1,7 @@
 package app.aapswear.mobile
 
 import android.Manifest
+import android.app.AlertDialog
 import android.app.NotificationManager
 import android.content.ActivityNotFoundException
 import android.content.ClipData
@@ -15,12 +16,14 @@ import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
+import android.text.InputType
 import android.text.SpannableString
 import android.text.Spanned
 import android.text.style.ForegroundColorSpan
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
+import android.widget.EditText
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.PopupWindow
@@ -89,6 +92,14 @@ class MainActivity : ComponentActivity() {
             TherapyStateStore(this@MainActivity).state.collectLatest {
                 state = it
                 refresh()
+            }
+        }
+        scope.launch {
+            NightscoutBackfillCoordinator.syncIfNeeded(applicationContext)
+        }
+        window.decorView.post {
+            if (NightscoutConfigStore.shouldOfferSetup(this)) {
+                showNightscoutSetup(firstRun = true)
             }
         }
         refresh()
@@ -175,6 +186,8 @@ class MainActivity : ComponentActivity() {
     private fun showMoreMenu(anchor: View) {
         showPillDropdown(anchor, alignEnd = true, listOf(
             PillMenuItem(R.id.dropdown_sync, "Jetzt synchronisieren", action = ::syncNow),
+            PillMenuItem(View.generateViewId(), "Nightscout einrichten", action = { showNightscoutSetup(firstRun = false) }),
+            PillMenuItem(View.generateViewId(), "24h-Backfill aktualisieren", action = { syncNightscout(force = true) }),
             PillMenuItem(R.id.dropdown_diagnostics, "Diagnose kopieren", action = ::copyDiagnostics),
             PillMenuItem(R.id.dropdown_app_info, "Datenschutz & App-Info") { navigate(DashboardScreen.SETTINGS) },
         ))
@@ -253,6 +266,72 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    private fun syncNightscout(force: Boolean) {
+        scope.launch {
+            val result = NightscoutBackfillCoordinator.syncIfNeeded(applicationContext, force)
+            when (result.status) {
+                NightscoutBackfillResult.Status.OK ->
+                    Toast.makeText(this@MainActivity, "${result.pointCount} Nightscout-Werte synchronisiert", Toast.LENGTH_SHORT).show()
+                NightscoutBackfillResult.Status.NOT_CONFIGURED ->
+                    showNightscoutSetup(firstRun = false)
+                NightscoutBackfillResult.Status.ERROR ->
+                    Toast.makeText(this@MainActivity, "Nightscout-Backfill fehlgeschlagen: ${result.message ?: "unbekannt"}", Toast.LENGTH_LONG).show()
+                else -> Unit
+            }
+        }
+    }
+
+    private fun showNightscoutSetup(firstRun: Boolean) {
+        val existing = NightscoutConfigStore.load(this)
+        val container = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(24.dp, 6.dp, 24.dp, 0)
+        }
+        val urlInput = EditText(this).apply {
+            hint = "https://dein-nightscout.example"
+            setText(existing?.baseUrl.orEmpty())
+            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_URI
+            isSingleLine = true
+        }
+        val tokenInput = EditText(this).apply {
+            hint = "Read-only Access Token (optional)"
+            setText(existing?.accessToken.orEmpty())
+            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD
+            isSingleLine = true
+        }
+        container.addView(urlInput)
+        container.addView(tokenInput)
+
+        val dialog = AlertDialog.Builder(this)
+            .setTitle(if (firstRun) "24h-Verlauf aus Nightscout" else "Nightscout")
+            .setMessage("Sugarlicious nutzt Nightscout nur lesend für den initialen 24h-Backfill und zum Reparieren von Graph-Lücken. AndroidAPS bleibt die Live-Datenquelle.")
+            .setView(container)
+            .setNegativeButton(if (firstRun) "Später" else "Abbrechen") { _, _ ->
+                if (firstRun) NightscoutConfigStore.markSetupPromptShown(this)
+            }
+            .setPositiveButton("Speichern", null)
+            .create()
+
+        dialog.setOnShowListener {
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+                runCatching {
+                    NightscoutConfigStore.save(
+                        this,
+                        urlInput.text.toString(),
+                        tokenInput.text.toString(),
+                    )
+                }.onSuccess {
+                    dialog.dismiss()
+                    Toast.makeText(this, "Nightscout gespeichert", Toast.LENGTH_SHORT).show()
+                    syncNightscout(force = true)
+                }.onFailure {
+                    Toast.makeText(this, it.message ?: "Ungültige Nightscout-Konfiguration", Toast.LENGTH_LONG).show()
+                }
+            }
+        }
+        dialog.show()
+    }
+
     private fun setLiveNotification(enabled: Boolean) {
         uiPreferences.edit { putBoolean(PersistentBridgeService.PREFERENCE_LIVE_NOTIFICATION, enabled) }
         PersistentBridgeService.refresh(this)
@@ -284,6 +363,8 @@ class MainActivity : ComponentActivity() {
             appendLine("Fähigkeiten: ${state?.capabilities?.size ?: 0}")
             appendLine("Uhren erreichbar: ${d.reachableWatches}")
             appendLine("Sync: ${d.syncStatus ?: "—"}")
+            appendLine("Nightscout Backfill: ${d.historyBackfillStatus ?: "—"}")
+            appendLine("Nightscout Punkte: ${d.historyBackfillPointCount}")
         }
         (getSystemService(CLIPBOARD_SERVICE) as ClipboardManager).setPrimaryClip(ClipData.newPlainText("Sugarlicious Diagnose", report))
         Toast.makeText(this, "Diagnose ohne Therapiewerte kopiert", Toast.LENGTH_SHORT).show()

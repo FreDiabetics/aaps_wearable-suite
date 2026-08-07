@@ -6,7 +6,9 @@ import android.content.Intent
 import androidx.core.content.edit
 import app.aapswear.datasource.aaps.AapsCapabilityDetector
 import app.aapswear.datasource.aaps.AapsPayloadAdapter
+import app.aapswear.model.GlucoseSample
 import app.aapswear.model.TherapyDisplayState
+import app.aapswear.model.Trend
 import app.aapswear.protocol.WearProtocol
 import app.aapswear.storage.TherapyStateStore
 import com.google.android.gms.wearable.PutDataRequest
@@ -40,7 +42,26 @@ class AapsStatusReceiver : BroadcastReceiver() {
                 val installation = AapsCapabilityDetector.detectInstallation(app)
                 val state = parsedState.copy(sourceVersion = installation?.versionName)
                 val store = TherapyStateStore(app)
-                val displayState = DisplayHistoryAccumulator.merge(store.state.first(), state, now)
+
+                var displayState = DisplayHistoryAccumulator.merge(store.state.first(), state, now)
+                val nightscoutHistory = NightscoutHistoryStore.load(app, now)
+                if (nightscoutHistory.isNotEmpty()) {
+                    displayState = DisplayHistoryAccumulator.mergeExternalHistory(
+                        displayState,
+                        nightscoutHistory,
+                        now,
+                    )
+                }
+
+                val glucose = displayState.glucose
+                if (glucose != null && glucose.trend == Trend.UNKNOWN) {
+                    val resolved = TrendArrowResolver.resolve(
+                        glucose.trend,
+                        displayState.glucoseHistory,
+                        glucose.measuredAtEpochMs,
+                    )
+                    displayState = displayState.copy(glucose = glucose.copy(trend = resolved))
+                }
 
                 // Persistence is deliberately completed before Data Layer I/O. A phone
                 // without a paired watch must never lose a valid AAPS status broadcast.
@@ -53,6 +74,14 @@ class AapsStatusReceiver : BroadcastReceiver() {
                     putString("sourcePackage", installation?.packageName)
                     putLong("sourceVersionCode", installation?.versionCode ?: 0L)
                     putString("lastSyncStatus", "pending")
+                }
+
+                val historyWithCurrent = buildList {
+                    addAll(displayState.glucoseHistory)
+                    displayState.glucose?.let { add(GlucoseSample(it.valueMgDl, it.measuredAtEpochMs)) }
+                }
+                if (DisplayHistoryAccumulator.hasGap(historyWithCurrent)) {
+                    NightscoutBackfillCoordinator.syncIfNeeded(app)
                 }
 
                 runCatching {

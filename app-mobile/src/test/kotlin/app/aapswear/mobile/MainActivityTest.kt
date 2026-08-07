@@ -126,7 +126,7 @@ class MainActivityTest {
 
         activity.findViewById<View>(R.id.more_button).performClick()
         val morePanel = activity.activeDropdown!!.contentView as ViewGroup
-        assertEquals(3, morePanel.childCount)
+        assertEquals(5, morePanel.childCount)
         assertNotNull(morePanel.findViewById<View>(R.id.dropdown_app_info).background)
         activity.activeDropdown?.dismiss()
 

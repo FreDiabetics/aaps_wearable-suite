@@ -18,6 +18,7 @@ import app.aapswear.model.FreshnessPolicy
 import app.aapswear.model.GlucoseUnit
 import app.aapswear.model.TherapyDisplayFormatter
 import app.aapswear.model.TherapyDisplayState
+import app.aapswear.model.Trend
 import java.text.DateFormat
 import java.text.NumberFormat
 import java.util.Date
@@ -144,7 +145,7 @@ class DashboardViewFactory(
         val top = LinearLayout(context).apply { orientation = LinearLayout.HORIZONTAL; isBaselineAligned = false }
         top.addView(summaryTile("GLUKOSE", glucoseText, unitLabel(unit), green, R.id.dashboard_glucose, callbacks.cycleUnit, minHeightDp = metrics.summaryTileHeight), weightedTileParams(metrics.summaryTileHeight))
         val deltaWithUnit = if (delta == "—") delta else "$delta ${unitLabel(unit)}"
-        top.addView(summaryTile("TREND", if (current) TherapyDisplayFormatter.trendArrow(glucose?.trend ?: app.aapswear.model.Trend.UNKNOWN).ifBlank { "—" } else "—", "$deltaWithUnit\n$age", text, minHeightDp = metrics.summaryTileHeight), weightedTileParams(metrics.summaryTileHeight))
+        top.addView(trendTile(if (current) glucose?.trend ?: Trend.UNKNOWN else Trend.UNKNOWN, "$deltaWithUnit\n$age", metrics.summaryTileHeight), weightedTileParams(metrics.summaryTileHeight))
         top.addView(summaryTile("ZIEL", if (current) TherapyDisplayFormatter.target(state?.target, unit) else "—", unitLabel(unit), text, valueSize = 17f, minHeightDp = metrics.summaryTileHeight), weightedTileParams(metrics.summaryTileHeight))
         val loopSub = when (state?.loop?.status) { "enacted" -> "Ausgeführt"; "suggested" -> "Vorschlag"; else -> "Nicht verfügbar" }
         top.addView(summaryTile("STATUS", "Loop", loopSub, text, R.id.dashboard_source_status, subColor = if (state?.loop != null && current) green else secondary, minHeightDp = metrics.summaryTileHeight), weightedTileParams(metrics.summaryTileHeight))
@@ -165,7 +166,7 @@ class DashboardViewFactory(
     }
 
     private fun renderHistory(parent: LinearLayout, state: TherapyDisplayState?, prefs: DashboardUiPreferences) {
-        parent.addView(screenTitle("Verlauf", "Echte, lokal empfangene AAPS-Anzeigedaten"))
+        parent.addView(screenTitle("Verlauf", "AAPS-Livedaten + echte Nightscout-Backfill-Werte"))
         parent.addView(glucoseGraphCard(state, prefs, compact = false, large = true), cardParams())
         parent.addView(metabolicGraphCard(state, prefs, compact = false, large = true), cardParams())
         parent.addView(infoCard("Datenbasis", listOf(
@@ -251,9 +252,9 @@ class DashboardViewFactory(
 
         parent.addView(infoCard("DATENSCHUTZ & SICHERHEIT", listOf(
             "Betriebsart" to "strikt read-only",
-            "Übertragung" to "lokal über Wear Data Layer",
-            "Internet" to "keine Berechtigung",
-            "Cloud / Telemetrie" to "nicht vorhanden",
+            "Übertragung" to "AAPS/Wear lokal · Nightscout nur lesend",
+            "Internet" to "nur für konfigurierten Nightscout-Backfill",
+            "Cloud / Telemetrie" to "keine Telemetrie · kein Upload durch Sugarlicious",
             "Datenhaltung" to "letzter Zustand + begrenzter Graphpuffer",
         )), cardParams())
         parent.addView(infoCard("UMFANG", listOf(
@@ -328,6 +329,51 @@ class DashboardViewFactory(
         minimumHeight = minHeightDp.dp
         addView(label(title)); addView(value(value, valueColor, valueSize, maxLines = 1)); addView(helper(sub, maxLines = 2, color = subColor))
         if (click != null) { isClickable = true; isFocusable = true; foreground = selectableForeground(); setOnClickListener { click() } }
+    }
+
+    /**
+     * Uses the supplied Sugarlicious trend artwork instead of Unicode arrows.
+     * AndroidAPS remains authoritative for the Trend enum; DOUBLE_* renders two copies.
+     */
+    private fun trendTile(trend: Trend, sub: String, minHeightDp: Int = 104) = tile(null).apply {
+        minimumHeight = minHeightDp.dp
+        addView(label("TREND"))
+
+        val arrowRow = LinearLayout(context).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER
+        }
+        val rotation = when (trend) {
+            Trend.DOUBLE_UP, Trend.SINGLE_UP -> -90f
+            Trend.FORTY_FIVE_UP -> -45f
+            Trend.FLAT -> 0f
+            Trend.FORTY_FIVE_DOWN -> 45f
+            Trend.SINGLE_DOWN, Trend.DOUBLE_DOWN -> 90f
+            Trend.UNKNOWN -> null
+        }
+        val copies = when (trend) {
+            Trend.DOUBLE_UP, Trend.DOUBLE_DOWN -> 2
+            Trend.UNKNOWN -> 0
+            else -> 1
+        }
+
+        if (rotation == null) {
+            arrowRow.addView(value("—", text, 26f, maxLines = 1))
+        } else {
+            repeat(copies) { index ->
+                arrowRow.addView(ImageView(context).apply {
+                    setImageResource(R.drawable.ic_trend_arrow)
+                    setColorFilter(text)
+                    this.rotation = rotation
+                    scaleType = ImageView.ScaleType.FIT_CENTER
+                    contentDescription = null
+                }, LinearLayout.LayoutParams(30.dp, 30.dp).apply {
+                    if (copies == 2 && index == 1) marginStart = (-7).dp
+                })
+            }
+        }
+        addView(arrowRow, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 34.dp))
+        addView(helper(sub, maxLines = 2))
     }
 
     private fun statTile(title: String, value: String, suffix: String, color: Int, minHeightDp: Int = 84) = tile(null).apply {

@@ -12,7 +12,7 @@ internal object DisplayHistoryAccumulator {
 
     /** True when two persisted CGM points are farther apart than a normal 5-minute cycle. */
     fun hasGap(history: List<GlucoseSample>): Boolean =
-        history.zipWithNext().any { (first, second) ->
+        history.sortedBy { it.measuredAtEpochMs }.zipWithNext().any { (first, second) ->
             second.measuredAtEpochMs - first.measuredAtEpochMs > GAP_THRESHOLD_MS
         }
 
@@ -21,19 +21,18 @@ internal object DisplayHistoryAccumulator {
         current: TherapyDisplayState,
         nowEpochMs: Long,
     ): TherapyDisplayState {
+        val glucose = mergeGlucose(
+            buildList {
+                addAll(previous?.glucoseHistory.orEmpty())
+                previous?.glucose?.let { add(GlucoseSample(it.valueMgDl, it.measuredAtEpochMs)) }
+                addAll(current.glucoseHistory)
+                current.glucose?.let { add(GlucoseSample(it.valueMgDl, it.measuredAtEpochMs)) }
+            },
+            nowEpochMs,
+        )
+
         val earliest = nowEpochMs - WINDOW_MS
         val latest = nowEpochMs + 5 * 60_000L
-        val glucose = buildList {
-            addAll(previous?.glucoseHistory.orEmpty())
-            previous?.glucose?.let { add(GlucoseSample(it.valueMgDl, it.measuredAtEpochMs)) }
-            addAll(current.glucoseHistory)
-            current.glucose?.let { add(GlucoseSample(it.valueMgDl, it.measuredAtEpochMs)) }
-        }.filter { it.measuredAtEpochMs in earliest..latest && it.valueMgDl.isFinite() }
-            .associateBy { it.measuredAtEpochMs }
-            .values
-            .sortedBy { it.measuredAtEpochMs }
-            .takeLast(MAX_POINTS)
-
         val therapy = buildList {
             addAll(previous?.therapyHistory.orEmpty())
             val timestamp = current.glucose?.measuredAtEpochMs ?: current.receivedAtEpochMs
@@ -51,5 +50,38 @@ internal object DisplayHistoryAccumulator {
             .takeLast(MAX_POINTS)
 
         return current.copy(glucoseHistory = glucose, therapyHistory = therapy)
+    }
+
+    fun mergeExternalHistory(
+        current: TherapyDisplayState,
+        external: List<GlucoseSample>,
+        nowEpochMs: Long,
+    ): TherapyDisplayState = current.copy(
+        glucoseHistory = mergeGlucose(
+            buildList {
+                addAll(current.glucoseHistory)
+                current.glucose?.let { add(GlucoseSample(it.valueMgDl, it.measuredAtEpochMs)) }
+                addAll(external)
+            },
+            nowEpochMs,
+        ),
+    )
+
+    private fun mergeGlucose(
+        values: List<GlucoseSample>,
+        nowEpochMs: Long,
+    ): List<GlucoseSample> {
+        val earliest = nowEpochMs - WINDOW_MS
+        val latest = nowEpochMs + 5 * 60_000L
+        return values
+            .filter {
+                it.measuredAtEpochMs in earliest..latest &&
+                    it.valueMgDl.isFinite() &&
+                    it.valueMgDl in 20.0..1000.0
+            }
+            .associateBy { it.measuredAtEpochMs }
+            .values
+            .sortedBy { it.measuredAtEpochMs }
+            .takeLast(MAX_POINTS)
     }
 }
