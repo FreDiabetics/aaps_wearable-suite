@@ -136,7 +136,13 @@ class MainActivity : ComponentActivity() {
         val diagnosticState = DiagnosticsSnapshot.read(diagnostics)
         val uiState = DashboardUiPreferences.read(uiPreferences)
         factory.render(content, screen, state, diagnosticState, uiState, System.currentTimeMillis())
-        findViewById<ImageView>(R.id.source_shield).alpha = if (diagnosticState.sourceVersion != null) 1f else 0.35f
+        val sourceAvailable = diagnosticState.sourceVersion != null
+        findViewById<ImageView>(R.id.source_shield).apply {
+            alpha = if (sourceAvailable) 1f else 0.45f
+            imageTintList = ColorStateList.valueOf(
+                getColor(if (sourceAvailable) R.color.app_accent else R.color.app_text_secondary),
+            )
+        }
         updateNavigation()
     }
 
@@ -156,15 +162,29 @@ class MainActivity : ComponentActivity() {
 
     private fun updateNavigation() {
         val entries = listOf(
-            Triple(DashboardScreen.OVERVIEW, R.id.nav_overview_icon, R.id.nav_overview_label),
-            Triple(DashboardScreen.HISTORY, R.id.nav_history_icon, R.id.nav_history_label),
-            Triple(DashboardScreen.DATA, R.id.nav_data_icon, R.id.nav_data_label),
-            Triple(DashboardScreen.SETTINGS, R.id.nav_settings_icon, R.id.nav_settings_label),
+            DashboardScreen.OVERVIEW to Triple(R.id.nav_overview, R.id.nav_overview_icon, R.id.nav_overview_label),
+            DashboardScreen.HISTORY to Triple(R.id.nav_history, R.id.nav_history_icon, R.id.nav_history_label),
+            DashboardScreen.DATA to Triple(R.id.nav_data, R.id.nav_data_icon, R.id.nav_data_label),
+            DashboardScreen.SETTINGS to Triple(R.id.nav_settings, R.id.nav_settings_icon, R.id.nav_settings_label),
         )
-        entries.forEach { (target, iconId, labelId) ->
-            val color = getColor(if (screen == target) R.color.app_accent else R.color.app_text_secondary)
-            findViewById<ImageView>(iconId).imageTintList = ColorStateList.valueOf(color)
-            findViewById<TextView>(labelId).setTextColor(color)
+        entries.forEach { (target, views) ->
+            val (itemId, iconId, labelId) = views
+            val selected = screen == target
+            val color = getColor(if (selected) R.color.app_accent else R.color.app_text_secondary)
+            findViewById<View>(itemId).setBackgroundResource(
+                if (selected) R.drawable.bg_nav_item_selected else R.drawable.bg_nav_item_idle,
+            )
+            findViewById<ImageView>(iconId).apply {
+                imageTintList = ColorStateList.valueOf(color)
+                alpha = if (selected) 1f else 0.72f
+            }
+            findViewById<TextView>(labelId).apply {
+                setTextColor(color)
+                setTypeface(
+                    typeface,
+                    if (selected) android.graphics.Typeface.BOLD else android.graphics.Typeface.NORMAL,
+                )
+            }
         }
     }
 

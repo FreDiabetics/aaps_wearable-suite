@@ -55,7 +55,7 @@ class DashboardChartsTest {
         assertTrue("orange=$orangePixels", orangePixels > 20)
     }
 
-    @Test fun `glucose series keeps reference green outside target range`() {
+    @Test fun `glucose dots use alert color outside display range`() {
         val now = System.currentTimeMillis()
         val state = TherapyDisplayState(
             receivedAtEpochMs = now,
@@ -66,10 +66,8 @@ class DashboardChartsTest {
             target = TargetState(80.0, 160.0),
         )
         val bitmap = render(GlucoseDashboardChart(context).apply { bind(state, GlucoseUnit.MG_DL, false, 6) }, 420, 230)
-        val greenPixels = count(bitmap) { Color.green(it) > 120 && Color.green(it) > Color.red(it) * 1.4 }
         val redPixels = count(bitmap) { Color.red(it) > 180 && Color.red(it) > Color.green(it) * 1.5 }
-        assertTrue("green=$greenPixels", greenPixels > 20)
-        assertTrue("red=$redPixels", redPixels == 0)
+        assertTrue("red=$redPixels", redPixels > 2)
     }
 
     private fun render(view: View, width: Int, height: Int): Bitmap {

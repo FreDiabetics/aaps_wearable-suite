@@ -67,23 +67,21 @@ class GlucoseDashboardChart @JvmOverloads constructor(
         }.filter { it.samples.size >= 2 }
 
         val dataValues = visibleHistory.map { it.valueMgDl } + visiblePredictions.flatMap { it.samples }.map { it.valueMgDl }
-        val targetLow = state?.target?.lowMgDl
-        val targetHigh = state?.target?.highMgDl
+        val targetLow = DISPLAY_RANGE_LOW_MGDL
+        val targetHigh = DISPLAY_RANGE_HIGH_MGDL
         val minimum = min(40.0, listOfNotNull(dataValues.minOrNull(), targetLow).minOrNull() ?: 40.0) - 10.0
         val maximum = max(200.0, listOfNotNull(dataValues.maxOrNull(), targetHigh).maxOrNull() ?: 200.0) + 10.0
         val yMin = (minimum / 20.0).toInt() * 20.0
         val yMax = ceil(maximum / 20.0) * 20.0
 
-        if (targetLow != null && targetHigh != null && targetHigh > targetLow) {
-            val top = mapY(targetHigh, yMin, yMax, plot)
-            val bottom = mapY(targetLow, yMin, yMax, plot)
-            fillPaint.color = Color.rgb(10, 57, 28)
-            canvas.drawRect(plot.left, top, plot.right, bottom, fillPaint)
-        }
+        val targetTop = mapY(targetHigh, yMin, yMax, plot)
+        val targetBottom = mapY(targetLow, yMin, yMax, plot)
+        fillPaint.color = Color.rgb(10, 57, 28)
+        canvas.drawRect(plot.left, targetTop, plot.right, targetBottom, fillPaint)
         drawGrid(canvas, plot, start, end, yMin, yMax)
 
         if (visibleHistory.isNotEmpty()) {
-            drawLineSeries(canvas, visibleHistory, plot, start, end, yMin, yMax, Color.rgb(84, 223, 48), 2.2f.dp, true)
+            drawGlucoseDots(canvas, visibleHistory, plot, start, end, yMin, yMax)
             visibleHistory.lastOrNull()?.let { point ->
                 fillPaint.color = Color.WHITE
                 canvas.drawCircle(mapX(point.measuredAtEpochMs, start, end, plot), mapY(point.valueMgDl, yMin, yMax, plot), 3.8f.dp, fillPaint)
@@ -122,18 +120,27 @@ class GlucoseDashboardChart @JvmOverloads constructor(
         linePaint.pathEffect = null
     }
 
-    private fun drawLineSeries(canvas: Canvas, points: List<GlucoseSample>, plot: RectF, start: Long, end: Long, yMin: Double, yMax: Double, color: Int, width: Float, circles: Boolean) {
-        val path = Path()
-        points.forEachIndexed { index, point ->
-            val x = mapX(point.measuredAtEpochMs, start, end, plot)
-            val y = mapY(point.valueMgDl, yMin, yMax, plot)
-            if (index == 0) path.moveTo(x, y) else path.lineTo(x, y)
-        }
-        linePaint.color = color; linePaint.strokeWidth = width; linePaint.pathEffect = null
-        canvas.drawPath(path, linePaint)
-        if (circles) {
-            fillPaint.color = color
-            points.forEach { canvas.drawCircle(mapX(it.measuredAtEpochMs, start, end, plot), mapY(it.valueMgDl, yMin, yMax, plot), 2.5f.dp, fillPaint) }
+    private fun drawGlucoseDots(
+        canvas: Canvas,
+        points: List<GlucoseSample>,
+        plot: RectF,
+        start: Long,
+        end: Long,
+        yMin: Double,
+        yMax: Double,
+    ) {
+        points.forEach { point ->
+            fillPaint.color = if (point.valueMgDl in DISPLAY_RANGE_LOW_MGDL..DISPLAY_RANGE_HIGH_MGDL) {
+                Color.rgb(84, 223, 48)
+            } else {
+                Color.rgb(255, 92, 105)
+            }
+            canvas.drawCircle(
+                mapX(point.measuredAtEpochMs, start, end, plot),
+                mapY(point.valueMgDl, yMin, yMax, plot),
+                2.7f.dp,
+                fillPaint,
+            )
         }
     }
 
@@ -149,6 +156,11 @@ class GlucoseDashboardChart @JvmOverloads constructor(
     private fun mapX(time: Long, start: Long, end: Long, plot: RectF) = plot.left + ((time - start).toDouble() / (end - start).coerceAtLeast(1L) * plot.width()).toFloat()
     private fun mapY(value: Double, min: Double, max: Double, plot: RectF) = plot.bottom - ((value - min) / (max - min).coerceAtLeast(1.0) * plot.height()).toFloat()
     private fun drawText(canvas: Canvas, value: String, x: Float, y: Float, sizeSp: Float, color: Int, align: Paint.Align) { textPaint.textSize = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, sizeSp, resources.displayMetrics); textPaint.color = color; textPaint.textAlign = align; canvas.drawText(value, x, y, textPaint) }
+    private companion object {
+        const val DISPLAY_RANGE_LOW_MGDL = 80.0
+        const val DISPLAY_RANGE_HIGH_MGDL = 160.0
+    }
+
     private val Float.dp get() = this * density
 }
 

@@ -142,13 +142,58 @@ class DashboardViewFactory(
         val glucoseText = if (glucose != null && current) glucose(glucose.valueMgDl, unit) else "—"
         val delta = if (glucose != null && current) signedDelta(glucose.deltaMgDl, unit).ifBlank { "—" } else "—"
         val age = glucose?.measuredAtEpochMs?.let { "${((now - it).coerceAtLeast(0L) / 60_000L)} min" } ?: "—"
-        val top = LinearLayout(context).apply { orientation = LinearLayout.HORIZONTAL; isBaselineAligned = false }
-        top.addView(summaryTile("GLUKOSE", glucoseText, unitLabel(unit), green, R.id.dashboard_glucose, callbacks.cycleUnit, minHeightDp = metrics.summaryTileHeight), weightedTileParams(metrics.summaryTileHeight))
-        val deltaWithUnit = if (delta == "—") delta else "$delta ${unitLabel(unit)}"
-        top.addView(trendTile(if (current) glucose?.trend ?: Trend.UNKNOWN else Trend.UNKNOWN, "$deltaWithUnit\n$age", metrics.summaryTileHeight), weightedTileParams(metrics.summaryTileHeight))
-        top.addView(summaryTile("ZIEL", if (current) TherapyDisplayFormatter.target(state?.target, unit) else "—", unitLabel(unit), text, valueSize = 17f, minHeightDp = metrics.summaryTileHeight), weightedTileParams(metrics.summaryTileHeight))
-        val loopSub = when (state?.loop?.status) { "enacted" -> "Ausgeführt"; "suggested" -> "Vorschlag"; else -> "Nicht verfügbar" }
-        top.addView(summaryTile("STATUS", "Loop", loopSub, text, R.id.dashboard_source_status, subColor = if (state?.loop != null && current) green else secondary, minHeightDp = metrics.summaryTileHeight), weightedTileParams(metrics.summaryTileHeight))
+        val glucoseMeta = buildList {
+            add(unitLabel(unit))
+            if (delta != "—") add(delta)
+            add(age)
+        }.joinToString(" · ")
+
+        val top = LinearLayout(context).apply {
+            orientation = LinearLayout.HORIZONTAL
+            isBaselineAligned = false
+        }
+        top.addView(
+            glucoseTile(
+                glucoseText = glucoseText,
+                trend = if (current) glucose?.trend ?: Trend.UNKNOWN else Trend.UNKNOWN,
+                sub = glucoseMeta,
+                valueColor = when {
+                    !current || glucose == null -> text
+                    glucose.valueMgDl in 80.0..160.0 -> text
+                    else -> context.getColor(R.color.app_red)
+                },
+                minHeightDp = metrics.summaryTileHeight,
+            ),
+            weightedTileParams(metrics.summaryTileHeight, weight = 1.45f),
+        )
+        top.addView(
+            summaryTile(
+                "ZIEL",
+                if (current) TherapyDisplayFormatter.target(state?.target, unit) else "—",
+                unitLabel(unit),
+                text,
+                valueSize = 17f,
+                minHeightDp = metrics.summaryTileHeight,
+            ),
+            weightedTileParams(metrics.summaryTileHeight, weight = 0.85f),
+        )
+        val loopSub = when (state?.loop?.status) {
+            "enacted" -> "Ausgeführt"
+            "suggested" -> "Vorschlag"
+            else -> "Nicht verfügbar"
+        }
+        top.addView(
+            summaryTile(
+                "STATUS",
+                "Loop",
+                loopSub,
+                text,
+                R.id.dashboard_source_status,
+                subColor = if (state?.loop != null && current) green else secondary,
+                minHeightDp = metrics.summaryTileHeight,
+            ),
+            weightedTileParams(metrics.summaryTileHeight, weight = 0.85f),
+        )
         parent.addView(top, fullWidth())
 
         parent.addView(glucoseGraphCard(state, prefs, compact = prefs.compact, chartHeightDp = metrics.glucoseChartHeight), cardParams())
@@ -317,7 +362,7 @@ class DashboardViewFactory(
 
     private fun legendRow() = LinearLayout(context).apply {
         orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL
-        addView(legend("●", "CGM", green)); addView(legend("●", "Prognose", context.getColor(R.color.app_yellow))); addView(legend("■", "Zielbereich", Color.rgb(16, 93, 40)))
+        addView(legend("●", "CGM", green)); addView(legend("●", "Prognose", context.getColor(R.color.app_yellow))); addView(legend("■", "80–160", Color.rgb(16, 93, 40)))
     }
 
     private fun legend(symbol: String, label: String, color: Int) = TextView(context).apply {
@@ -332,48 +377,72 @@ class DashboardViewFactory(
     }
 
     /**
-     * Uses the supplied Sugarlicious trend artwork instead of Unicode arrows.
-     * AndroidAPS remains authoritative for the Trend enum; DOUBLE_* renders two copies.
+     * Primary glucose tile: current value and Sugarlicious trend artwork are one visual unit.
+     * AndroidAPS remains authoritative for the Trend enum.
      */
-    private fun trendTile(trend: Trend, sub: String, minHeightDp: Int = 104) = tile(null).apply {
+    private fun glucoseTile(
+        glucoseText: String,
+        trend: Trend,
+        sub: String,
+        valueColor: Int,
+        minHeightDp: Int = 104,
+    ) = tile(null).apply {
+        id = R.id.dashboard_glucose
         minimumHeight = minHeightDp.dp
-        addView(label("TREND"))
+        addView(label("GLUKOSE"))
 
-        val arrowRow = LinearLayout(context).apply {
+        val valueRow = LinearLayout(context).apply {
             orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER
+            gravity = Gravity.CENTER_VERTICAL
         }
+        valueRow.addView(value(glucoseText, valueColor, 28f, maxLines = 1))
+
+        trendArrowCluster(trend, 16)?.let { arrow ->
+            valueRow.addView(
+                arrow,
+                LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, 18.dp).apply {
+                    marginStart = 3.dp
+                },
+            )
+        }
+
+        addView(valueRow)
+        addView(helper(sub, maxLines = 1))
+        isClickable = true
+        isFocusable = true
+        foreground = selectableForeground()
+        setOnClickListener { callbacks.cycleUnit() }
+    }
+
+    private fun trendArrowCluster(trend: Trend, arrowSizeDp: Int): View? {
         val rotation = when (trend) {
             Trend.DOUBLE_UP, Trend.SINGLE_UP -> -90f
             Trend.FORTY_FIVE_UP -> -45f
             Trend.FLAT -> 0f
             Trend.FORTY_FIVE_DOWN -> 45f
             Trend.SINGLE_DOWN, Trend.DOUBLE_DOWN -> 90f
-            Trend.UNKNOWN -> null
+            Trend.UNKNOWN -> return null
         }
-        val copies = when (trend) {
-            Trend.DOUBLE_UP, Trend.DOUBLE_DOWN -> 2
-            Trend.UNKNOWN -> 0
-            else -> 1
-        }
+        val copies = if (trend == Trend.DOUBLE_UP || trend == Trend.DOUBLE_DOWN) 2 else 1
 
-        if (rotation == null) {
-            arrowRow.addView(value("—", text, 26f, maxLines = 1))
-        } else {
+        return LinearLayout(context).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
             repeat(copies) { index ->
-                arrowRow.addView(ImageView(context).apply {
-                    setImageResource(R.drawable.ic_trend_arrow)
-                    setColorFilter(text)
-                    this.rotation = rotation
-                    scaleType = ImageView.ScaleType.FIT_CENTER
-                    contentDescription = null
-                }, LinearLayout.LayoutParams(30.dp, 30.dp).apply {
-                    if (copies == 2 && index == 1) marginStart = (-7).dp
-                })
+                addView(
+                    ImageView(context).apply {
+                        setImageResource(R.drawable.ic_trend_arrow)
+                        clearColorFilter()
+                        this.rotation = rotation
+                        scaleType = ImageView.ScaleType.FIT_CENTER
+                        contentDescription = null
+                    },
+                    LinearLayout.LayoutParams(arrowSizeDp.dp, arrowSizeDp.dp).apply {
+                        if (copies == 2 && index == 1) marginStart = (-6).dp
+                    },
+                )
             }
         }
-        addView(arrowRow, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 34.dp))
-        addView(helper(sub, maxLines = 2))
     }
 
     private fun statTile(title: String, value: String, suffix: String, color: Int, minHeightDp: Int = 84) = tile(null).apply {
@@ -439,7 +508,7 @@ class DashboardViewFactory(
     }
     private fun helper(value: String, maxLines: Int = 2, color: Int = secondary) = TextView(context).apply { text = value; textSize = 11f; setTextColor(color); this.maxLines = maxLines }
 
-    private fun weightedTileParams(height: Int = 104) = LinearLayout.LayoutParams(0, height.dp, 1f).apply { marginStart = 3.dp; marginEnd = 3.dp }
+    private fun weightedTileParams(height: Int = 104, weight: Float = 1f) = LinearLayout.LayoutParams(0, height.dp, weight).apply { marginStart = 3.dp; marginEnd = 3.dp }
     private fun fullWidth() = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
     private fun cardParams(top: Int = 6, bottom: Int = 0) = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply { topMargin = top.dp; bottomMargin = bottom.dp }
     private fun selectableForeground(): Drawable? = context.obtainStyledAttributes(intArrayOf(android.R.attr.selectableItemBackground)).let { array -> array.getDrawable(0).also { array.recycle() } }
