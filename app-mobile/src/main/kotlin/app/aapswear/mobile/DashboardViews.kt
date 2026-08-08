@@ -32,7 +32,7 @@ data class DashboardUiPreferences(
     val showDetails: Boolean = true,
     val showPredictions: Boolean = true,
     val compact: Boolean = true,
-    val graphHours: Int = 6,
+    val graphHours: Int = 3,
     val liveNotification: Boolean = false,
 ) {
     fun unitFor(state: TherapyDisplayState?): GlucoseUnit = when (unit) {
@@ -47,7 +47,7 @@ data class DashboardUiPreferences(
             showDetails = preferences.getBoolean("showDetails", true),
             showPredictions = preferences.getBoolean("showPredictions", true),
             compact = preferences.getBoolean("compact", true),
-            graphHours = preferences.getInt("graphHours", 6).takeIf { it in listOf(6, 12, 24) } ?: 6,
+            graphHours = preferences.getInt("graphHours", 3).takeIf { it in listOf(3, 6, 12, 24) } ?: 3,
             liveNotification = preferences.getBoolean(PersistentBridgeService.PREFERENCE_LIVE_NOTIFICATION, false),
         )
     }
@@ -253,7 +253,7 @@ class DashboardViewFactory(
         display.addView(switchRow("Kompakte Übersicht", "Dichte Darstellung für die Bridge-Übersicht", prefs.compact, R.id.dashboard_compact_switch, callbacks.setCompact))
         display.addView(switchRow("Live-Benachrichtigung", "Optionaler Android-16-Live-Status; normale Benachrichtigung bleibt sonst aktiv", prefs.liveNotification, R.id.dashboard_live_notification_switch, callbacks.setLiveNotification))
         display.addView(sectionLabel("Graph-Zeitraum"))
-        display.addView(chipRow(listOf(6, 12, 24).map { hours ->
+        display.addView(chipRow(listOf(3, 6, 12, 24).map { hours ->
             Triple("$hours h", prefs.graphHours == hours) { callbacks.setGraphHours(hours) }
         }))
         parent.addView(display, cardParams())

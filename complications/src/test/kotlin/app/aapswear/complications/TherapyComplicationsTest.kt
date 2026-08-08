@@ -1,6 +1,7 @@
 package app.aapswear.complications
 
 import androidx.wear.watchface.complications.data.ComplicationType
+import androidx.wear.watchface.complications.data.RangedValueComplicationData
 import androidx.wear.watchface.complications.data.ShortTextComplicationData
 import androidx.wear.watchface.complications.datasource.ComplicationRequest
 import app.aapswear.model.GlucoseState
@@ -90,6 +91,38 @@ class TherapyComplicationsTest {
                 .getTextAt(ageService.resources, Instant.now())
                 .toString(),
         )
+    }
+
+    @Test
+    fun `glucose providers expose ranged value with glucose and trend`() {
+        listOf(
+            GlucoseComplication::class.java,
+            GlucoseTrendComplication::class.java,
+            GlucoseRangedComplication::class.java,
+        ).forEach { providerClass ->
+            val service = Robolectric.buildService(providerClass).create().get()
+            val data =
+                service.getPreviewData(
+                    ComplicationType.RANGED_VALUE,
+                ) as RangedValueComplicationData
+
+            assertEquals(ComplicationType.RANGED_VALUE, data.type)
+            assertEquals(40f, data.min)
+            assertEquals(260f, data.max)
+            assertEquals(123f, data.value)
+            assertEquals(
+                "123",
+                data.text!!
+                    .getTextAt(service.resources, Instant.now())
+                    .toString(),
+            )
+            assertEquals(
+                "↗",
+                data.title!!
+                    .getTextAt(service.resources, Instant.now())
+                    .toString(),
+            )
+        }
     }
 
     @Test

@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -32,6 +33,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -68,8 +71,8 @@ internal enum class ComplicationCategory(
 }
 
 internal val SugarliciousComplicationCatalog = listOf(
-    ComplicationCatalogEntry(1, "Glucose", ComplicationCategory.GLUCOSE, "SHORT · LONG"),
-    ComplicationCatalogEntry(2, "Glucose + Trend", ComplicationCategory.GLUCOSE, "SHORT · LONG"),
+    ComplicationCatalogEntry(1, "Glucose", ComplicationCategory.GLUCOSE, "RANGED"),
+    ComplicationCatalogEntry(2, "Glucose + Trend", ComplicationCategory.GLUCOSE, "RANGED"),
     ComplicationCatalogEntry(3, "Glucose-Delta", ComplicationCategory.GLUCOSE, "SHORT · LONG"),
     ComplicationCatalogEntry(4, "Glucose + Trend + Delta", ComplicationCategory.GLUCOSE, "SHORT · LONG"),
     ComplicationCatalogEntry(5, "Glukose-Datenalter", ComplicationCategory.GLUCOSE, "SHORT · LONG"),
@@ -433,6 +436,27 @@ private fun ComplicationDataPreview(
     val preview = previewFor(entry.id, state)
     val shape = RoundedCornerShape(14.dp)
 
+    if (entry.id == 1 || entry.id == 2 || entry.id == 8) {
+        val now = System.currentTimeMillis()
+        val glucose = state?.glucose
+        val freshness = FreshnessPolicy.classify(glucose?.measuredAtEpochMs, now)
+        val current = freshness == Freshness.CURRENT || freshness == Freshness.DELAYED
+        val g = glucose.takeIf { current }
+
+        CircularGlucoseComplicationPreview(
+            glucoseValue = g?.valueMgDl ?: 123.0,
+            glucoseText = g?.let { TherapyDisplayFormatter.glucose(it) } ?: "123",
+            trendText = g?.let { TherapyDisplayFormatter.trendArrow(it.trend) }
+                ?.ifBlank { "↗" }
+                ?: "↗",
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(SugarliciousColors.Background, shape)
+                .padding(vertical = 10.dp),
+        )
+        return
+    }
+
     if (entry.id == 9 || entry.id == 10) {
         Column(
             modifier = Modifier
@@ -499,6 +523,96 @@ private fun ComplicationDataPreview(
     }
 }
 
+@Composable
+private fun CircularGlucoseComplicationPreview(
+    glucoseValue: Double,
+    glucoseText: String,
+    trendText: String,
+    modifier: Modifier = Modifier,
+) {
+    val foreground = when {
+        glucoseValue < 80.0 -> SugarliciousColors.Red
+        glucoseValue > 160.0 -> SugarliciousColors.Yellow
+        else -> SugarliciousColors.TextPrimary
+    }
+    val progress =
+        ((glucoseValue - 40.0) / (260.0 - 40.0))
+            .coerceIn(0.0, 1.0)
+            .toFloat()
+
+    Box(
+        modifier = modifier,
+        contentAlignment = Alignment.Center,
+    ) {
+        Box(
+            modifier = Modifier.size(108.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            Canvas(modifier = Modifier.fillMaxSize()) {
+                val stroke = 9.dp.toPx()
+                val diameter = size.minDimension - stroke
+                val topLeft = Offset(
+                    (size.width - diameter) / 2f,
+                    (size.height - diameter) / 2f,
+                )
+                val arcSize =
+                    androidx.compose.ui.geometry.Size(
+                        diameter,
+                        diameter,
+                    )
+
+                drawArc(
+                    color = SugarliciousColors.SurfaceHigh,
+                    startAngle = 135f,
+                    sweepAngle = 270f,
+                    useCenter = false,
+                    topLeft = topLeft,
+                    size = arcSize,
+                    style = Stroke(
+                        width = stroke,
+                        cap = StrokeCap.Round,
+                    ),
+                )
+
+                drawArc(
+                    color = foreground,
+                    startAngle = 135f,
+                    sweepAngle = 270f * progress,
+                    useCenter = false,
+                    topLeft = topLeft,
+                    size = arcSize,
+                    style = Stroke(
+                        width = stroke,
+                        cap = StrokeCap.Round,
+                    ),
+                )
+            }
+
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center,
+            ) {
+                Text(
+                    text = glucoseText,
+                    color = foreground,
+                    fontSize = 28.sp,
+                    lineHeight = 28.sp,
+                    fontWeight = FontWeight.Bold,
+                )
+
+                Spacer(Modifier.height(5.dp))
+
+                Text(
+                    text = trendText,
+                    color = SugarliciousColors.TextPrimary,
+                    fontSize = 19.sp,
+                    lineHeight = 19.sp,
+                    fontWeight = FontWeight.Bold,
+                )
+            }
+        }
+    }
+}
 @Composable
 private fun MiniGlucosePreview(
     samples: List<GlucoseSample>,
@@ -606,7 +720,7 @@ private fun previewFor(
             },
             glucoseColor,
         )
-        8 -> PhonePreview(glucoseText, "Skala 40–260", glucoseColor)
+        8 -> PhonePreview(glucoseText, trend, glucoseColor)
         9, 10 -> PhonePreview("$glucoseText$trend", "Dot-Graph", glucoseColor)
 
         11 -> PhonePreview(number(state?.insulin?.totalIob, 2, "1.20") + " U", "IOB")
@@ -640,7 +754,7 @@ private fun previewFor(
                 "enacted" -> "aktiv"
                 "suggested" -> "Vorschlag"
                 null -> "aktiv"
-                else -> state.loop?.status ?: "—"
+                else -> state?.loop?.status ?: "—"
             },
             "Loop",
         )

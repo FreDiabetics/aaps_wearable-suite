@@ -60,11 +60,25 @@ class MainActivity : ComponentActivity() {
         private set
 
     private val diagnosticsListener = SharedPreferences.OnSharedPreferenceChangeListener { _, _ -> runOnUiThread(::refresh) }
-    private val uiListener = SharedPreferences.OnSharedPreferenceChangeListener { _, _ -> runOnUiThread(::refresh) }
+    private val uiListener =
+        SharedPreferences.OnSharedPreferenceChangeListener { _, _ ->
+            runOnUiThread(::refresh)
+            scope.launch(Dispatchers.IO) {
+                runCatching {
+                    publishWatchConfig(applicationContext)
+                }
+            }
+        }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
+        if (!uiPreferences.getBoolean("graphHoursDefault3Migrated", false)) {
+            uiPreferences.edit()
+                .putInt("graphHours", 3)
+                .putBoolean("graphHoursDefault3Migrated", true)
+                .apply()
+        }
         content = findViewById(R.id.dashboard_content)
         scroll = findViewById(R.id.dashboard_scroll)
         screen = savedInstanceState?.getString("screen")?.let { runCatching { DashboardScreen.valueOf(it) }.getOrNull() } ?: DashboardScreen.OVERVIEW

@@ -78,7 +78,8 @@ internal fun SugarliciousOverviewScreen(
             glucoseColor = glucoseColor,
             trend = if (displayable) glucose?.trend ?: Trend.UNKNOWN else Trend.UNKNOWN,
             delta = delta,
-            age = age,
+            
+            deltaMgDl = glucose?.deltaMgDl,age = age,
             unitLabel = unitLabel(unit),
             tirStats = tirStats,
             heightDp = maxOf(metrics.summaryTileHeight + 48, 136),
@@ -110,7 +111,8 @@ private fun GlucoseHeroCard(
     glucoseColor: Color,
     trend: Trend,
     delta: String,
-    age: String,
+    
+    deltaMgDl: Double?,age: String,
     unitLabel: String,
     tirStats: TirStats,
     heightDp: Int,
@@ -165,7 +167,7 @@ private fun GlucoseHeroCard(
                             letterSpacing = (-0.8).sp,
                         )
                         Spacer(Modifier.width(6.dp))
-                        TrendIndicator(trend)
+                        TrendIndicator(correctedTrendForDisplay(trend, deltaMgDl))
                     }
 
                     Spacer(Modifier.height(5.dp))
@@ -305,6 +307,23 @@ private fun TirProgress(
     }
 }
 
+private fun correctedTrendForDisplay(
+    sourceTrend: Trend,
+    deltaMgDl: Double?,
+): Trend {
+    val delta = deltaMgDl?.takeIf { it.isFinite() } ?: return sourceTrend
+
+    return when {
+        delta >= 14.0 -> Trend.DOUBLE_UP
+        delta >= 7.0 -> Trend.SINGLE_UP
+        delta >= 2.5 -> Trend.FORTY_FIVE_UP
+        delta > -2.5 -> Trend.FLAT
+        delta > -7.0 -> Trend.FORTY_FIVE_DOWN
+        delta > -14.0 -> Trend.SINGLE_DOWN
+        else -> Trend.DOUBLE_DOWN
+    }
+}
+
 @Composable
 private fun TrendIndicator(trend: Trend) {
     val rotation = when (trend) {
@@ -315,10 +334,22 @@ private fun TrendIndicator(trend: Trend) {
         Trend.SINGLE_DOWN, Trend.DOUBLE_DOWN -> 90f
         Trend.UNKNOWN -> return
     }
-    val copies = if (trend == Trend.DOUBLE_UP || trend == Trend.DOUBLE_DOWN) 2 else 1
+
+    val copies =
+        if (
+            trend == Trend.DOUBLE_UP ||
+            trend == Trend.DOUBLE_DOWN
+        ) {
+            2
+        } else {
+            1
+        }
 
     Box(
-        modifier = Modifier.height(44.dp),
+        modifier = Modifier.size(
+            width = 34.dp,
+            height = 44.dp,
+        ),
         contentAlignment = Alignment.Center,
     ) {
         Row(
@@ -327,12 +358,15 @@ private fun TrendIndicator(trend: Trend) {
         ) {
             repeat(copies) {
                 Image(
-                    painter = painterResource(R.drawable.ic_trend_arrow),
+                    painter = painterResource(
+                        R.drawable.ic_trend_arrow,
+                    ),
                     contentDescription = null,
                     modifier = Modifier
-                        .size(28.dp)
+                        .size(25.dp)
                         .graphicsLayer(
                             rotationZ = rotation,
+                            translationX = 0f,
                             translationY = 0f,
                         ),
                 )
@@ -340,7 +374,6 @@ private fun TrendIndicator(trend: Trend) {
         }
     }
 }
-
 @Composable
 private fun QuickStatsRow(
     state: TherapyDisplayState?,

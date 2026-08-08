@@ -67,7 +67,7 @@ class PersistentBridgeService : Service(), SharedPreferences.OnSharedPreferenceC
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
         val builder = Notification.Builder(this, CHANNEL_ID)
-            .setSmallIcon(R.drawable.ic_notification)
+            .setSmallIcon(R.drawable.ic_notification_outlined)
             .setColor(getColor(R.color.app_accent))
             .setContentTitle(if (liveCapable) "Sugarlicious Live-Status" else "Sugarlicious ist aktiv")
             .setContentText(if (liveCapable) liveStatusText() else "AndroidAPS-Empfang und Watch-Verbindung bleiben bereit")

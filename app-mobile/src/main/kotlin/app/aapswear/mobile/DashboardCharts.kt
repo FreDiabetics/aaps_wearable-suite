@@ -103,7 +103,23 @@ class GlucoseDashboardChart @JvmOverloads constructor(
         drawCurrentDot(canvas, visibleHistory.lastOrNull(), plot, start, end, yMin, yMax, dividerX, visiblePredictions.isNotEmpty())
 
         visiblePredictions.forEach { series ->
-            drawPredictionDots(canvas, series, plot, start, end, yMin, yMax, dividerX)
+            val color = when (series.kind) {
+                PredictionKind.IOB -> Color.rgb(82, 193, 255)
+                PredictionKind.COB, PredictionKind.ACOB -> Color.rgb(244, 222, 0)
+                PredictionKind.UAM -> Color.rgb(255, 174, 31)
+                PredictionKind.ZERO_TEMP -> Color.rgb(48, 219, 222)
+            }
+            drawPredictionDots(
+                canvas,
+                series,
+                plot,
+                start,
+                end,
+                yMin,
+                yMax,
+                dividerX,
+                color,
+            )
         }
 
         if (visibleHistory.size < 2) {
@@ -185,12 +201,19 @@ class GlucoseDashboardChart @JvmOverloads constructor(
         yMin: Double,
         yMax: Double,
         dividerX: Float,
+        color: Int,
     ) {
         series.samples.forEachIndexed { index, point ->
             val rawX = mapX(point.measuredAtEpochMs, start, end, plot)
-            val x = if (index == 0) max(rawX, dividerX + 4f.dp) else rawX
+            val x =
+                if (index == 0) {
+                    max(rawX, dividerX + 4f.dp)
+                } else {
+                    rawX
+                }
             val y = mapY(point.valueMgDl, yMin, yMax, plot)
-            fillPaint.color = glucoseDotColor(point.valueMgDl)
+
+            fillPaint.color = color
             canvas.drawCircle(x, y, 1.9f.dp, fillPaint)
         }
     }

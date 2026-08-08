@@ -16,77 +16,201 @@
             android:layout_height="wrap_content"
             android:gravity="center_horizontal"
             android:orientation="vertical"
-            android:paddingStart="30dp"
-            android:paddingTop="18dp"
-            android:paddingEnd="30dp"
-            android:paddingBottom="30dp">
+            android:paddingStart="20dp"
+            android:paddingTop="8dp"
+            android:paddingEnd="20dp"
+            android:paddingBottom="24dp">
 
             <LinearLayout
                 android:layout_width="match_parent"
-                android:layout_height="48dp"
+                android:layout_height="36dp"
                 android:gravity="center_vertical"
                 android:orientation="horizontal">
+
                 <ImageView
-                    android:layout_width="46dp"
-                    android:layout_height="46dp"
+                    android:layout_width="30dp"
+                    android:layout_height="30dp"
                     android:contentDescription="@string/brand_logo"
                     android:src="@drawable/frediabetics_logo" />
+
                 <TextView
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
+                    android:layout_marginStart="4dp"
                     android:layout_weight="1"
                     android:text="Sugarlicious"
                     android:textColor="@color/wear_text"
-                    android:textSize="17sp"
+                    android:textSize="14sp"
                     android:textStyle="bold" />
+
                 <TextView
                     android:id="@+id/wear_clock"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="10:30"
                     android:textColor="@color/wear_text_secondary"
-                    android:textSize="13sp" />
+                    android:textSize="11sp" />
             </LinearLayout>
 
             <LinearLayout
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="5dp"
+                android:layout_height="116dp"
+                android:layout_marginTop="3dp"
                 android:background="@drawable/bg_wear_glucose"
-                android:gravity="center"
                 android:orientation="vertical"
-                android:padding="14dp">
-                <TextView
-                    android:id="@+id/wear_glucose"
-                    android:layout_width="wrap_content"
+                android:paddingStart="15dp"
+                android:paddingTop="9dp"
+                android:paddingEnd="15dp"
+                android:paddingBottom="9dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="—"
-                    android:textColor="@color/wear_green"
-                    android:textSize="44sp"
-                    android:textStyle="bold" />
-                <TextView
-                    android:id="@+id/wear_unit"
-                    android:layout_width="wrap_content"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="GLUKOSE"
+                        android:textColor="@color/wear_text_secondary"
+                        android:textSize="8sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/wear_status"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:background="@drawable/bg_wear_pill"
+                        android:paddingStart="7dp"
+                        android:paddingTop="3dp"
+                        android:paddingEnd="7dp"
+                        android:paddingBottom="3dp"
+                        android:text="○ KEINE DATEN"
+                        android:textColor="@color/wear_text_secondary"
+                        android:textSize="7sp"
+                        android:textStyle="bold" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="0dp"
+                    android:layout_weight="1"
+                    android:gravity="center"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:id="@+id/wear_glucose"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:includeFontPadding="false"
+                        android:text="—"
+                        android:textColor="@color/wear_text"
+                        android:textSize="42sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/wear_trend"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="4dp"
+                        android:includeFontPadding="false"
+                        android:text="—"
+                        android:textColor="@color/wear_text"
+                        android:textSize="22sp" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="keine Daten"
-                    android:textColor="@color/wear_text_secondary"
-                    android:textSize="12sp" />
-                <TextView
-                    android:id="@+id/wear_status"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="5dp"
-                    android:text="○ Keine Daten"
-                    android:textColor="@color/wear_text_secondary"
-                    android:textSize="12sp" />
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:id="@+id/wear_delta"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="—"
+                        android:textColor="@color/wear_cyan"
+                        android:textSize="10sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/wear_age"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="6dp"
+                        android:text="—"
+                        android:textColor="@color/wear_text_secondary"
+                        android:textSize="9sp" />
+
+                    <Space
+                        android:layout_width="0dp"
+                        android:layout_height="1dp"
+                        android:layout_weight="1" />
+
+                    <TextView
+                        android:id="@+id/wear_unit"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="keine Daten"
+                        android:textColor="@color/wear_text_secondary"
+                        android:textSize="9sp" />
+                </LinearLayout>
             </LinearLayout>
 
             <LinearLayout
                 android:layout_width="match_parent"
-                android:layout_height="82dp"
+                android:layout_height="126dp"
+                android:layout_marginTop="7dp"
+                android:background="@drawable/bg_wear_tile"
+                android:orientation="vertical"
+                android:paddingStart="10dp"
+                android:paddingTop="8dp"
+                android:paddingEnd="10dp"
+                android:paddingBottom="8dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="GLUKOSEVERLAUF"
+                        android:textColor="@color/wear_text"
+                        android:textSize="9sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/wear_history_info"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Keine Historie"
+                        android:textColor="@color/wear_text_secondary"
+                        android:textSize="7sp" />
+                </LinearLayout>
+
+                <app.aapswear.wear.WearGlucoseChart
+                    android:id="@+id/wear_glucose_chart"
+                    android:layout_width="match_parent"
+                    android:layout_height="0dp"
+                    android:layout_marginTop="4dp"
+                    android:layout_weight="1" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/wear_therapy_row"
+                android:layout_width="match_parent"
+                android:layout_height="62dp"
                 android:layout_marginTop="7dp"
                 android:baselineAligned="false"
                 android:orientation="horizontal">
+
                 <LinearLayout
                     android:layout_width="0dp"
                     android:layout_height="match_parent"
@@ -95,9 +219,51 @@
                     android:background="@drawable/bg_wear_tile"
                     android:gravity="center"
                     android:orientation="vertical">
-                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="TREND" android:textColor="@color/wear_text_secondary" android:textSize="10sp" />
-                    <TextView android:id="@+id/wear_trend" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="—" android:textColor="@color/wear_text" android:textSize="28sp" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="IOB"
+                        android:textColor="@color/wear_text_secondary"
+                        android:textSize="8sp" />
+
+                    <TextView
+                        android:id="@+id/wear_iob"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="—"
+                        android:textColor="@color/wear_text"
+                        android:textSize="14sp"
+                        android:textStyle="bold" />
                 </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_marginStart="3dp"
+                    android:layout_marginEnd="3dp"
+                    android:layout_weight="1"
+                    android:background="@drawable/bg_wear_tile"
+                    android:gravity="center"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="COB"
+                        android:textColor="@color/wear_text_secondary"
+                        android:textSize="8sp" />
+
+                    <TextView
+                        android:id="@+id/wear_cob"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="—"
+                        android:textColor="@color/wear_text"
+                        android:textSize="14sp"
+                        android:textStyle="bold" />
+                </LinearLayout>
+
                 <LinearLayout
                     android:layout_width="0dp"
                     android:layout_height="match_parent"
@@ -106,9 +272,22 @@
                     android:background="@drawable/bg_wear_tile"
                     android:gravity="center"
                     android:orientation="vertical">
-                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="DELTA" android:textColor="@color/wear_text_secondary" android:textSize="10sp" />
-                    <TextView android:id="@+id/wear_delta" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="—" android:textColor="@color/wear_cyan" android:textSize="21sp" />
-                    <TextView android:id="@+id/wear_age" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="—" android:textColor="@color/wear_text_secondary" android:textSize="10sp" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="BASAL"
+                        android:textColor="@color/wear_text_secondary"
+                        android:textSize="8sp" />
+
+                    <TextView
+                        android:id="@+id/wear_basal"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="—"
+                        android:textColor="@color/wear_text"
+                        android:textSize="13sp"
+                        android:textStyle="bold" />
                 </LinearLayout>
             </LinearLayout>
 
@@ -118,19 +297,81 @@
                 android:layout_marginTop="7dp"
                 android:background="@drawable/bg_wear_tile"
                 android:orientation="vertical"
-                android:padding="12dp">
-                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="VERBINDUNG" android:textColor="@color/wear_text_secondary" android:textSize="10sp" />
-                <TextView android:id="@+id/wear_connection" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="○ Telefon nicht erreichbar" android:textColor="@color/wear_text_secondary" android:textSize="13sp" />
-                <TextView android:id="@+id/wear_source" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="3dp" android:ellipsize="end" android:maxLines="1" android:text="AndroidAPS nicht erkannt" android:textColor="@color/wear_text" android:textSize="12sp" />
+                android:paddingStart="11dp"
+                android:paddingTop="8dp"
+                android:paddingEnd="11dp"
+                android:paddingBottom="8dp">
+
+                <TextView
+                    android:id="@+id/wear_config_info"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="3h · Prognose an · AAPS-Einheit"
+                    android:textColor="@color/wear_text"
+                    android:textSize="9sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/wear_preset_info"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:text="Complication-Preset: keines"
+                    android:textColor="@color/wear_text_secondary"
+                    android:textSize="8sp" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/wear_connection_card"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="7dp"
+                android:background="@drawable/bg_wear_tile"
+                android:clickable="true"
+                android:focusable="true"
+                android:orientation="vertical"
+                android:paddingStart="11dp"
+                android:paddingTop="8dp"
+                android:paddingEnd="11dp"
+                android:paddingBottom="8dp">
+
+                <TextView
+                    android:id="@+id/wear_connection"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="○ Telefon nicht erreichbar"
+                    android:textColor="@color/wear_text_secondary"
+                    android:textSize="10sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/wear_source"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:ellipsize="end"
+                    android:maxLines="1"
+                    android:text="AndroidAPS nicht erkannt"
+                    android:textColor="@color/wear_text"
+                    android:textSize="9sp" />
+
+                <TextView
+                    android:id="@+id/wear_sync_hint"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:text="Tippen zum Aktualisieren"
+                    android:textColor="@color/wear_text_secondary"
+                    android:textSize="8sp" />
             </LinearLayout>
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="12dp"
+                android:layout_marginTop="8dp"
                 android:text="@string/read_only"
                 android:textColor="@color/wear_text_secondary"
-                android:textSize="10sp" />
+                android:textSize="7sp" />
         </LinearLayout>
     </ScrollView>
 </FrameLayout>

@@ -241,60 +241,129 @@ abstract class TherapyComplicationService(
         }
 
         if (type == ComplicationType.RANGED_VALUE) {
-            val ranged = when (kind) {
-                ProviderKind.GLUCOSE_RANGED -> Triple(
-                    if (displayable && glucose != null) {
-                        glucose.valueMgDl.toFloat().coerceIn(
-                            GLUCOSE_GAUGE_MIN,
-                            GLUCOSE_GAUGE_MAX,
+            when (kind) {
+                ProviderKind.GLUCOSE,
+                ProviderKind.GLUCOSE_TREND,
+                ProviderKind.GLUCOSE_RANGED -> {
+                    val value =
+                        if (displayable && glucose != null) {
+                            glucose.valueMgDl
+                                .toFloat()
+                                .coerceIn(
+                                    GLUCOSE_GAUGE_MIN,
+                                    GLUCOSE_GAUGE_MAX,
+                                )
+                        } else {
+                            GLUCOSE_GAUGE_MIN
+                        }
+
+                    val rangedDescription =
+                        PlainComplicationText.Builder(
+                            if (displayable && glucose != null) {
+                                "$glucoseText $trendText"
+                            } else {
+                                "Glucose no data"
+                            },
+                        ).build()
+
+                    val rangedVisual =
+                        SmallImage.Builder(
+                            Icon.createWithBitmap(
+                                renderRangedGlucoseVisual(
+                                    glucoseText = glucoseText,
+                                    trendText = trendText.ifBlank { "→" },
+                                ),
+                            ),
+                            SmallImageType.ICON,
+                        ).build()
+
+                    return RangedValueComplicationData.Builder(
+                        value,
+                        GLUCOSE_GAUGE_MIN,
+                        GLUCOSE_GAUGE_MAX,
+                        rangedDescription,
+                    )                        .setText(
+                            PlainComplicationText.Builder(
+                                glucoseText,
+                            ).build(),
                         )
-                    } else {
-                        GLUCOSE_GAUGE_MIN
-                    },
-                    GLUCOSE_GAUGE_MIN,
-                    GLUCOSE_GAUGE_MAX,
-                )
+                        .setTitle(
+                            PlainComplicationText.Builder(
+                                trendText.ifBlank { "→" },
+                            ).build(),
+                        )
+                        .setSmallImage(rangedVisual)
+                        .setTapAction(tap)
+                        .build()
+                }
 
-                ProviderKind.RESERVOIR -> Triple(
-                    therapyState?.pump?.reservoirUnits
-                        ?.toFloat()
-                        ?.coerceIn(0f, 300f)
-                        ?: 0f,
-                    0f,
-                    300f,
-                )
+                ProviderKind.RESERVOIR -> {
+                    val value =
+                        therapyState?.pump?.reservoirUnits
+                            ?.toFloat()
+                            ?.coerceIn(0f, 300f)
+                            ?: 0f
 
-                ProviderKind.PUMP_BATTERY -> Triple(
-                    therapyState?.pump?.batteryPercent
-                        ?.toFloat()
-                        ?.coerceIn(0f, 100f)
-                        ?: 0f,
-                    0f,
-                    100f,
-                )
+                    return RangedValueComplicationData.Builder(
+                        value,
+                        0f,
+                        300f,
+                        description,
+                    )
+                        .setText(
+                            PlainComplicationText.Builder(
+                                pair.first,
+                            ).build(),
+                        )
+                        .setTapAction(tap)
+                        .build()
+                }
 
-                ProviderKind.PHONE_BATTERY -> Triple(
-                    therapyState?.device?.phoneBatteryPercent
-                        ?.toFloat()
-                        ?.coerceIn(0f, 100f)
-                        ?: 0f,
-                    0f,
-                    100f,
-                )
+                ProviderKind.PUMP_BATTERY -> {
+                    val value =
+                        therapyState?.pump?.batteryPercent
+                            ?.toFloat()
+                            ?.coerceIn(0f, 100f)
+                            ?: 0f
 
-                else -> null
-            }
+                    return RangedValueComplicationData.Builder(
+                        value,
+                        0f,
+                        100f,
+                        description,
+                    )
+                        .setText(
+                            PlainComplicationText.Builder(
+                                pair.first,
+                            ).build(),
+                        )
+                        .setTapAction(tap)
+                        .build()
+                }
 
-            if (ranged != null) {
-                return RangedValueComplicationData.Builder(
-                    ranged.first,
-                    ranged.second,
-                    ranged.third,
-                    description,
-                )
-                    .setText(PlainComplicationText.Builder(pair.first).build())
-                    .setTapAction(tap)
-                    .build()
+                ProviderKind.PHONE_BATTERY -> {
+                    val value =
+                        therapyState?.device?.phoneBatteryPercent
+                            ?.toFloat()
+                            ?.coerceIn(0f, 100f)
+                            ?: 0f
+
+                    return RangedValueComplicationData.Builder(
+                        value,
+                        0f,
+                        100f,
+                        description,
+                    )
+                        .setText(
+                            PlainComplicationText.Builder(
+                                pair.first,
+                            ).build(),
+                        )
+                        .setTapAction(tap)
+                        .build()
+                }
+
+                else -> Unit
             }
         }
 
@@ -320,6 +389,45 @@ abstract class TherapyComplicationService(
             .build()
     }
 
+    private fun renderRangedGlucoseVisual(
+        glucoseText: String,
+        trendText: String,
+    ): Bitmap {
+        val size = 192
+        val bitmap =
+            Bitmap.createBitmap(
+                size,
+                size,
+                Bitmap.Config.ARGB_8888,
+            )
+        val canvas = Canvas(bitmap)
+        val paint =
+            Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = Color.WHITE
+                textAlign = Paint.Align.CENTER
+                typeface = Typeface.DEFAULT_BOLD
+            }
+
+        canvas.drawColor(Color.TRANSPARENT)
+
+        paint.textSize = 82f
+        canvas.drawText(
+            glucoseText,
+            size / 2f,
+            100f,
+            paint,
+        )
+
+        paint.textSize = 48f
+        canvas.drawText(
+            trendText,
+            size / 2f,
+            158f,
+            paint,
+        )
+
+        return bitmap
+    }
     private fun renderImage(
         state: TherapyDisplayState?,
         kind: ProviderKind,
@@ -666,7 +774,7 @@ abstract class TherapyComplicationService(
             glucose = GlucoseState(
                 valueMgDl = 123.0,
                 displayUnit = GlucoseUnit.MG_DL,
-                trend = Trend.FLAT,
+                trend = Trend.FORTY_FIVE_UP,
                 measuredAtEpochMs = now,
                 deltaMgDl = 5.0,
                 averageDeltaMgDl = 3.0,

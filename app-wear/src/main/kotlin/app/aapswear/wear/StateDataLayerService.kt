@@ -26,7 +26,9 @@ class StateDataLayerService : WearableListenerService() {
     override fun onCreate() {
         super.onCreate()
         scope.launch {
-            runCatching { requestLatestState(this@StateDataLayerService) }
+            runCatching {
+                requestLatestState(this@StateDataLayerService)
+            }
         }
     }
 
@@ -39,6 +41,10 @@ class StateDataLayerService : WearableListenerService() {
                     persistComplicationPreset(event)
                 }
 
+                WearProtocol.WATCH_CONFIG_PATH -> {
+                    persistWatchConfig(event)
+                }
+
                 WearProtocol.STATE_PATH -> {
                     persistTherapyState(event)
                 }
@@ -47,44 +53,76 @@ class StateDataLayerService : WearableListenerService() {
     }
 
     private fun persistComplicationPreset(event: DataEvent) {
-        val ids = runCatching {
-            DataMapItem
-                .fromDataItem(event.dataItem)
-                .dataMap
-                .getIntegerArrayList("ids")
-        }.getOrNull()
-            .orEmpty()
-            .filter { it in 1..27 }
-            .distinct()
-            .take(MAX_PRESET_ITEMS)
+        val ids =
+            runCatching {
+                DataMapItem
+                    .fromDataItem(event.dataItem)
+                    .dataMap
+                    .getIntegerArrayList("ids")
+            }
+                .getOrNull()
+                .orEmpty()
+                .filter { it in 1..27 }
+                .distinct()
+                .take(MAX_PRESET_ITEMS)
 
         getSharedPreferences(
             COMPLICATION_SETUP_PREFS,
             Context.MODE_PRIVATE,
         )
             .edit()
-            .putString(COMPLICATION_PRESET_KEY, ids.joinToString(","))
+            .putString(
+                COMPLICATION_PRESET_KEY,
+                ids.joinToString(","),
+            )
             .apply()
     }
 
+    private fun persistWatchConfig(event: DataEvent) {
+        val config =
+            runCatching {
+                WearProtocol.decodeConfig(
+                    event.dataItem.data ?: return,
+                )
+            }.getOrNull() ?: return
+
+        WearDisplayPreferences.save(
+            this,
+            config,
+        )
+    }
+
     private fun persistTherapyState(event: DataEvent) {
-        val incoming = runCatching {
-            WearProtocol.decode(event.dataItem.data ?: return)
-        }.getOrNull() ?: return
+        val incoming =
+            runCatching {
+                WearProtocol.decode(
+                    event.dataItem.data ?: return,
+                )
+            }.getOrNull() ?: return
 
         scope.launch {
-            val store = TherapyStateStore(this@StateDataLayerService)
+            val store =
+                TherapyStateStore(
+                    this@StateDataLayerService,
+                )
             val old = store.state.first()
             val now = System.currentTimeMillis()
 
-            val mergedByTimestamp = linkedMapOf<Long, GlucoseSample>()
+            val mergedByTimestamp =
+                linkedMapOf<Long, GlucoseSample>()
 
-            old?.glucoseHistory
+            old
+                ?.glucoseHistory
                 .orEmpty()
-                .forEach { mergedByTimestamp[it.measuredAtEpochMs] = it }
+                .forEach {
+                    mergedByTimestamp[it.measuredAtEpochMs] = it
+                }
 
-            incoming.glucoseHistory
-                .forEach { mergedByTimestamp[it.measuredAtEpochMs] = it }
+            incoming
+                .glucoseHistory
+                .forEach {
+                    mergedByTimestamp[it.measuredAtEpochMs] = it
+                }
 
             incoming.glucose?.let {
                 mergedByTimestamp[it.measuredAtEpochMs] =
@@ -94,19 +132,24 @@ class StateDataLayerService : WearableListenerService() {
                     )
             }
 
-            val history = mergedByTimestamp
-                .values
-                .asSequence()
-                .filter {
-                    it.valueMgDl in 20.0..1000.0 &&
-                        now - it.measuredAtEpochMs <= HISTORY_WINDOW_MS &&
-                        it.measuredAtEpochMs <= now + FUTURE_TOLERANCE_MS
-                }
-                .sortedBy { it.measuredAtEpochMs }
-                .toList()
-                .takeLast(MAX_HISTORY_POINTS)
+            val history =
+                mergedByTimestamp
+                    .values
+                    .asSequence()
+                    .filter {
+                        it.valueMgDl in 20.0..1000.0 &&
+                            now - it.measuredAtEpochMs <= HISTORY_WINDOW_MS &&
+                            it.measuredAtEpochMs <= now + FUTURE_TOLERANCE_MS
+                    }
+                    .sortedBy { it.measuredAtEpochMs }
+                    .toList()
+                    .takeLast(MAX_HISTORY_POINTS)
 
-            store.save(incoming.copy(glucoseHistory = history))
+            store.save(
+                incoming.copy(
+                    glucoseHistory = history,
+                ),
+            )
             requestAllComplicationUpdates()
         }
     }
@@ -128,25 +171,47 @@ class StateDataLayerService : WearableListenerService() {
     }
 
     companion object {
-        private const val HISTORY_WINDOW_MS = 24 * 60 * 60_000L
-        private const val FUTURE_TOLERANCE_MS = 5 * 60_000L
+        private const val HISTORY_WINDOW_MS =
+            24 * 60 * 60_000L
+        private const val FUTURE_TOLERANCE_MS =
+            5 * 60_000L
         private const val MAX_HISTORY_POINTS = 300
 
-        private const val COMPLICATION_SETUP_PREFS = "complication_setup"
-        private const val COMPLICATION_PRESET_KEY = "selected_ids"
+        private const val COMPLICATION_SETUP_PREFS =
+            "complication_setup"
+        private const val COMPLICATION_PRESET_KEY =
+            "selected_ids"
         private const val MAX_PRESET_ITEMS = 4
     }
 }
 
-suspend fun requestLatestState(context: Context): Int {
-    val nodes = Wearable.getNodeClient(context).connectedNodes.await()
+suspend fun requestLatestState(
+    context: Context,
+): Int {
+    val nodes =
+        Wearable
+            .getNodeClient(context)
+            .connectedNodes
+            .await()
 
     nodes.forEach { node ->
         runCatching {
-            Wearable.getMessageClient(context)
+            Wearable
+                .getMessageClient(context)
                 .sendMessage(
                     node.id,
                     WearProtocol.REQUEST_PATH,
+                    byteArrayOf(),
+                )
+                .await()
+        }
+
+        runCatching {
+            Wearable
+                .getMessageClient(context)
+                .sendMessage(
+                    node.id,
+                    WearProtocol.WATCH_CONFIG_REQUEST_PATH,
                     byteArrayOf(),
                 )
                 .await()
