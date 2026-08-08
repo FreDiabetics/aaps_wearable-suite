@@ -12,4 +12,6 @@
     <string name="read_only">Nur Anzeige · read-only</string>
     <string name="source_protected">Datenquelle geschützt</string>
     <string name="legend_item">%1$s  %2$s</string>
+    <string name="dashboard_nightscout_label">NIGHTSCOUT</string>
+    <string name="dashboard_battery_percent_inline">&#160;&#160;%1$d%%</string>
 </resources>
