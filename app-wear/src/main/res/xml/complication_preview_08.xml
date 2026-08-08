@@ -4,10 +4,9 @@
         type="RANGED_VALUE"
         value="123"
         min="40"
-        max="260">
+        max="260"
+        monochromaticImage="@drawable/comp_preview_trend_arrow">
         <text><plain value="123" valueType="integer"/></text>
-    </complication>
-    <complication type="SHORT_TEXT">
-        <text><plain value="123" valueType="integer"/></text>
+        <title><plain value="↗" valueType="string"/></title>
     </complication>
 </complications>

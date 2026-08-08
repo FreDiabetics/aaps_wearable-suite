@@ -1,11 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <complications>
     <complication type="SHORT_TEXT">
-        <text><plain value="1.2U"/></text>
-        <title><plain value="IOB"/></title>
-    </complication>
-    <complication type="LONG_TEXT">
-        <text><plain value="IOB 1.2 U"/></text>
-        <title><plain value="IOB gesamt"/></title>
+        <text><plain value="1.20U" valueType="string"/></text>
     </complication>
 </complications>

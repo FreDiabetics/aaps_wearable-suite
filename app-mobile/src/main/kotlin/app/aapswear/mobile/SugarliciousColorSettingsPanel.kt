@@ -1,0 +1,751 @@
+package app.aapswear.mobile
+
+import android.content.Context
+import android.graphics.Color as AndroidColor
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Slider
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import app.aapswear.mobile.ui.theme.SugarliciousColorGroup
+import app.aapswear.mobile.ui.theme.SugarliciousColorRole
+import app.aapswear.mobile.ui.theme.SugarliciousColorStore
+import app.aapswear.mobile.ui.theme.SugarliciousColors
+import kotlin.math.roundToInt
+
+@Composable
+internal fun SugarliciousColorSettingsPanel() {
+    val context = LocalContext.current
+    val preferences =
+        remember {
+            context.getSharedPreferences(
+                "dashboard_ui",
+                Context.MODE_PRIVATE,
+            )
+        }
+
+    var palette by remember {
+        mutableStateOf(
+            SugarliciousColorStore.load(preferences),
+        )
+    }
+    var editingRole by remember {
+        mutableStateOf<SugarliciousColorRole?>(null)
+    }
+
+    fun reload() {
+        palette = SugarliciousColorStore.load(preferences)
+        SugarliciousColors.apply(palette)
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(
+                SugarliciousColors.Surface,
+                RoundedCornerShape(24.dp),
+            )
+            .border(
+                1.dp,
+                SugarliciousColors.Border,
+                RoundedCornerShape(24.dp),
+            )
+            .padding(14.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text(
+                    text = "FARBEN",
+                    color = SugarliciousColors.TextSecondary,
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    letterSpacing = 0.6.sp,
+                )
+                Text(
+                    text = "Mobile App vollständig anpassen",
+                    color = SugarliciousColors.TextPrimary,
+                    fontSize = 17.sp,
+                    fontWeight = FontWeight.SemiBold,
+                )
+            }
+
+            TextButton(
+                onClick = {
+                    SugarliciousColorStore.resetAll(preferences)
+                    reload()
+                },
+            ) {
+                Text(
+                    "ALLES RESET",
+                    color = SugarliciousColors.Primary,
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Bold,
+                )
+            }
+        }
+
+        Text(
+            text =
+                "Jede Zeile zeigt rechts ein Beispiel der betroffenen " +
+                    "Darstellung. Tippen öffnet HEX- und RGB-Einstellung.",
+            color = SugarliciousColors.TextSecondary,
+            fontSize = 10.sp,
+            lineHeight = 14.sp,
+        )
+
+        SugarliciousColorGroup.entries.forEach { group ->
+            Text(
+                text = group.label.uppercase(),
+                color = SugarliciousColors.TextSecondary,
+                fontSize = 10.sp,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(top = 6.dp),
+            )
+
+            SugarliciousColorRole.entries
+                .filter { it.group == group }
+                .forEach { role ->
+                    val argb = palette.argb(role)
+
+                    ColorSettingRow(
+                        role = role,
+                        argb = argb,
+                        isDefault = argb == role.defaultArgb,
+                        onEdit = {
+                            editingRole = role
+                        },
+                        onReset = {
+                            SugarliciousColorStore.reset(
+                                preferences,
+                                role,
+                            )
+                            reload()
+                        },
+                    )
+                }
+        }
+    }
+
+    editingRole?.let { role ->
+        ColorEditorDialog(
+            role = role,
+            initialArgb = palette.argb(role),
+            onDismiss = {
+                editingRole = null
+            },
+            onSave = { argb ->
+                SugarliciousColorStore.save(
+                    preferences,
+                    role,
+                    argb,
+                )
+                reload()
+                editingRole = null
+            },
+        )
+    }
+}
+
+@Composable
+private fun ColorSettingRow(
+    role: SugarliciousColorRole,
+    argb: Int,
+    isDefault: Boolean,
+    onEdit: () -> Unit,
+    onReset: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(
+                SugarliciousColors.SurfaceHigh,
+                RoundedCornerShape(16.dp),
+            )
+            .clickable(onClick = onEdit)
+            .padding(
+                horizontal = 11.dp,
+                vertical = 9.dp,
+            ),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            modifier = Modifier
+                .size(24.dp)
+                .background(
+                    Color(argb),
+                    CircleShape,
+                )
+                .border(
+                    1.dp,
+                    SugarliciousColors.Border,
+                    CircleShape,
+                ),
+        )
+
+        Spacer(Modifier.width(9.dp))
+
+        Column(Modifier.weight(1f)) {
+            Text(
+                text = role.label,
+                color = SugarliciousColors.TextPrimary,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Medium,
+            )
+            Text(
+                text = toHex(argb),
+                color = SugarliciousColors.TextSecondary,
+                fontSize = 9.sp,
+            )
+        }
+
+        if (!isDefault) {
+            TextButton(
+                onClick = onReset,
+                modifier = Modifier.padding(horizontal = 2.dp),
+            ) {
+                Text(
+                    "RESET",
+                    color = SugarliciousColors.Primary,
+                    fontSize = 8.sp,
+                    fontWeight = FontWeight.Bold,
+                )
+            }
+        }
+
+        Spacer(Modifier.width(6.dp))
+
+        ColorRoleExample(
+            role = role,
+            argb = argb,
+            modifier = Modifier
+                .width(88.dp)
+                .height(42.dp),
+        )
+    }
+}
+
+@Composable
+private fun ColorRoleExample(
+    role: SugarliciousColorRole,
+    argb: Int,
+    modifier: Modifier = Modifier,
+) {
+    val selectedColor = Color(argb)
+    val shape = RoundedCornerShape(12.dp)
+
+    Box(
+        modifier = modifier
+            .background(
+                SugarliciousColors.Surface,
+                shape,
+            )
+            .border(
+                1.dp,
+                SugarliciousColors.Border,
+                shape,
+            )
+            .padding(5.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        when (role) {
+            SugarliciousColorRole.BACKGROUND -> {
+                Box(
+                    Modifier
+                        .fillMaxSize()
+                        .background(selectedColor, RoundedCornerShape(8.dp)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Box(
+                        Modifier
+                            .width(46.dp)
+                            .height(20.dp)
+                            .background(
+                                SugarliciousColors.Surface,
+                                RoundedCornerShape(6.dp),
+                            ),
+                    )
+                }
+            }
+
+            SugarliciousColorRole.SURFACE,
+            SugarliciousColorRole.SURFACE_HIGH,
+            SugarliciousColorRole.SURFACE_RAISED,
+            SugarliciousColorRole.SURFACE_SELECTED
+            -> {
+                Box(
+                    Modifier
+                        .width(60.dp)
+                        .height(27.dp)
+                        .background(
+                            selectedColor,
+                            RoundedCornerShape(8.dp),
+                        )
+                        .border(
+                            1.dp,
+                            SugarliciousColors.Border,
+                            RoundedCornerShape(8.dp),
+                        ),
+                )
+            }
+
+            SugarliciousColorRole.BORDER -> {
+                Box(
+                    Modifier
+                        .width(60.dp)
+                        .height(27.dp)
+                        .border(
+                            2.dp,
+                            selectedColor,
+                            RoundedCornerShape(8.dp),
+                        ),
+                )
+            }
+
+            SugarliciousColorRole.TEXT_PRIMARY,
+            SugarliciousColorRole.TEXT_SECONDARY
+            -> {
+                Text(
+                    text = "Aa",
+                    color = selectedColor,
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                )
+            }
+
+            SugarliciousColorRole.ON_PRIMARY -> {
+                Box(
+                    Modifier
+                        .fillMaxSize()
+                        .background(
+                            SugarliciousColors.Primary,
+                            RoundedCornerShape(8.dp),
+                        ),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        "Aa",
+                        color = selectedColor,
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold,
+                    )
+                }
+            }
+
+            SugarliciousColorRole.ON_SECONDARY -> {
+                Box(
+                    Modifier
+                        .fillMaxSize()
+                        .background(
+                            SugarliciousColors.Secondary,
+                            RoundedCornerShape(8.dp),
+                        ),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        "Aa",
+                        color = selectedColor,
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold,
+                    )
+                }
+            }
+
+            SugarliciousColorRole.GLUCOSE_LOW,
+            SugarliciousColorRole.GLUCOSE_IN_RANGE,
+            SugarliciousColorRole.GLUCOSE_HIGH
+            -> {
+                Text(
+                    text = "123",
+                    color = selectedColor,
+                    fontSize = 19.sp,
+                    fontWeight = FontWeight.Bold,
+                )
+            }
+
+            SugarliciousColorRole.TARGET_BAND -> {
+                Box(
+                    Modifier
+                        .fillMaxWidth()
+                        .height(18.dp)
+                        .background(
+                            selectedColor,
+                            RoundedCornerShape(5.dp),
+                        ),
+                )
+            }
+
+            SugarliciousColorRole.PREDICTION_IOB,
+            SugarliciousColorRole.PREDICTION_COB,
+            SugarliciousColorRole.PREDICTION_UAM,
+            SugarliciousColorRole.PREDICTION_ZERO_TEMP
+            -> {
+                Canvas(Modifier.fillMaxSize()) {
+                    repeat(5) { index ->
+                        drawCircle(
+                            color = selectedColor,
+                            radius = 3.3.dp.toPx(),
+                            center = Offset(
+                                x = 9.dp.toPx() + index * 14.dp.toPx(),
+                                y =
+                                    size.height -
+                                        8.dp.toPx() -
+                                        index * 4.dp.toPx(),
+                            ),
+                        )
+                    }
+                }
+            }
+
+            SugarliciousColorRole.GRAPH_IOB,
+            SugarliciousColorRole.GRAPH_COB
+            -> {
+                Canvas(Modifier.fillMaxSize()) {
+                    val points =
+                        listOf(
+                            Offset(4.dp.toPx(), size.height - 5.dp.toPx()),
+                            Offset(22.dp.toPx(), size.height - 15.dp.toPx()),
+                            Offset(40.dp.toPx(), size.height - 11.dp.toPx()),
+                            Offset(58.dp.toPx(), 7.dp.toPx()),
+                        )
+
+                    points.zipWithNext().forEach { (start, end) ->
+                        drawLine(
+                            color = selectedColor,
+                            start = start,
+                            end = end,
+                            strokeWidth = 3.dp.toPx(),
+                        )
+                    }
+                }
+            }
+
+            SugarliciousColorRole.GRAPH_GRID -> {
+                Canvas(Modifier.fillMaxSize()) {
+                    repeat(3) { index ->
+                        val y = size.height * index / 2f
+                        drawLine(
+                            color = selectedColor,
+                            start = Offset(0f, y),
+                            end = Offset(size.width, y),
+                            strokeWidth = 1.dp.toPx(),
+                        )
+                    }
+                    repeat(3) { index ->
+                        val x = size.width * index / 2f
+                        drawLine(
+                            color = selectedColor,
+                            start = Offset(x, 0f),
+                            end = Offset(x, size.height),
+                            strokeWidth = 1.dp.toPx(),
+                        )
+                    }
+                }
+            }
+
+            SugarliciousColorRole.GRAPH_LABEL -> {
+                Text(
+                    text = "120  18",
+                    color = selectedColor,
+                    fontSize = 12.sp,
+                    textAlign = TextAlign.Center,
+                )
+            }
+
+            SugarliciousColorRole.GRAPH_MUTED -> {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    repeat(4) {
+                        Box(
+                            Modifier
+                                .width(11.dp)
+                                .height(2.dp)
+                                .background(selectedColor),
+                        )
+                    }
+                }
+            }
+
+            SugarliciousColorRole.GRAPH_CURRENT_OUTLINE -> {
+                Canvas(Modifier.fillMaxSize()) {
+                    drawCircle(
+                        color = selectedColor,
+                        radius = 12.dp.toPx(),
+                        center = center,
+                        style = Stroke(
+                            width = 3.dp.toPx(),
+                        ),
+                    )
+                    drawCircle(
+                        color = SugarliciousColors.GlucoseInRange,
+                        radius = 7.dp.toPx(),
+                        center = center,
+                    )
+                }
+            }
+
+            else -> {
+                val label =
+                    when (role) {
+                        SugarliciousColorRole.BLUE -> "IOB"
+                        SugarliciousColorRole.ORANGE -> "COB"
+                        SugarliciousColorRole.YELLOW -> "!"
+                        SugarliciousColorRole.RED -> "!"
+                        SugarliciousColorRole.PURPLE -> "●"
+                        SugarliciousColorRole.GREEN -> "●"
+                        SugarliciousColorRole.BRAND_GREEN -> "S"
+                        SugarliciousColorRole.PRIMARY -> "AKTIV"
+                        SugarliciousColorRole.SECONDARY -> "INFO"
+                    }
+
+                Box(
+                    modifier = Modifier
+                        .background(
+                            selectedColor.copy(alpha = 0.18f),
+                            RoundedCornerShape(999.dp),
+                        )
+                        .border(
+                            1.dp,
+                            selectedColor,
+                            RoundedCornerShape(999.dp),
+                        )
+                        .padding(
+                            horizontal = 9.dp,
+                            vertical = 4.dp,
+                        ),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        text = label,
+                        color = selectedColor,
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.Bold,
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ColorEditorDialog(
+    role: SugarliciousColorRole,
+    initialArgb: Int,
+    onDismiss: () -> Unit,
+    onSave: (Int) -> Unit,
+) {
+    var red by remember(role, initialArgb) {
+        mutableIntStateOf(AndroidColor.red(initialArgb))
+    }
+    var green by remember(role, initialArgb) {
+        mutableIntStateOf(AndroidColor.green(initialArgb))
+    }
+    var blue by remember(role, initialArgb) {
+        mutableIntStateOf(AndroidColor.blue(initialArgb))
+    }
+    var hex by remember(role, initialArgb) {
+        mutableStateOf(toHex(initialArgb))
+    }
+
+    fun currentArgb(): Int =
+        AndroidColor.rgb(red, green, blue)
+
+    fun syncHex() {
+        hex = toHex(currentArgb())
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(
+                role.label,
+                color = SugarliciousColors.TextPrimary,
+            )
+        },
+        text = {
+            Column(
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                ColorRoleExample(
+                    role = role,
+                    argb = currentArgb(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(62.dp),
+                )
+
+                OutlinedTextField(
+                    value = hex,
+                    onValueChange = { value ->
+                        val normalized =
+                            value
+                                .trim()
+                                .uppercase()
+                                .let {
+                                    if (it.startsWith("#")) it
+                                    else "#$it"
+                                }
+                                .take(7)
+
+                        hex = normalized
+
+                        parseHex(normalized)?.let { parsed ->
+                            red = AndroidColor.red(parsed)
+                            green = AndroidColor.green(parsed)
+                            blue = AndroidColor.blue(parsed)
+                        }
+                    },
+                    label = {
+                        Text("HEX")
+                    },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+
+                ChannelSlider(
+                    label = "Rot",
+                    value = red,
+                    onChange = {
+                        red = it
+                        syncHex()
+                    },
+                )
+                ChannelSlider(
+                    label = "Grün",
+                    value = green,
+                    onChange = {
+                        green = it
+                        syncHex()
+                    },
+                )
+                ChannelSlider(
+                    label = "Blau",
+                    value = blue,
+                    onChange = {
+                        blue = it
+                        syncHex()
+                    },
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    onSave(currentArgb())
+                },
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = SugarliciousColors.Primary,
+                    contentColor = SugarliciousColors.OnPrimary,
+                ),
+            ) {
+                Text("SPEICHERN")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(
+                    "ABBRECHEN",
+                    color = SugarliciousColors.TextSecondary,
+                )
+            }
+        },
+        containerColor = SugarliciousColors.Surface,
+        titleContentColor = SugarliciousColors.TextPrimary,
+        textContentColor = SugarliciousColors.TextPrimary,
+    )
+}
+
+@Composable
+private fun ChannelSlider(
+    label: String,
+    value: Int,
+    onChange: (Int) -> Unit,
+) {
+    Column {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                label,
+                color = SugarliciousColors.TextSecondary,
+                fontSize = 11.sp,
+                modifier = Modifier.weight(1f),
+            )
+            Text(
+                value.toString(),
+                color = SugarliciousColors.TextPrimary,
+                fontSize = 11.sp,
+            )
+        }
+
+        Slider(
+            value = value.toFloat(),
+            onValueChange = {
+                onChange(
+                    it.roundToInt().coerceIn(0, 255),
+                )
+            },
+            valueRange = 0f..255f,
+        )
+    }
+}
+
+private fun toHex(argb: Int): String =
+    String.format(
+        "#%02X%02X%02X",
+        AndroidColor.red(argb),
+        AndroidColor.green(argb),
+        AndroidColor.blue(argb),
+    )
+
+private fun parseHex(value: String): Int? {
+    val cleaned = value.removePrefix("#")
+    if (cleaned.length != 6) {
+        return null
+    }
+
+    return cleaned.toIntOrNull(16)?.let {
+        0xFF000000.toInt() or it
+    }
+}

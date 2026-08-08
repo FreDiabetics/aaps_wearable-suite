@@ -1,11 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <complications>
     <complication type="SHORT_TEXT">
-        <text><plain value="15g"/></text>
-        <title><plain value="COB"/></title>
-    </complication>
-    <complication type="LONG_TEXT">
-        <text><plain value="COB 15 g"/></text>
-        <title><plain value="COB"/></title>
+        <text><plain value="15g" valueType="string"/></text>
     </complication>
 </complications>

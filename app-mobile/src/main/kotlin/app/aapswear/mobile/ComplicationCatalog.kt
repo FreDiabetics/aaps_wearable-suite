@@ -1,5 +1,6 @@
 package app.aapswear.mobile
 
+import androidx.core.content.edit
 import android.content.Context
 import android.widget.Toast
 import androidx.compose.foundation.Canvas
@@ -24,11 +25,11 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -65,41 +66,47 @@ internal enum class ComplicationCategory(
     val label: String,
     val range: String,
 ) {
-    GLUCOSE("Glukose", "01–10"),
-    THERAPY("Therapie", "11–21"),
-    DEVICE("Geräte & Status", "22–27"),
+    GLUCOSE("Glukose", "02 · 03 · 09 · 10"),
+    THERAPY("Therapie", "11 · 14"),
 }
 
 internal val SugarliciousComplicationCatalog = listOf(
-    ComplicationCatalogEntry(1, "Glucose", ComplicationCategory.GLUCOSE, "RANGED"),
-    ComplicationCatalogEntry(2, "Glucose + Trend", ComplicationCategory.GLUCOSE, "RANGED"),
-    ComplicationCatalogEntry(3, "Glucose-Delta", ComplicationCategory.GLUCOSE, "SHORT · LONG"),
-    ComplicationCatalogEntry(4, "Glucose + Trend + Delta", ComplicationCategory.GLUCOSE, "SHORT · LONG"),
-    ComplicationCatalogEntry(5, "Glukose-Datenalter", ComplicationCategory.GLUCOSE, "SHORT · LONG"),
-    ComplicationCatalogEntry(6, "Glucose image", ComplicationCategory.GLUCOSE, "IMAGE"),
-    ComplicationCatalogEntry(7, "Glukosebereich 80–160", ComplicationCategory.GLUCOSE, "SHORT · LONG"),
-    ComplicationCatalogEntry(8, "Glukose-Anzeige", ComplicationCategory.GLUCOSE, "RANGED"),
-    ComplicationCatalogEntry(9, "Glukosegraph 3h", ComplicationCategory.GLUCOSE, "IMAGE"),
-    ComplicationCatalogEntry(10, "Glukosegraph 6h", ComplicationCategory.GLUCOSE, "IMAGE"),
-
-    ComplicationCatalogEntry(11, "IOB gesamt", ComplicationCategory.THERAPY, "SHORT · LONG"),
-    ComplicationCatalogEntry(12, "Bolus IOB", ComplicationCategory.THERAPY, "SHORT · LONG"),
-    ComplicationCatalogEntry(13, "Basal IOB", ComplicationCategory.THERAPY, "SHORT · LONG"),
-    ComplicationCatalogEntry(14, "COB", ComplicationCategory.THERAPY, "SHORT · LONG"),
-    ComplicationCatalogEntry(15, "IOB + COB", ComplicationCategory.THERAPY, "SHORT · LONG"),
-    ComplicationCatalogEntry(16, "Basal rate", ComplicationCategory.THERAPY, "SHORT · LONG"),
-    ComplicationCatalogEntry(17, "Temp basal", ComplicationCategory.THERAPY, "SHORT · LONG"),
-    ComplicationCatalogEntry(18, "Target", ComplicationCategory.THERAPY, "SHORT · LONG"),
-    ComplicationCatalogEntry(19, "Loop-Status", ComplicationCategory.THERAPY, "SHORT · LONG"),
-    ComplicationCatalogEntry(20, "Letzter Loop", ComplicationCategory.THERAPY, "SHORT · LONG"),
-    ComplicationCatalogEntry(21, "Profile", ComplicationCategory.THERAPY, "SHORT · LONG"),
-
-    ComplicationCatalogEntry(22, "Reservoir", ComplicationCategory.DEVICE, "SHORT · LONG · RANGED"),
-    ComplicationCatalogEntry(23, "Pump battery", ComplicationCategory.DEVICE, "SHORT · LONG · RANGED"),
-    ComplicationCatalogEntry(24, "Phone battery", ComplicationCategory.DEVICE, "SHORT · LONG · RANGED"),
-    ComplicationCatalogEntry(25, "AAPS-Datenquelle", ComplicationCategory.DEVICE, "SHORT · LONG"),
-    ComplicationCatalogEntry(26, "Sugarlicious Kurzstatus", ComplicationCategory.DEVICE, "SHORT · LONG"),
-    ComplicationCatalogEntry(27, "Sugarlicious Vollstatus", ComplicationCategory.DEVICE, "LONG"),
+    ComplicationCatalogEntry(
+        2,
+        "Glucose + Trend",
+        ComplicationCategory.GLUCOSE,
+        "RANGED",
+    ),
+    ComplicationCatalogEntry(
+        3,
+        "Delta + Alter",
+        ComplicationCategory.GLUCOSE,
+        "SHORT",
+    ),
+    ComplicationCatalogEntry(
+        9,
+        "Glukosegraph 3h",
+        ComplicationCategory.GLUCOSE,
+        "IMAGE",
+    ),
+    ComplicationCatalogEntry(
+        10,
+        "Glukosegraph 6h",
+        ComplicationCategory.GLUCOSE,
+        "IMAGE",
+    ),
+    ComplicationCatalogEntry(
+        11,
+        "IOB",
+        ComplicationCategory.THERAPY,
+        "SHORT",
+    ),
+    ComplicationCatalogEntry(
+        14,
+        "COB",
+        ComplicationCategory.THERAPY,
+        "SHORT",
+    ),
 )
 
 @Composable
@@ -436,7 +443,7 @@ private fun ComplicationDataPreview(
     val preview = previewFor(entry.id, state)
     val shape = RoundedCornerShape(14.dp)
 
-    if (entry.id == 1 || entry.id == 2 || entry.id == 8) {
+    if (entry.id == 2) {
         val now = System.currentTimeMillis()
         val glucose = state?.glucose
         val freshness = FreshnessPolicy.classify(glucose?.measuredAtEpochMs, now)
@@ -531,9 +538,9 @@ private fun CircularGlucoseComplicationPreview(
     modifier: Modifier = Modifier,
 ) {
     val foreground = when {
-        glucoseValue < 80.0 -> SugarliciousColors.Red
-        glucoseValue > 160.0 -> SugarliciousColors.Yellow
-        else -> SugarliciousColors.TextPrimary
+        glucoseValue < 80.0 -> SugarliciousColors.GlucoseLow
+        glucoseValue > 160.0 -> SugarliciousColors.GlucoseHigh
+        else -> SugarliciousColors.GlucoseInRange
     }
     val progress =
         ((glucoseValue - 40.0) / (260.0 - 40.0))
@@ -545,7 +552,7 @@ private fun CircularGlucoseComplicationPreview(
         contentAlignment = Alignment.Center,
     ) {
         Box(
-            modifier = Modifier.size(108.dp),
+            modifier = Modifier.size(116.dp),
             contentAlignment = Alignment.Center,
         ) {
             Canvas(modifier = Modifier.fillMaxSize()) {
@@ -595,18 +602,16 @@ private fun CircularGlucoseComplicationPreview(
                 Text(
                     text = glucoseText,
                     color = foreground,
-                    fontSize = 28.sp,
-                    lineHeight = 28.sp,
+                    fontSize = 30.sp,
+                    lineHeight = 30.sp,
                     fontWeight = FontWeight.Bold,
                 )
-
-                Spacer(Modifier.height(1.dp))
 
                 Text(
                     text = trendText,
                     color = SugarliciousColors.TextPrimary,
-                    fontSize = 26.sp,
-                    lineHeight = 26.sp,
+                    fontSize = 30.sp,
+                    lineHeight = 30.sp,
                     fontWeight = FontWeight.Bold,
                 )
             }
@@ -637,7 +642,7 @@ private fun MiniGlucosePreview(
         val highY = size.height * ((260.0 - 160.0) / 220.0).toFloat()
 
         drawRect(
-            color = Color(0xFF0A391C),
+            color = SugarliciousColors.TargetBand,
             topLeft = Offset(0f, highY),
             size = androidx.compose.ui.geometry.Size(
                 size.width,
@@ -696,8 +701,9 @@ private fun previewFor(
 
     val glucoseColor = when {
         g == null -> SugarliciousColors.TextPrimary
-        g.valueMgDl in 80.0..160.0 -> SugarliciousColors.TextPrimary
-        else -> SugarliciousColors.Red
+        g.valueMgDl < 80.0 -> SugarliciousColors.GlucoseLow
+        g.valueMgDl > 160.0 -> SugarliciousColors.GlucoseHigh
+        else -> SugarliciousColors.GlucoseInRange
     }
 
     fun number(v: Double?, digits: Int, fallback: String): String =
@@ -706,7 +712,7 @@ private fun previewFor(
     return when (id) {
         1 -> PhonePreview(glucoseText, unitLabel(g?.displayUnit), glucoseColor)
         2 -> PhonePreview("$glucoseText$trend", "Glucose + Trend", glucoseColor)
-        3 -> PhonePreview(delta, "Delta")
+        3 -> PhonePreview("$delta · $age", "")
         4 -> PhonePreview("$glucoseText$trend", "Δ $delta", glucoseColor)
         5 -> PhonePreview(age, freshness.name.lowercase())
         6 -> PhonePreview("$glucoseText$trend", "Bild-Complication", glucoseColor)
@@ -723,10 +729,10 @@ private fun previewFor(
         8 -> PhonePreview(glucoseText, trend, glucoseColor)
         9, 10 -> PhonePreview("$glucoseText$trend", "Dot-Graph", glucoseColor)
 
-        11 -> PhonePreview(number(state?.insulin?.totalIob, 2, "1.20") + " U", "IOB")
+        11 -> PhonePreview(number(state?.insulin?.totalIob, 2, "1.20") + "U", "")
         12 -> PhonePreview(number(state?.insulin?.bolusIob, 2, "0.80") + " U", "Bolus")
         13 -> PhonePreview(number(state?.insulin?.basalIob, 2, "0.40") + " U", "Basal IOB")
-        14 -> PhonePreview(number(state?.carbs?.cobGrams, 0, "15") + " g", "COB")
+        14 -> PhonePreview(number(state?.carbs?.cobGrams, 0, "15") + "g", "")
         15 -> PhonePreview(
             "${number(state?.insulin?.totalIob, 1, "1.2")} U · " +
                 "${number(state?.carbs?.cobGrams, 0, "15")} g",
@@ -749,15 +755,18 @@ private fun previewFor(
             ),
             "Target",
         )
-        19 -> PhonePreview(
-            when (state?.loop?.status?.lowercase()) {
-                "enacted" -> "aktiv"
-                "suggested" -> "Vorschlag"
-                null -> "aktiv"
-                else -> state?.loop?.status ?: "—"
-            },
-            "Loop",
-        )
+        19 -> {
+            val loopStatus = state?.loop?.status
+            PhonePreview(
+                when (loopStatus?.lowercase()) {
+                    "enacted" -> "aktiv"
+                    "suggested" -> "Vorschlag"
+                    null -> "aktiv"
+                    else -> loopStatus
+                },
+                "Loop",
+            )
+        }
         20 -> PhonePreview(
             state?.loop?.lastRunAtEpochMs?.let {
                 TherapyDisplayFormatter.ageMinutes(it, now)
@@ -827,10 +836,9 @@ private fun togglePresetEntry(
         else -> current + entryId
     }
 
-    context.getSharedPreferences(PRESET_PREFS, Context.MODE_PRIVATE)
-        .edit()
-        .putString(PRESET_KEY, updated.joinToString(","))
-        .apply()
+    context.getSharedPreferences(PRESET_PREFS, Context.MODE_PRIVATE).edit {
+        putString(PRESET_KEY, updated.joinToString(","))
+    }
 
     return updated
 }

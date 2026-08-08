@@ -1,5 +1,6 @@
 package app.aapswear.mobile
 
+import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Color
@@ -18,6 +19,8 @@ import app.aapswear.model.GlucoseUnit
 import app.aapswear.model.PredictionKind
 import app.aapswear.model.TherapyDisplayState
 import app.aapswear.model.TherapyHistorySample
+import app.aapswear.mobile.ui.theme.SugarliciousColorRole
+import app.aapswear.mobile.ui.theme.SugarliciousColors
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -25,6 +28,7 @@ import kotlin.math.ceil
 import kotlin.math.max
 import kotlin.math.min
 
+@SuppressLint("DrawAllocation")
 class GlucoseDashboardChart @JvmOverloads constructor(
     context: Context,
     attrs: AttributeSet? = null,
@@ -85,14 +89,14 @@ class GlucoseDashboardChart @JvmOverloads constructor(
 
         val targetTop = mapY(DISPLAY_RANGE_HIGH_MGDL, yMin, yMax, plot)
         val targetBottom = mapY(DISPLAY_RANGE_LOW_MGDL, yMin, yMax, plot)
-        fillPaint.color = Color.rgb(10, 57, 28)
+        fillPaint.color = SugarliciousColors.argb(SugarliciousColorRole.TARGET_BAND)
         canvas.drawRect(plot.left, targetTop, plot.right, targetBottom, fillPaint)
 
         drawGrid(canvas, plot, start, end, yMin, yMax)
 
         val dividerX = mapX(now, start, end, plot)
         if (visiblePredictions.isNotEmpty()) {
-            linePaint.color = Color.argb(170, 125, 125, 125)
+            linePaint.color = SugarliciousColors.argb(SugarliciousColorRole.GRAPH_MUTED)
             linePaint.strokeWidth = 1.0f.dp
             linePaint.pathEffect = DashPathEffect(floatArrayOf(4f.dp, 4f.dp), 0f)
             canvas.drawLine(dividerX, plot.top, dividerX, plot.bottom, linePaint)
@@ -104,10 +108,10 @@ class GlucoseDashboardChart @JvmOverloads constructor(
 
         visiblePredictions.forEach { series ->
             val color = when (series.kind) {
-                PredictionKind.IOB -> Color.rgb(82, 193, 255)
-                PredictionKind.COB, PredictionKind.ACOB -> Color.rgb(244, 222, 0)
-                PredictionKind.UAM -> Color.rgb(255, 174, 31)
-                PredictionKind.ZERO_TEMP -> Color.rgb(48, 219, 222)
+                PredictionKind.IOB -> SugarliciousColors.argb(SugarliciousColorRole.PREDICTION_IOB)
+                PredictionKind.COB, PredictionKind.ACOB -> SugarliciousColors.argb(SugarliciousColorRole.PREDICTION_COB)
+                PredictionKind.UAM -> SugarliciousColors.argb(SugarliciousColorRole.PREDICTION_UAM)
+                PredictionKind.ZERO_TEMP -> SugarliciousColors.argb(SugarliciousColorRole.PREDICTION_ZERO_TEMP)
             }
             drawPredictionDots(
                 canvas,
@@ -123,12 +127,12 @@ class GlucoseDashboardChart @JvmOverloads constructor(
         }
 
         if (visibleHistory.size < 2) {
-            drawEmptyMessage(canvas, plot, "Verlauf baut sich aus AAPS-Empfangsdaten auf")
+            drawEmptyMessage(canvas, plot)
         }
     }
 
     private fun drawGrid(canvas: Canvas, plot: RectF, start: Long, end: Long, yMin: Double, yMax: Double) {
-        linePaint.color = Color.rgb(70, 70, 70)
+        linePaint.color = SugarliciousColors.argb(SugarliciousColorRole.GRAPH_GRID)
         linePaint.strokeWidth = 0.8f.dp
         linePaint.pathEffect = DashPathEffect(floatArrayOf(3f.dp, 3f.dp), 0f)
 
@@ -136,14 +140,14 @@ class GlucoseDashboardChart @JvmOverloads constructor(
             val y = plot.top + plot.height() * index / 4f
             canvas.drawLine(plot.left, y, plot.right, y, linePaint)
             val value = yMax - (yMax - yMin) * index / 4.0
-            drawText(canvas, glucoseLabel(value), plot.right + 5f.dp, y + 3f.dp, 9f, Color.rgb(210, 210, 210), Paint.Align.LEFT)
+            drawText(canvas, glucoseLabel(value), plot.right + 5f.dp, y + 3f.dp, 9f, SugarliciousColors.argb(SugarliciousColorRole.GRAPH_LABEL), Paint.Align.LEFT)
         }
 
         repeat(4) { index ->
             val x = plot.left + plot.width() * index / 3f
             canvas.drawLine(x, plot.top, x, plot.bottom, linePaint)
             val time = start + (end - start) * index / 3
-            drawText(canvas, timeFormat.format(Date(time)), x, plot.bottom + 15f.dp, 9f, Color.rgb(200, 200, 200), Paint.Align.CENTER)
+            drawText(canvas, timeFormat.format(Date(time)), x, plot.bottom + 15f.dp, 9f, SugarliciousColors.argb(SugarliciousColorRole.GRAPH_LABEL), Paint.Align.CENTER)
         }
 
         linePaint.pathEffect = null
@@ -185,7 +189,7 @@ class GlucoseDashboardChart @JvmOverloads constructor(
         val x = if (pinCurrent) min(rawX, dividerX - 4f.dp) else rawX
         val y = mapY(point.valueMgDl, yMin, yMax, plot)
 
-        fillPaint.color = Color.BLACK
+        fillPaint.color = SugarliciousColors.argb(SugarliciousColorRole.GRAPH_CURRENT_OUTLINE)
         canvas.drawCircle(x, y, 4.8f.dp, fillPaint)
 
         fillPaint.color = glucoseDotColor(point.valueMgDl)
@@ -219,9 +223,9 @@ class GlucoseDashboardChart @JvmOverloads constructor(
     }
 
     private fun glucoseDotColor(valueMgDl: Double): Int = when {
-        valueMgDl < DISPLAY_RANGE_LOW_MGDL -> Color.rgb(255, 92, 105)
-        valueMgDl > DISPLAY_RANGE_HIGH_MGDL -> Color.rgb(255, 208, 64)
-        else -> Color.WHITE
+        valueMgDl < DISPLAY_RANGE_LOW_MGDL -> SugarliciousColors.argb(SugarliciousColorRole.GLUCOSE_LOW)
+        valueMgDl > DISPLAY_RANGE_HIGH_MGDL -> SugarliciousColors.argb(SugarliciousColorRole.GLUCOSE_HIGH)
+        else -> SugarliciousColors.argb(SugarliciousColorRole.GLUCOSE_IN_RANGE)
     }
 
     private fun glucoseLabel(valueMgDl: Double): String =
@@ -231,8 +235,8 @@ class GlucoseDashboardChart @JvmOverloads constructor(
             valueMgDl.toInt().toString()
         }
 
-    private fun drawEmptyMessage(canvas: Canvas, plot: RectF, message: String) =
-        drawText(canvas, message, plot.centerX(), plot.centerY(), 10f, Color.rgb(150, 150, 150), Paint.Align.CENTER)
+    private fun drawEmptyMessage(canvas: Canvas, plot: RectF) =
+        drawText(canvas, "Verlauf baut sich aus AAPS-Empfangsdaten auf", plot.centerX(), plot.centerY(), 10f, SugarliciousColors.argb(SugarliciousColorRole.GRAPH_MUTED), Paint.Align.CENTER)
 
     private fun mapX(time: Long, start: Long, end: Long, plot: RectF) =
         plot.left + ((time - start).toDouble() / (end - start).coerceAtLeast(1L) * plot.width()).toFloat()
@@ -263,6 +267,7 @@ class GlucoseDashboardChart @JvmOverloads constructor(
     private val Float.dp get() = this * density
 }
 
+@SuppressLint("DrawAllocation")
 class MetabolicDashboardChart @JvmOverloads constructor(context: Context, attrs: AttributeSet? = null) : View(context, attrs) {
     private val density = resources.displayMetrics.density
     private val linePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeCap = Paint.Cap.ROUND; strokeJoin = Paint.Join.ROUND }
@@ -286,22 +291,22 @@ class MetabolicDashboardChart @JvmOverloads constructor(context: Context, attrs:
         drawLane(canvas, cobPlot, points, start, now, false)
         repeat(4) { index ->
             val x = left + (right - left) * index / 3f
-            drawText(canvas, timeFormat.format(Date(start + (now - start) * index / 3)), x, bottom + 15f.dp, 9f, Color.rgb(200, 200, 200), Paint.Align.CENTER)
+            drawText(canvas, timeFormat.format(Date(start + (now - start) * index / 3)), x, bottom + 15f.dp, 9f, SugarliciousColors.argb(SugarliciousColorRole.GRAPH_LABEL), Paint.Align.CENTER)
         }
-        if (points.size < 2) drawText(canvas, "IOB/COB-Verlauf baut sich lokal auf", (left + right) / 2f, (top + bottom) / 2f, 10f, Color.rgb(150, 150, 150), Paint.Align.CENTER)
+        if (points.size < 2) drawText(canvas, "IOB/COB-Verlauf baut sich lokal auf", (left + right) / 2f, (top + bottom) / 2f, 10f, SugarliciousColors.argb(SugarliciousColorRole.GRAPH_MUTED), Paint.Align.CENTER)
     }
 
     private fun drawLane(canvas: Canvas, plot: RectF, points: List<TherapyHistorySample>, start: Long, end: Long, iob: Boolean) {
         val values = points.mapNotNull { if (iob) it.totalIob else it.cobGrams }
         val maxValue = max(if (iob) 1.0 else 10.0, (values.maxOrNull() ?: 0.0) * 1.18)
-        val color = if (iob) Color.rgb(100, 191, 255) else Color.rgb(255, 157, 24)
+        val color = if (iob) SugarliciousColors.argb(SugarliciousColorRole.GRAPH_IOB) else SugarliciousColors.argb(SugarliciousColorRole.GRAPH_COB)
         val title = if (iob) "IOB (IE)" else "COB (g)"
         drawText(canvas, title, plot.left, plot.top - 6f.dp, 9f, color, Paint.Align.LEFT)
-        linePaint.color = Color.rgb(70, 70, 70); linePaint.strokeWidth = 0.7f.dp; linePaint.pathEffect = DashPathEffect(floatArrayOf(3f.dp, 3f.dp), 0f)
+        linePaint.color = SugarliciousColors.argb(SugarliciousColorRole.GRAPH_GRID); linePaint.strokeWidth = 0.7f.dp; linePaint.pathEffect = DashPathEffect(floatArrayOf(3f.dp, 3f.dp), 0f)
         repeat(3) { index ->
             val y = plot.top + plot.height() * index / 2f
             canvas.drawLine(plot.left, y, plot.right, y, linePaint)
-            drawText(canvas, format(maxValue * (2 - index) / 2.0, if (iob) 1 else 0), plot.right + 5f.dp, y + 3f.dp, 8f, Color.rgb(210, 210, 210), Paint.Align.LEFT)
+            drawText(canvas, format(maxValue * (2 - index) / 2.0, if (iob) 1 else 0), plot.right + 5f.dp, y + 3f.dp, 8f, SugarliciousColors.argb(SugarliciousColorRole.GRAPH_LABEL), Paint.Align.LEFT)
         }
         linePaint.pathEffect = null
         val actual = points.mapNotNull { point -> (if (iob) point.totalIob else point.cobGrams)?.let { point.measuredAtEpochMs to it } }

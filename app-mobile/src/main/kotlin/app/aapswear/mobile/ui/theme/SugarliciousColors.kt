@@ -1,38 +1,157 @@
 package app.aapswear.mobile.ui.theme
 
+import android.content.SharedPreferences
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.Color
+import androidx.core.content.edit
+
+enum class SugarliciousColorGroup(val label: String) {
+    APP("App-Oberfläche"),
+    GLUCOSE("Glukose & Zielbereich"),
+    THERAPY("Therapie-Akzente"),
+    GRAPH("Graphen & Prognosen"),
+}
+
+enum class SugarliciousColorRole(
+    val preferenceKey: String,
+    val label: String,
+    val group: SugarliciousColorGroup,
+    val defaultArgb: Int,
+) {
+    BRAND_GREEN("brand_green", "Marken-Grün", SugarliciousColorGroup.APP, 0xFF5FC479.toInt()),
+    PRIMARY("primary", "Primär / Hauptakzent", SugarliciousColorGroup.APP, 0xFF6DE892.toInt()),
+    ON_PRIMARY("on_primary", "Text auf Primärfarbe", SugarliciousColorGroup.APP, 0xFF181818.toInt()),
+    SECONDARY("secondary", "Sekundär / Cyan", SugarliciousColorGroup.APP, 0xFF19D7E8.toInt()),
+    ON_SECONDARY("on_secondary", "Text auf Sekundärfarbe", SugarliciousColorGroup.APP, 0xFF181818.toInt()),
+    BACKGROUND("background", "App-Hintergrund", SugarliciousColorGroup.APP, 0xFF181818.toInt()),
+    SURFACE("surface", "Karten / Flächen", SugarliciousColorGroup.APP, 0xFF242424.toInt()),
+    SURFACE_HIGH("surface_high", "Erhöhte Fläche", SugarliciousColorGroup.APP, 0xFF303030.toInt()),
+    SURFACE_RAISED("surface_raised", "Progress-/Raised-Fläche", SugarliciousColorGroup.APP, 0xFF363636.toInt()),
+    SURFACE_SELECTED("surface_selected", "Ausgewählte Fläche", SugarliciousColorGroup.APP, 0xFF3A3A3A.toInt()),
+    BORDER("border", "Konturen / Rahmen", SugarliciousColorGroup.APP, 0xFF404040.toInt()),
+    TEXT_PRIMARY("text_primary", "Haupttext", SugarliciousColorGroup.APP, 0xFFF5F5F5.toInt()),
+    TEXT_SECONDARY("text_secondary", "Sekundärtext", SugarliciousColorGroup.APP, 0xFFB5B5B5.toInt()),
+
+    GLUCOSE_LOW("glucose_low", "Glukose unter Ziel", SugarliciousColorGroup.GLUCOSE, 0xFFFF5C69.toInt()),
+    GLUCOSE_IN_RANGE("glucose_in_range", "Glukose im Ziel", SugarliciousColorGroup.GLUCOSE, 0xFFF5F5F5.toInt()),
+    GLUCOSE_HIGH("glucose_high", "Glukose über Ziel", SugarliciousColorGroup.GLUCOSE, 0xFFFFD040.toInt()),
+    TARGET_BAND("target_band", "Zielbereich im Graph", SugarliciousColorGroup.GLUCOSE, 0xFF0A391C.toInt()),
+
+    GREEN("green", "Grün / Status", SugarliciousColorGroup.THERAPY, 0xFF54DF30.toInt()),
+    BLUE("blue", "Blau / IOB", SugarliciousColorGroup.THERAPY, 0xFF64BFFF.toInt()),
+    ORANGE("orange", "Orange / COB", SugarliciousColorGroup.THERAPY, 0xFFFF9D18.toInt()),
+    YELLOW("yellow", "Gelb / Warnung", SugarliciousColorGroup.THERAPY, 0xFFF4DE00.toInt()),
+    PURPLE("purple", "Violett", SugarliciousColorGroup.THERAPY, 0xFFD69AFF.toInt()),
+    RED("red", "Rot / Fehler", SugarliciousColorGroup.THERAPY, 0xFFFF5C69.toInt()),
+
+    PREDICTION_IOB("prediction_iob", "Prognose IOB", SugarliciousColorGroup.GRAPH, 0xFF52C1FF.toInt()),
+    PREDICTION_COB("prediction_cob", "Prognose COB / ACOB", SugarliciousColorGroup.GRAPH, 0xFFF4DE00.toInt()),
+    PREDICTION_UAM("prediction_uam", "Prognose UAM", SugarliciousColorGroup.GRAPH, 0xFFFFAE1F.toInt()),
+    PREDICTION_ZERO_TEMP("prediction_zero_temp", "Prognose Zero Temp", SugarliciousColorGroup.GRAPH, 0xFF30DBDE.toInt()),
+    GRAPH_IOB("graph_iob", "IOB-Verlauf", SugarliciousColorGroup.GRAPH, 0xFF64BFFF.toInt()),
+    GRAPH_COB("graph_cob", "COB-Verlauf", SugarliciousColorGroup.GRAPH, 0xFFFF9D18.toInt()),
+    GRAPH_GRID("graph_grid", "Graph-Gitter", SugarliciousColorGroup.GRAPH, 0xFF464646.toInt()),
+    GRAPH_LABEL("graph_label", "Achsenbeschriftung", SugarliciousColorGroup.GRAPH, 0xFFD2D2D2.toInt()),
+    GRAPH_MUTED("graph_muted", "Graph-Hinweise / Trennlinie", SugarliciousColorGroup.GRAPH, 0xFF969696.toInt()),
+    GRAPH_CURRENT_OUTLINE("graph_current_outline", "Aktueller Punkt · Kontur", SugarliciousColorGroup.GRAPH, 0xFF000000.toInt()),
+}
+
+data class SugarliciousPalette(
+    private val values: Map<SugarliciousColorRole, Int>,
+) {
+    fun argb(role: SugarliciousColorRole): Int =
+        values[role] ?: role.defaultArgb
+
+    fun compose(role: SugarliciousColorRole): Color =
+        Color(argb(role))
+
+    companion object {
+        fun defaults(): SugarliciousPalette =
+            SugarliciousPalette(
+                SugarliciousColorRole.entries.associateWith { it.defaultArgb },
+            )
+    }
+}
+
+object SugarliciousColorStore {
+    private const val PREFIX = "color."
+
+    fun load(preferences: SharedPreferences): SugarliciousPalette =
+        SugarliciousPalette(
+            SugarliciousColorRole.entries.associateWith { role ->
+                preferences.getInt(PREFIX + role.preferenceKey, role.defaultArgb)
+            },
+        )
+
+    fun save(
+        preferences: SharedPreferences,
+        role: SugarliciousColorRole,
+        argb: Int,
+    ) {
+        preferences.edit {
+            putInt(PREFIX + role.preferenceKey, argb or 0xFF000000.toInt())
+        }
+    }
+
+    fun reset(
+        preferences: SharedPreferences,
+        role: SugarliciousColorRole,
+    ) {
+        preferences.edit {
+            remove(PREFIX + role.preferenceKey)
+        }
+    }
+
+    fun resetAll(preferences: SharedPreferences) {
+        preferences.edit {
+            SugarliciousColorRole.entries.forEach { role ->
+                remove(PREFIX + role.preferenceKey)
+            }
+        }
+    }
+}
 
 /**
- * Sugarlicious brand and semantic color tokens.
+ * Runtime palette shared by classic Views, custom Canvas charts and Compose.
  *
- * Keep these values in sync with res/values/colors.xml while the app uses
- * both classic Android Views and Jetpack Compose during the migration.
+ * The backing palette is Compose state so open Compose screens recompose
+ * immediately when a color is saved in Settings.
  */
 object SugarliciousColors {
-    // Brand
-    val BrandGreen = Color(0xFF5FC479) // exact green used by the app logo
-    val Primary = Color(0xFF6DE892)    // brighter interaction accent on dark surfaces
-    val OnPrimary = Color(0xFF181818)
-    val Secondary = Color(0xFF19D7E8)
-    val OnSecondary = Color(0xFF181818)
+    var palette by mutableStateOf(SugarliciousPalette.defaults())
+        private set
 
-    // Neutral surfaces
-    val Background = Color(0xFF181818)
-    val Surface = Color(0xFF242424)
-    val SurfaceHigh = Color(0xFF303030)
-    val SurfaceRaised = Color(0xFF363636)
-    val SurfaceSelected = Color(0xFF3A3A3A)
-    val Border = Color(0xFF404040)
+    fun apply(palette: SugarliciousPalette) {
+        this.palette = palette
+    }
 
-    // Content
-    val TextPrimary = Color(0xFFF5F5F5)
-    val TextSecondary = Color(0xFFB5B5B5)
+    fun argb(role: SugarliciousColorRole): Int = palette.argb(role)
+    fun color(role: SugarliciousColorRole): Color = palette.compose(role)
+    val Primary get() = color(SugarliciousColorRole.PRIMARY)
+    val OnPrimary get() = color(SugarliciousColorRole.ON_PRIMARY)
+    val Secondary get() = color(SugarliciousColorRole.SECONDARY)
+    val OnSecondary get() = color(SugarliciousColorRole.ON_SECONDARY)
 
-    // Therapy/data accents
-    val Green = Color(0xFF54DF30)
-    val Blue = Color(0xFF64BFFF)
-    val Orange = Color(0xFFFF9D18)
-    val Yellow = Color(0xFFF4DE00)
-    val Purple = Color(0xFFD69AFF)
-    val Red = Color(0xFFFF5C69)
+    val Background get() = color(SugarliciousColorRole.BACKGROUND)
+    val Surface get() = color(SugarliciousColorRole.SURFACE)
+    val SurfaceHigh get() = color(SugarliciousColorRole.SURFACE_HIGH)
+    val SurfaceRaised get() = color(SugarliciousColorRole.SURFACE_RAISED)
+    val SurfaceSelected get() = color(SugarliciousColorRole.SURFACE_SELECTED)
+    val Border get() = color(SugarliciousColorRole.BORDER)
+
+    val TextPrimary get() = color(SugarliciousColorRole.TEXT_PRIMARY)
+    val TextSecondary get() = color(SugarliciousColorRole.TEXT_SECONDARY)
+
+    val GlucoseLow get() = color(SugarliciousColorRole.GLUCOSE_LOW)
+    val GlucoseInRange get() = color(SugarliciousColorRole.GLUCOSE_IN_RANGE)
+    val GlucoseHigh get() = color(SugarliciousColorRole.GLUCOSE_HIGH)
+    val TargetBand get() = color(SugarliciousColorRole.TARGET_BAND)
+
+    val Green get() = color(SugarliciousColorRole.GREEN)
+    val Blue get() = color(SugarliciousColorRole.BLUE)
+    val Orange get() = color(SugarliciousColorRole.ORANGE)
+    val Yellow get() = color(SugarliciousColorRole.YELLOW)
+    val Red get() = color(SugarliciousColorRole.RED)
 }

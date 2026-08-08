@@ -1,12 +1,12 @@
 package app.aapswear.mobile
 
+import android.graphics.drawable.GradientDrawable
 import android.Manifest
 import android.app.AlertDialog
 import android.app.NotificationManager
 import android.content.ActivityNotFoundException
 import android.content.ClipData
 import android.content.ClipboardManager
-import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
 import android.content.pm.PackageManager
@@ -34,6 +34,9 @@ import androidx.activity.ComponentActivity
 import androidx.core.content.edit
 import androidx.core.graphics.drawable.toDrawable
 import androidx.core.net.toUri
+import app.aapswear.mobile.ui.theme.SugarliciousColorRole
+import app.aapswear.mobile.ui.theme.SugarliciousColorStore
+import app.aapswear.mobile.ui.theme.SugarliciousColors
 import app.aapswear.storage.TherapyStateStore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -62,7 +65,10 @@ class MainActivity : ComponentActivity() {
     private val diagnosticsListener = SharedPreferences.OnSharedPreferenceChangeListener { _, _ -> runOnUiThread(::refresh) }
     private val uiListener =
         SharedPreferences.OnSharedPreferenceChangeListener { _, _ ->
-            runOnUiThread(::refresh)
+            runOnUiThread {
+                SugarliciousColors.apply(SugarliciousColorStore.load(uiPreferences))
+                refresh()
+            }
             scope.launch(Dispatchers.IO) {
                 runCatching {
                     publishWatchConfig(applicationContext)
@@ -72,12 +78,10 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        SugarliciousColors.apply(SugarliciousColorStore.load(uiPreferences))
         setContentView(R.layout.activity_main)
         if (!uiPreferences.getBoolean("graphHoursDefault3Migrated", false)) {
-            uiPreferences.edit()
-                .putInt("graphHours", 3)
-                .putBoolean("graphHoursDefault3Migrated", true)
-                .apply()
+            uiPreferences.edit { putInt("graphHours", 3); putBoolean("graphHoursDefault3Migrated", true) }
         }
         content = findViewById(R.id.dashboard_content)
         scroll = findViewById(R.id.dashboard_scroll)
@@ -91,11 +95,12 @@ class MainActivity : ComponentActivity() {
             setUnit = { uiPreferences.edit { putString("unit", it.name) } },
             setShowDetails = { uiPreferences.edit { putBoolean("showDetails", it) } },
             setShowPredictions = { uiPreferences.edit { putBoolean("showPredictions", it) } },
+            setShowMetabolicGraph = { uiPreferences.edit { putBoolean("showMetabolicGraph", it) } },
             setCompact = { uiPreferences.edit { putBoolean("compact", it) } },
             setLiveNotification = ::setLiveNotification,
             syncNow = ::syncNow,
             configureNightscout = { showNightscoutSetup(firstRun = false) },
-            syncNightscout = { syncNightscout(force = true) },
+            syncNightscout = { syncNightscout() },
             copyDiagnostics = ::copyDiagnostics,
             openContactEmail = ::openContactEmail,
             openGithub = ::openGithub,
@@ -150,6 +155,8 @@ class MainActivity : ComponentActivity() {
 
     private fun refresh() {
         if (!::content.isInitialized || !::factory.isInitialized) return
+        SugarliciousColors.apply(SugarliciousColorStore.load(uiPreferences))
+        applyRuntimeColors()
         val diagnosticState = DiagnosticsSnapshot.read(diagnostics)
         val uiState = DashboardUiPreferences.read(uiPreferences)
         factory.render(content, screen, state, diagnosticState, uiState, System.currentTimeMillis())
@@ -157,12 +164,69 @@ class MainActivity : ComponentActivity() {
         findViewById<ImageView>(R.id.source_shield).apply {
             alpha = if (sourceAvailable) 1f else 0.45f
             imageTintList = ColorStateList.valueOf(
-                getColor(if (sourceAvailable) R.color.app_accent else R.color.app_text_secondary),
+                SugarliciousColors.argb(if (sourceAvailable) SugarliciousColorRole.PRIMARY else SugarliciousColorRole.TEXT_SECONDARY),
             )
         }
         updateNavigation()
     }
 
+
+    private fun applyRuntimeColors() {
+        val backgroundColor =
+            SugarliciousColors.argb(
+                SugarliciousColorRole.BACKGROUND,
+            )
+        val surface =
+            SugarliciousColors.argb(
+                SugarliciousColorRole.SURFACE,
+            )
+        val border =
+            SugarliciousColors.argb(
+                SugarliciousColorRole.BORDER,
+            )
+        val text =
+            SugarliciousColors.argb(
+                SugarliciousColorRole.TEXT_PRIMARY,
+            )
+
+        findViewById<View>(R.id.root)
+            .setBackgroundColor(backgroundColor)
+
+        findViewById<TextView>(R.id.app_title)
+            .setTextColor(text)
+
+        val iconButtonBackground =
+            SugarliciousColors.argb(
+                SugarliciousColorRole.SURFACE_HIGH,
+            )
+
+        findViewById<ImageView>(R.id.menu_button).apply {
+            setColorFilter(text)
+            background =
+                GradientDrawable().apply {
+                    shape =
+                        GradientDrawable.OVAL
+                    setColor(iconButtonBackground)
+                }
+        }
+        findViewById<ImageView>(R.id.more_button).apply {
+            setColorFilter(text)
+            background =
+                GradientDrawable().apply {
+                    shape =
+                        GradientDrawable.OVAL
+                    setColor(iconButtonBackground)
+                }
+        }
+
+        findViewById<View>(R.id.bottom_navigation).background =
+            GradientDrawable().apply {
+                cornerRadius = 28.dp.toFloat()
+                setColor(surface)
+                setStroke(1.dp, border)
+            }
+styleTitle()
+    }
     private fun bindNavigation() {
         findViewById<View>(R.id.nav_overview).setOnClickListener { navigate(DashboardScreen.OVERVIEW) }
         findViewById<View>(R.id.nav_watch).setOnClickListener { navigate(DashboardScreen.WATCH) }
@@ -185,10 +249,20 @@ class MainActivity : ComponentActivity() {
         entries.forEach { (target, views) ->
             val (itemId, iconId, labelId) = views
             val selected = screen == target
-            val color = getColor(if (selected) R.color.app_accent else R.color.app_text_secondary)
-            findViewById<View>(itemId).setBackgroundResource(
-                if (selected) R.drawable.bg_nav_item_selected else R.drawable.bg_nav_item_idle,
-            )
+            val color = SugarliciousColors.argb(if (selected) SugarliciousColorRole.PRIMARY else SugarliciousColorRole.TEXT_SECONDARY)
+            findViewById<View>(itemId).background =
+                GradientDrawable().apply {
+                    cornerRadius = 20.dp.toFloat()
+                    setColor(
+                        if (selected) {
+                            SugarliciousColors.argb(
+                                SugarliciousColorRole.SURFACE_SELECTED,
+                            )
+                        } else {
+                            Color.TRANSPARENT
+                        },
+                    )
+                }
             findViewById<ImageView>(iconId).apply {
                 imageTintList = ColorStateList.valueOf(color)
                 alpha = if (selected) 1f else 0.72f
@@ -205,7 +279,7 @@ class MainActivity : ComponentActivity() {
 
     private fun styleTitle() {
         val value = SpannableString(getString(R.string.app_name))
-        value.setSpan(ForegroundColorSpan(getColor(R.color.app_accent)), 5, value.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+        value.setSpan(ForegroundColorSpan(SugarliciousColors.argb(SugarliciousColorRole.PRIMARY)), 5, value.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
         findViewById<TextView>(R.id.app_title).text = value
     }
 
@@ -231,7 +305,7 @@ class MainActivity : ComponentActivity() {
             id = R.id.dropdown_panel
             orientation = LinearLayout.VERTICAL
             setPadding(8.dp, 8.dp, 8.dp, 8.dp)
-            setBackgroundResource(R.drawable.bg_dropdown_panel)
+            background = GradientDrawable().apply { cornerRadius = 22.dp.toFloat(); setColor(SugarliciousColors.argb(SugarliciousColorRole.SURFACE)); setStroke(1.dp, SugarliciousColors.argb(SugarliciousColorRole.BORDER)) }
         }
         lateinit var popup: PopupWindow
         items.forEachIndexed { index, item ->
@@ -239,11 +313,11 @@ class MainActivity : ComponentActivity() {
                 id = item.id
                 text = item.label
                 textSize = 14f
-                setTextColor(getColor(if (item.selected) R.color.app_accent else R.color.app_text))
+                setTextColor(SugarliciousColors.argb(if (item.selected) SugarliciousColorRole.PRIMARY else SugarliciousColorRole.TEXT_PRIMARY))
                 gravity = Gravity.CENTER_VERTICAL
                 minHeight = 46.dp
                 setPadding(18.dp, 0, 18.dp, 0)
-                setBackgroundResource(if (item.selected) R.drawable.bg_dropdown_pill_selected else R.drawable.bg_dropdown_pill)
+                background = GradientDrawable().apply { cornerRadius = 18.dp.toFloat(); setColor(if (item.selected) SugarliciousColors.argb(SugarliciousColorRole.SURFACE_SELECTED) else SugarliciousColors.argb(SugarliciousColorRole.SURFACE_HIGH)); if (item.selected) setStroke(1.dp, SugarliciousColors.argb(SugarliciousColorRole.PRIMARY)) }
                 isClickable = true
                 isFocusable = true
                 setOnClickListener {
@@ -281,7 +355,7 @@ class MainActivity : ComponentActivity() {
             12 -> 24
             else -> 3
         }
-        uiPreferences.edit().putInt("graphHours", next).apply()
+        uiPreferences.edit { putInt("graphHours", next) }
     }
 
     private fun syncNow() {
@@ -304,9 +378,9 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private fun syncNightscout(force: Boolean) {
+    private fun syncNightscout() {
         scope.launch {
-            val result = NightscoutBackfillCoordinator.syncIfNeeded(applicationContext, force)
+            val result = NightscoutBackfillCoordinator.syncIfNeeded(applicationContext, force = true)
             when (result.status) {
                 NightscoutBackfillResult.Status.OK ->
                     Toast.makeText(this@MainActivity, "${result.pointCount} Nightscout-Werte synchronisiert", Toast.LENGTH_SHORT).show()
@@ -361,7 +435,7 @@ class MainActivity : ComponentActivity() {
                 }.onSuccess {
                     dialog.dismiss()
                     Toast.makeText(this, "Nightscout gespeichert", Toast.LENGTH_SHORT).show()
-                    syncNightscout(force = true)
+                    syncNightscout()
                 }.onFailure {
                     Toast.makeText(this, it.message ?: "Ungültige Nightscout-Konfiguration", Toast.LENGTH_LONG).show()
                 }

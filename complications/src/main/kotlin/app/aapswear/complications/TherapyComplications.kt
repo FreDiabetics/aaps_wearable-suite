@@ -1,5 +1,5 @@
 package app.aapswear.complications
-
+import android.annotation.SuppressLint
 import android.app.PendingIntent
 import android.content.Intent
 import android.graphics.Bitmap
@@ -118,7 +118,7 @@ abstract class TherapyComplicationService(
                 "$glucoseText$trendText" to "Glucose"
 
             ProviderKind.GLUCOSE_DELTA ->
-                deltaText.ifBlank { DASH } to "Delta"
+                "${deltaText.ifBlank { DASH }} · $ageText" to "Delta and age"
 
             ProviderKind.GLUCOSE_TREND_DELTA ->
                 "$glucoseText$trendText" to deltaText.ifBlank { DASH }
@@ -257,24 +257,22 @@ abstract class TherapyComplicationService(
                             GLUCOSE_GAUGE_MIN
                         }
 
+                    val trendValue =
+                        trendText.ifBlank { "→" }
+
+                    val visibleText =
+                        if (
+                            kind == ProviderKind.GLUCOSE_TREND ||
+                            kind == ProviderKind.GLUCOSE_RANGED
+                        ) {
+                            "$glucoseText\n$trendValue"
+                        } else {
+                            glucoseText
+                        }
+
                     val rangedDescription =
                         PlainComplicationText.Builder(
-                            if (displayable && glucose != null) {
-                                "$glucoseText $trendText"
-                            } else {
-                                "Glucose no data"
-                            },
-                        ).build()
-
-                    val rangedVisual =
-                        SmallImage.Builder(
-                            Icon.createWithBitmap(
-                                renderRangedGlucoseVisual(
-                                    glucoseText = glucoseText,
-                                    trendText = trendText.ifBlank { "→" },
-                                ),
-                            ),
-                            SmallImageType.ICON,
+                            visibleText.replace('\n', ' '),
                         ).build()
 
                     return RangedValueComplicationData.Builder(
@@ -282,20 +280,17 @@ abstract class TherapyComplicationService(
                         GLUCOSE_GAUGE_MIN,
                         GLUCOSE_GAUGE_MAX,
                         rangedDescription,
-                    )                        .setText(
+                    )
+                        .setText(
                             PlainComplicationText.Builder(
-                                glucoseText,
+                                visibleText,
                             ).build(),
                         )
-                        .setTitle(
-                            PlainComplicationText.Builder(
-                                trendText.ifBlank { "→" },
-                            ).build(),
-                        )
-                        .setSmallImage(rangedVisual)
                         .setTapAction(tap)
                         .build()
                 }
+
+
 
                 ProviderKind.RESERVOIR -> {
                     val value =
@@ -381,53 +376,15 @@ abstract class TherapyComplicationService(
         }
 
         return ShortTextComplicationData.Builder(
-            PlainComplicationText.Builder(pair.first.take(24)).build(),
+            PlainComplicationText.Builder(
+                pair.first.take(24),
+            ).build(),
             description,
         )
-            .setTitle(PlainComplicationText.Builder(pair.second.take(16)).build())
             .setTapAction(tap)
             .build()
     }
-
-    private fun renderRangedGlucoseVisual(
-        glucoseText: String,
-        trendText: String,
-    ): Bitmap {
-        val size = 192
-        val bitmap =
-            Bitmap.createBitmap(
-                size,
-                size,
-                Bitmap.Config.ARGB_8888,
-            )
-        val canvas = Canvas(bitmap)
-        val paint =
-            Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                color = Color.WHITE
-                textAlign = Paint.Align.CENTER
-                typeface = Typeface.DEFAULT_BOLD
-            }
-
-        canvas.drawColor(Color.TRANSPARENT)
-
-        paint.textSize = 82f
-        canvas.drawText(
-            glucoseText,
-            size / 2f,
-            96f,
-            paint,
-        )
-
-        paint.textSize = 72f
-        canvas.drawText(
-            trendText,
-            size / 2f,
-            145f,
-            paint,
-        )
-
-        return bitmap
-    }
+    @SuppressLint("UseKtx")
     private fun renderImage(
         state: TherapyDisplayState?,
         kind: ProviderKind,
@@ -436,17 +393,13 @@ abstract class TherapyComplicationService(
         val valueOnly = kind == ProviderKind.GLUCOSE_IMAGE
         val width = 400
         val height = if (valueOnly) 200 else 240
-        val bitmap = Bitmap.createBitmap(
-            width,
-            height,
-            Bitmap.Config.ARGB_8888,
-        )
+        val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(bitmap)
         canvas.drawColor(Color.TRANSPARENT)
 
         val glucose = state?.glucose
         if (valueOnly) {
-            drawValueImage(canvas, glucose, width, height, now)
+            drawValueImage(canvas, glucose, height, now)
             return bitmap
         }
 
@@ -457,7 +410,6 @@ abstract class TherapyComplicationService(
         drawGraphImage(
             canvas = canvas,
             state = state,
-            width = width,
             height = height,
             now = now,
             windowMs = windowMs,
@@ -468,10 +420,10 @@ abstract class TherapyComplicationService(
     private fun drawValueImage(
         canvas: Canvas,
         glucose: GlucoseState?,
-        width: Int,
         height: Int,
         now: Long,
     ) {
+        val width = canvas.width
         val valuePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = glucoseColor(glucose)
             textAlign = Paint.Align.CENTER
@@ -498,38 +450,16 @@ abstract class TherapyComplicationService(
     private fun drawGraphImage(
         canvas: Canvas,
         state: TherapyDisplayState?,
-        width: Int,
         height: Int,
         now: Long,
         windowMs: Long,
     ) {
+        val width = canvas.width
         val glucose = state?.glucose
-        val headerPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = glucoseColor(glucose)
-            textAlign = Paint.Align.LEFT
-            typeface = Typeface.DEFAULT_BOLD
-            textSize = 42f
-        }
-        val metaPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.LTGRAY
-            textAlign = Paint.Align.RIGHT
-            typeface = Typeface.DEFAULT
-            textSize = 24f
-        }
-
-        val header =
-            glucose?.let { glucose(it) + arrow(it.trend) } ?: DASH
-        canvas.drawText(header, 14f, 44f, headerPaint)
-        canvas.drawText(
-            glucose?.let { timeAgo(it.measuredAtEpochMs, now) } ?: "No data",
-            width - 14f,
-            40f,
-            metaPaint,
-        )
 
         val plotLeft = 12f
         val plotRight = width - 12f
-        val plotTop = 62f
+        val plotTop = 12f
         val plotBottom = height - 12f
 
         val targetPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -896,32 +826,11 @@ class LongStatusComplication :
 
 object AllProviders {
     val classes = listOf(
-        GlucoseComplication::class.java,
         GlucoseTrendComplication::class.java,
         GlucoseDeltaComplication::class.java,
-        GlucoseTrendDeltaComplication::class.java,
-        GlucoseAgeComplication::class.java,
-        GlucoseImageComplication::class.java,
-        GlucoseRangeComplication::class.java,
-        GlucoseRangedComplication::class.java,
         GlucoseGraphComplication::class.java,
         GlucoseGraphLargeComplication::class.java,
         IobComplication::class.java,
-        BolusIobComplication::class.java,
-        BasalIobComplication::class.java,
         CobComplication::class.java,
-        IobCobComplication::class.java,
-        BasalComplication::class.java,
-        TempBasalComplication::class.java,
-        TempTargetComplication::class.java,
-        LoopComplication::class.java,
-        LastLoopComplication::class.java,
-        ProfileComplication::class.java,
-        ReservoirComplication::class.java,
-        PumpBatteryComplication::class.java,
-        PhoneBatteryComplication::class.java,
-        SourceComplication::class.java,
-        AapsStatusComplication::class.java,
-        LongStatusComplication::class.java,
     )
 }

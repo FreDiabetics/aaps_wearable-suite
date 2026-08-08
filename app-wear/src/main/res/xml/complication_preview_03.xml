@@ -1,11 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <complications>
     <complication type="SHORT_TEXT">
-        <text><plain value="+5"/></text>
-        <title><plain value="DELTA"/></title>
-    </complication>
-    <complication type="LONG_TEXT">
-        <text><plain value="Delta +5 mg/dL"/></text>
-        <title><plain value="Glukose-Delta"/></title>
+        <text><plain value="+5 · 2m" valueType="string"/></text>
     </complication>
 </complications>
