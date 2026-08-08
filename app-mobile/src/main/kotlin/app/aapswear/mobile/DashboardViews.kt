@@ -35,6 +35,7 @@ data class DashboardUiPreferences(
     val compact: Boolean = true,
     val graphHours: Int = 3,
     val liveNotification: Boolean = false,
+    val watchFaceIndex: Int = 1,
 ) {
     fun unitFor(state: TherapyDisplayState?): GlucoseUnit = when (unit) {
         DisplayUnitPreference.AAPS ->
@@ -84,6 +85,13 @@ data class DashboardUiPreferences(
                         PersistentBridgeService.PREFERENCE_LIVE_NOTIFICATION,
                         false,
                     ),
+                watchFaceIndex =
+                    preferences
+                        .getInt(
+                            "watchFaceIndex",
+                            1,
+                        )
+                        .coerceIn(0, 2),
             )
     }
 }
@@ -186,6 +194,7 @@ data class DashboardCallbacks(
     val setShowMetabolicGraph: (Boolean) -> Unit,
     val setCompact: (Boolean) -> Unit,
     val setLiveNotification: (Boolean) -> Unit,
+    val setWatchFaceIndex: (Int) -> Unit,
     val syncNow: () -> Unit,
     val configureNightscout: () -> Unit,
     val syncNightscout: () -> Unit,
@@ -283,6 +292,7 @@ class DashboardViewFactory(
                     SugarliciousTheme {
                         SugarliciousOverviewScreen(
                             state = state,
+                            diagnostics = diagnostics,
                             preferences = preferences,
                             now = now,
                             callbacks = callbacks,
@@ -294,24 +304,6 @@ class DashboardViewFactory(
         parent.addView(
             composeView,
             fullWidth(),
-        )
-
-        val freshness =
-            FreshnessPolicy.classify(
-                state?.glucose?.measuredAtEpochMs,
-                now,
-            )
-        val current =
-            freshness == Freshness.CURRENT ||
-                freshness == Freshness.DELAYED
-
-        parent.addView(
-            connectionCard(
-                state,
-                diagnostics,
-                current,
-            ),
-            cardParams(top = 8),
         )
     }
 
@@ -785,6 +777,7 @@ class DashboardViewFactory(
             )
         }
 
+    @Suppress("unused")
     private fun connectionCard(
         state: TherapyDisplayState?,
         diagnostics: DiagnosticsSnapshot,

@@ -98,6 +98,14 @@ class MainActivity : ComponentActivity() {
             setShowMetabolicGraph = { uiPreferences.edit { putBoolean("showMetabolicGraph", it) } },
             setCompact = { uiPreferences.edit { putBoolean("compact", it) } },
             setLiveNotification = ::setLiveNotification,
+            setWatchFaceIndex = {
+                uiPreferences.edit {
+                    putInt(
+                        "watchFaceIndex",
+                        it.coerceIn(0, 2),
+                    )
+                }
+            },
             syncNow = ::syncNow,
             configureNightscout = { showNightscoutSetup(firstRun = false) },
             syncNightscout = { syncNightscout() },

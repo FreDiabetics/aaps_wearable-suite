@@ -50,6 +50,7 @@ import kotlin.math.roundToInt
 @Composable
 internal fun SugarliciousOverviewScreen(
     state: TherapyDisplayState?,
+    diagnostics: DiagnosticsSnapshot,
     preferences: DashboardUiPreferences,
     now: Long,
     callbacks: DashboardCallbacks,
@@ -80,6 +81,20 @@ internal fun SugarliciousOverviewScreen(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 2.dp, vertical = 2.dp),
         verticalArrangement = Arrangement.spacedBy(gap),
     ) {
+        OverviewWatchFaceTile(
+            state = state,
+            diagnostics = diagnostics,
+            selectedFaceIndex = preferences.watchFaceIndex,
+            now = now,
+            onSelectedFace = callbacks.setWatchFaceIndex,
+            onEdit = {
+                callbacks.navigate(
+                    DashboardScreen.WATCH,
+                )
+            },
+            onSync = callbacks.syncNow,
+        )
+
         GlucoseHeroCard(
             glucoseText = glucoseText,
             glucoseColor = glucoseColor,
@@ -367,49 +382,97 @@ private fun correctedTrendForDisplay(
 
 @Composable
 private fun TrendIndicator(trend: Trend) {
-    val rotation = when (trend) {
-        Trend.DOUBLE_UP, Trend.SINGLE_UP -> -90f
-        Trend.FORTY_FIVE_UP -> -45f
-        Trend.FLAT -> 0f
-        Trend.FORTY_FIVE_DOWN -> 45f
-        Trend.SINGLE_DOWN, Trend.DOUBLE_DOWN -> 90f
-        Trend.UNKNOWN -> return
-    }
+    val rotation =
+        when (trend) {
+            Trend.DOUBLE_UP,
+            Trend.SINGLE_UP,
+            -> -90f
 
-    val copies =
-        if (
-            trend == Trend.DOUBLE_UP ||
+            Trend.FORTY_FIVE_UP ->
+                -45f
+
+            Trend.FLAT ->
+                0f
+
+            Trend.FORTY_FIVE_DOWN ->
+                45f
+
+            Trend.SINGLE_DOWN,
+            Trend.DOUBLE_DOWN,
+            -> 90f
+
+            Trend.UNKNOWN ->
+                return
+        }
+
+    val doubleArrow =
+        trend == Trend.DOUBLE_UP ||
             trend == Trend.DOUBLE_DOWN
-        ) {
-            2
-        } else {
-            1
+
+    val arrowSize =
+        when (trend) {
+            Trend.FLAT,
+            Trend.SINGLE_UP,
+            Trend.SINGLE_DOWN,
+            -> 24.dp
+
+            Trend.FORTY_FIVE_UP,
+            Trend.FORTY_FIVE_DOWN,
+            -> 26.dp
+
+            Trend.DOUBLE_UP,
+            Trend.DOUBLE_DOWN,
+            -> 25.dp
+
+            Trend.UNKNOWN ->
+                25.dp
         }
 
     Box(
-        modifier = Modifier.size(
-            width = 34.dp,
-            height = 44.dp,
-        ),
-        contentAlignment = Alignment.Center,
+        modifier =
+            Modifier.size(
+                width =
+                    if (doubleArrow) {
+                        54.dp
+                    } else {
+                        32.dp
+                    },
+                height = 44.dp,
+            ),
+        contentAlignment =
+            Alignment.Center,
     ) {
         Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy((-4).dp),
+            verticalAlignment =
+                Alignment.CenterVertically,
+            horizontalArrangement =
+                Arrangement.spacedBy(
+                    if (doubleArrow) {
+                        1.dp
+                    } else {
+                        0.dp
+                    },
+                ),
         ) {
-            repeat(copies) {
+            repeat(
+                if (doubleArrow) {
+                    2
+                } else {
+                    1
+                },
+            ) {
                 Image(
-                    painter = painterResource(
-                        R.drawable.ic_trend_arrow,
-                    ),
-                    contentDescription = null,
-                    modifier = Modifier
-                        .size(25.dp)
-                        .graphicsLayer(
-                            rotationZ = rotation,
-                            translationX = 0f,
-                            translationY = 0f,
+                    painter =
+                        painterResource(
+                            R.drawable.ic_trend_arrow,
                         ),
+                    contentDescription = null,
+                    modifier =
+                        Modifier
+                            .size(arrowSize)
+                            .graphicsLayer(
+                                rotationZ = rotation,
+                            ),
                 )
             }
         }

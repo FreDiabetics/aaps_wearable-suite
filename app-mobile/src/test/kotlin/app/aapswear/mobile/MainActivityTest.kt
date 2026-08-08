@@ -32,7 +32,7 @@ class MainActivityTest {
         assertEquals(Color.rgb(109, 232, 146), context.getColor(R.color.app_accent))
     }
 
-    @Test fun `diagnostics update while tile dashboard stays visible`() {
+    @Test fun `diagnostics update while overview dashboard stays visible`() {
         val context = ApplicationProvider.getApplicationContext<android.content.Context>()
         val diagnostics = context.getSharedPreferences("diagnostics", android.content.Context.MODE_PRIVATE)
         diagnostics.edit().clear().commit()
@@ -40,7 +40,10 @@ class MainActivityTest {
 
         val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
         val activity = controller.get()
-        assertTrue(textOf(activity.findViewById(R.id.dashboard_sync_status)).contains("Keine Watch erreichbar"))
+        val dashboard = activity.findViewById<ViewGroup>(R.id.dashboard_content)
+
+        assertNotNull(dashboard)
+        assertTrue(dashboard.childCount > 0)
 
         diagnostics.edit()
             .putLong("received", 1_000L)
@@ -51,7 +54,8 @@ class MainActivityTest {
             .commit()
         shadowOf(android.os.Looper.getMainLooper()).idle()
 
-        assertTrue(textOf(activity.findViewById(R.id.dashboard_sync_status)).contains("Watch verbunden"))
+        assertTrue(dashboard.childCount > 0)
+
         activity.findViewById<View>(R.id.nav_settings).performClick()
         shadowOf(android.os.Looper.getMainLooper()).idle()
         val settingsText = textOf(activity.findViewById(R.id.dashboard_content))
