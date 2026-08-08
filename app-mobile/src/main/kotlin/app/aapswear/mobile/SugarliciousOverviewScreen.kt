@@ -349,15 +349,18 @@ private fun correctedTrendForDisplay(
     sourceTrend: Trend,
     deltaMgDl: Double?,
 ): Trend {
-    val delta = deltaMgDl?.takeIf { it.isFinite() } ?: return sourceTrend
+    val delta =
+        deltaMgDl
+            ?.takeIf { it.isFinite() }
+            ?: return sourceTrend
 
     return when {
-        delta >= 14.0 -> Trend.DOUBLE_UP
-        delta >= 7.0 -> Trend.SINGLE_UP
-        delta >= 2.5 -> Trend.FORTY_FIVE_UP
-        delta > -2.5 -> Trend.FLAT
-        delta > -7.0 -> Trend.FORTY_FIVE_DOWN
-        delta > -14.0 -> Trend.SINGLE_DOWN
+        delta >= 15.0 -> Trend.DOUBLE_UP
+        delta >= 10.0 -> Trend.SINGLE_UP
+        delta >= 5.0 -> Trend.FORTY_FIVE_UP
+        delta > -5.0 -> Trend.FLAT
+        delta > -10.0 -> Trend.FORTY_FIVE_DOWN
+        delta > -15.0 -> Trend.SINGLE_DOWN
         else -> Trend.DOUBLE_DOWN
     }
 }
@@ -479,12 +482,6 @@ private fun GlucoseGraphSurface(
 ) {
     OverviewSurface {
         Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                "Glukoseverlauf",
-                color = SugarliciousColors.TextPrimary,
-                fontSize = 12.sp,
-                fontWeight = FontWeight.SemiBold,
-            )
             Spacer(Modifier.weight(1f))
             Surface(
                 modifier = Modifier.clickable(onClick = onHoursClick),
