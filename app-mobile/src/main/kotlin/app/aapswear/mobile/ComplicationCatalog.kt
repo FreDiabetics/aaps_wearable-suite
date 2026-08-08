@@ -600,13 +600,13 @@ private fun CircularGlucoseComplicationPreview(
                     fontWeight = FontWeight.Bold,
                 )
 
-                Spacer(Modifier.height(5.dp))
+                Spacer(Modifier.height(1.dp))
 
                 Text(
                     text = trendText,
                     color = SugarliciousColors.TextPrimary,
-                    fontSize = 19.sp,
-                    lineHeight = 19.sp,
+                    fontSize = 26.sp,
+                    lineHeight = 26.sp,
                     fontWeight = FontWeight.Bold,
                 )
             }

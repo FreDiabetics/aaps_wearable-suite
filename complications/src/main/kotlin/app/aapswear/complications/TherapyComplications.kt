@@ -414,15 +414,15 @@ abstract class TherapyComplicationService(
         canvas.drawText(
             glucoseText,
             size / 2f,
-            100f,
+            96f,
             paint,
         )
 
-        paint.textSize = 48f
+        paint.textSize = 72f
         canvas.drawText(
             trendText,
             size / 2f,
-            158f,
+            145f,
             paint,
         )
 

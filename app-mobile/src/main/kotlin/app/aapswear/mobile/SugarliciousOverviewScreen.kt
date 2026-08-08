@@ -30,6 +30,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -111,8 +112,8 @@ private fun GlucoseHeroCard(
     glucoseColor: Color,
     trend: Trend,
     delta: String,
-    
-    deltaMgDl: Double?,age: String,
+    deltaMgDl: Double?,
+    age: String,
     unitLabel: String,
     tirStats: TirStats,
     heightDp: Int,
@@ -126,71 +127,75 @@ private fun GlucoseHeroCard(
             .height(heightDp.dp)
             .background(
                 brush = Brush.linearGradient(
-                    listOf(SugarliciousColors.SurfaceHigh, SugarliciousColors.Surface),
+                    listOf(
+                        SugarliciousColors.SurfaceHigh,
+                        SugarliciousColors.Surface,
+                    ),
                 ),
                 shape = shape,
             )
-            .border(1.dp, SugarliciousColors.Border.copy(alpha = 0.85f), shape)
+            .border(
+                1.dp,
+                SugarliciousColors.Border.copy(alpha = 0.85f),
+                shape,
+            )
             .clip(shape)
             .clickable(onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 12.dp),
+            .padding(
+                horizontal = 18.dp,
+                vertical = 10.dp,
+            ),
+        contentAlignment = Alignment.Center,
     ) {
-        Column(
+        Row(
             modifier = Modifier.fillMaxSize(),
-            verticalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(
-                text = "GLUKOSE",
-                color = SugarliciousColors.TextSecondary,
-                fontSize = 11.sp,
-                fontWeight = FontWeight.SemiBold,
-                letterSpacing = 0.8.sp,
-            )
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.Center,
             ) {
-                Column(
-                    modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.Center,
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Text(
-                            text = glucoseText,
-                            color = glucoseColor,
-                            fontSize = 42.sp,
-                            lineHeight = 44.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            letterSpacing = (-0.8).sp,
-                        )
-                        Spacer(Modifier.width(6.dp))
-                        TrendIndicator(correctedTrendForDisplay(trend, deltaMgDl))
-                    }
-
-                    Spacer(Modifier.height(5.dp))
-
                     Text(
-                        text = "Δ $delta · $age · $unitLabel",
-                        color = SugarliciousColors.TextSecondary,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Medium,
+                        text = glucoseText,
+                        color = glucoseColor,
+                        fontSize = 42.sp,
+                        lineHeight = 44.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        letterSpacing = (-0.8).sp,
+                    )
+
+                    Spacer(Modifier.width(6.dp))
+
+                    TrendIndicator(
+                        correctedTrendForDisplay(
+                            trend,
+                            deltaMgDl,
+                        ),
                     )
                 }
 
-                Spacer(Modifier.width(14.dp))
+                Spacer(Modifier.height(3.dp))
 
-                TirProgressColumn(
-                    stats = tirStats,
-                    modifier = Modifier.width(148.dp),
+                Text(
+                    text = "Δ $delta · $age · $unitLabel",
+                    color = SugarliciousColors.TextSecondary,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Medium,
                 )
             }
+
+            Spacer(Modifier.width(20.dp))
+
+            TirProgressColumn(
+                stats = tirStats,
+                modifier = Modifier.width(194.dp),
+            )
         }
     }
 }
-
 private data class TirStats(
     val inRange: Int?,
     val below: Int?,
@@ -243,50 +248,45 @@ private fun TirProgressColumn(
 ) {
     Column(
         modifier = modifier,
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        TirProgress(Modifier.fillMaxWidth(), "TIR 24H", stats.inRange, SugarliciousColors.Primary)
-        TirProgress(Modifier.fillMaxWidth(), "<80", stats.below, SugarliciousColors.Red)
-        TirProgress(Modifier.fillMaxWidth(), ">160", stats.above, SugarliciousColors.Orange)
+        TirProgress(
+            modifier = Modifier.fillMaxWidth(),
+            percent = stats.above,
+            accent = SugarliciousColors.Yellow,
+        )
+
+        TirProgress(
+            modifier = Modifier.fillMaxWidth(),
+            percent = stats.inRange,
+            accent = SugarliciousColors.Primary,
+        )
+
+        TirProgress(
+            modifier = Modifier.fillMaxWidth(),
+            percent = stats.below,
+            accent = SugarliciousColors.Red,
+        )
     }
 }
 
 @Composable
 private fun TirProgress(
     modifier: Modifier,
-    label: String,
     percent: Int?,
     accent: Color,
 ) {
-    val progress = ((percent ?: 0).coerceIn(0, 100) / 100f)
+    val safePercent = (percent ?: 0).coerceIn(0, 100)
+    val progress = safePercent / 100f
 
-    Column(
+    Row(
         modifier = modifier,
-        verticalArrangement = Arrangement.spacedBy(4.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(
-                text = label,
-                color = SugarliciousColors.TextSecondary,
-                fontSize = 9.sp,
-                fontWeight = FontWeight.SemiBold,
-            )
-            Spacer(Modifier.weight(1f))
-            Text(
-                text = percent?.let { "$it%" } ?: "—",
-                color = SugarliciousColors.TextPrimary,
-                fontSize = 10.sp,
-                fontWeight = FontWeight.SemiBold,
-            )
-        }
-
         Box(
             modifier = Modifier
-                .fillMaxWidth()
-                .height(10.dp)
+                .weight(1f)
+                .height(12.dp)
                 .background(
                     SugarliciousColors.SurfaceRaised,
                     RoundedCornerShape(999.dp),
@@ -296,7 +296,7 @@ private fun TirProgress(
                 Box(
                     modifier = Modifier
                         .fillMaxWidth(progress)
-                        .height(10.dp)
+                        .height(12.dp)
                         .background(
                             accent,
                             RoundedCornerShape(999.dp),
@@ -304,9 +304,21 @@ private fun TirProgress(
                 )
             }
         }
+
+        Spacer(Modifier.width(10.dp))
+
+        Text(
+            text = percent?.let { "$it%" } ?: "—",
+            modifier = Modifier.width(42.dp),
+            color = SugarliciousColors.TextPrimary,
+            fontSize = 12.sp,
+            lineHeight = 12.sp,
+            fontWeight = FontWeight.SemiBold,
+            textAlign = TextAlign.End,
+            maxLines = 1,
+        )
     }
 }
-
 private fun correctedTrendForDisplay(
     sourceTrend: Trend,
     deltaMgDl: Double?,
