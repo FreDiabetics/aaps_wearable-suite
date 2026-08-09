@@ -15,6 +15,7 @@ import app.aapswear.model.PredictionKind
 import app.aapswear.model.TargetState
 import app.aapswear.model.TherapyDisplayState
 import app.aapswear.model.TherapyHistorySample
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -53,6 +54,7 @@ class DashboardChartsTest {
                 now - (5 - index) * 15 * 60_000L,
                 totalIob = 0.7 + index * 0.25,
                 cobGrams = 8.0 + index * 5,
+                insulinActivityUnitsPerMinute = 0.008 + index * 0.002,
                 smbUnits = if (index == 2) 0.3 else null,
             )
         }
@@ -61,9 +63,23 @@ class DashboardChartsTest {
         val bluePixels = count(bitmap) { Color.blue(it) > 170 && Color.blue(it) > Color.red(it) * 1.2 }
         val orangePixels = count(bitmap) { Color.red(it) > 170 && Color.green(it) > 70 && Color.blue(it) < 120 }
         val smbPixels = count(bitmap) { Color.green(it) > 170 && Color.blue(it) > 150 && Color.red(it) < 100 }
+        val activityPixels = count(bitmap) { Color.red(it) > 190 && Color.green(it) > 150 && Color.blue(it) < 120 }
         assertTrue("blue=$bluePixels", bluePixels > 20)
         assertTrue("orange=$orangePixels", orangePixels > 20)
         assertTrue("smb=$smbPixels", smbPixels > 10)
+        assertTrue("activity=$activityPixels", activityPixels > 4)
+    }
+
+    @Test fun `toolkit metabolic scaling aligns zero and uses fixed smb sizes`() {
+        val iob = toolkitMetabolicRange(listOf(0.5, 2.0))
+        val cob = toolkitMetabolicRange(listOf(10.0, 30.0), iob.zeroRatio)
+
+        assertEquals(-2.0, iob.minimum, 0.0001)
+        assertEquals(6.0, iob.maximum, 0.0001)
+        assertEquals(iob.zeroRatio, cob.zeroRatio, 0.0001)
+        assertEquals(9f, toolkitSmbMarkerSide(0.1))
+        assertEquals(12f, toolkitSmbMarkerSide(0.25))
+        assertEquals(15f, toolkitSmbMarkerSide(0.5))
     }
 
     @Test fun `glucose dots use alert color outside display range`() {
@@ -79,6 +95,18 @@ class DashboardChartsTest {
         val bitmap = render(GlucoseDashboardChart(context).apply { bind(state, GlucoseUnit.MG_DL, false, 6) }, 420, 230)
         val redPixels = count(bitmap) { Color.red(it) > 180 && Color.red(it) > Color.green(it) * 1.5 }
         assertTrue("red=$redPixels", redPixels > 2)
+    }
+
+    @Test fun `glucose chart uses stable logarithmic scale`() {
+        assertEquals(0.0, glucoseLogRatio(40.0), 0.0001)
+        assertEquals(1.0, glucoseLogRatio(400.0), 0.0001)
+        assertEquals(
+            glucoseLogRatio(80.0) - glucoseLogRatio(40.0),
+            glucoseLogRatio(160.0) - glucoseLogRatio(80.0),
+            0.0001,
+        )
+        assertEquals(0.0, glucoseLogRatio(20.0), 0.0001)
+        assertEquals(1.0, glucoseLogRatio(600.0), 0.0001)
     }
 
     private fun render(view: View, width: Int, height: Int): Bitmap {

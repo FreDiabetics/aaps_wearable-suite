@@ -31,7 +31,7 @@ class TherapyComplicationsTest {
     }
 
     @Test
-    fun `glucose trend ranged complication contains only value and trend text`() {
+    fun `glucose trend ranged complication separates value and trend for renderers`() {
         val service =
             Robolectric
                 .buildService(GlucoseTrendComplication::class.java)
@@ -47,7 +47,7 @@ class TherapyComplicationsTest {
         assertEquals(260f, data.max)
         assertEquals(123f, data.value)
         assertEquals(
-            "123\n↗",
+            "123",
             data.text!!
                 .getTextAt(
                     service.resources,
@@ -55,7 +55,15 @@ class TherapyComplicationsTest {
                 )
                 .toString(),
         )
-        assertNull(data.title)
+        assertEquals(
+            "↗",
+            data.title!!
+                .getTextAt(
+                    service.resources,
+                    Instant.now(),
+                )
+                .toString(),
+        )
         assertNull(data.monochromaticImage)
         assertNull(data.smallImage)
     }

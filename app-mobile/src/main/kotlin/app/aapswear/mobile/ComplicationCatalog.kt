@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -552,11 +553,11 @@ private fun CircularGlucoseComplicationPreview(
         contentAlignment = Alignment.Center,
     ) {
         Box(
-            modifier = Modifier.size(116.dp),
+            modifier = Modifier.size(122.dp),
             contentAlignment = Alignment.Center,
         ) {
             Canvas(modifier = Modifier.fillMaxSize()) {
-                val stroke = 12.dp.toPx()
+                val stroke = 17.dp.toPx()
                 val diameter = size.minDimension - stroke
                 val topLeft = Offset(
                     (size.width - diameter) / 2f,
@@ -596,6 +597,7 @@ private fun CircularGlucoseComplicationPreview(
             }
 
             Column(
+                modifier = Modifier.offset(y = 7.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center,
             ) {
@@ -603,15 +605,16 @@ private fun CircularGlucoseComplicationPreview(
                     text = glucoseText,
                     color = foreground,
                     fontSize = 30.sp,
-                    lineHeight = 30.sp,
+                    lineHeight = 27.sp,
                     fontWeight = FontWeight.Bold,
                 )
 
                 Text(
                     text = trendText,
+                    modifier = Modifier.offset(y = (-4).dp),
                     color = SugarliciousColors.TextPrimary,
-                    fontSize = 30.sp,
-                    lineHeight = 30.sp,
+                    fontSize = 37.sp,
+                    lineHeight = 33.sp,
                     fontWeight = FontWeight.Bold,
                 )
             }

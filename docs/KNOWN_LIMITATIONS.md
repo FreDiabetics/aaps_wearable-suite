@@ -86,3 +86,15 @@
 - Die Analogzeiger sind bewusst eigenständig gezeichnet. Eine exakte Kopie von
   Apple-Watch-Ressourcen oder Apple-Trade-Dress ist weder enthalten noch als
   Zielparität deklariert.
+
+## Sugarlicious-WFF-Installation 0.6.2
+
+- Analog, Orbit, Rings und Graph sind vier eigenständige WFF-Anwendungen und
+  werden nicht durch die Wear-Provider-App mitinstalliert. Für den DIY-Build
+  müssen die vier Release-APKs separat auf die Uhr übertragen werden.
+- Der automatisierte Build, WFF-Validator und codefreie APK-Check sind grün;
+  die konkrete Sichtbarkeit in Galaxy Wearable 8.x wurde in diesem Arbeitspaket
+  mangels verbundener Watch nicht erneut real geprüft.
+- Bei fremden Watchfaces bestimmt weiterhin deren Renderer Dicke, Position und
+  Typografie einer Ranged-Value-Complication. Die neue kontrollierte Geometrie
+  gilt für die mobile Vorschau und die eigenen Sugarlicious-WFF-Slots.

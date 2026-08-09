@@ -30,6 +30,21 @@ Therapieinformationen bleiben ausschließlich AndroidAPS-Daten.
    das betreffende Watchface-Paket entfernen und nach der Wear-App erneut
    installieren oder die AAPS-Complications einmal manuell zuweisen.
 
+Wichtig: Die vier Sugarlicious-Watchfaces sind eigenständige WFF-Apps. Die
+Installation von `app-wear-debug.apk` installiert sie nicht automatisch. Für
+einen lokalen Debug-Build werden zuerst alle vier Pakete gebaut und danach auf
+der Watch installiert:
+
+```powershell
+.\gradlew.bat :watchfaces:sugarlicious-analog:assembleRelease :watchfaces:sugarlicious-orbit:assembleRelease :watchfaces:sugarlicious-rings:assembleRelease :watchfaces:sugarlicious-graph:assembleRelease
+.\tools\install-sugarlicious-watchfaces.ps1 -WatchSerial "ADB-SERIENNUMMER-DER-WATCH"
+```
+
+Anschließend erscheinen `Sugarlicious Analog`, `Sugarlicious Orbit`,
+`Sugarlicious Rings` und `Sugarlicious Graph` in der Watchface-Auswahl. Falls
+Galaxy Wearable die Liste noch zwischengespeichert hat, die Auswahl auf der Uhr
+durch langes Drücken des Zifferblatts öffnen oder Galaxy Wearable neu starten.
+
 Alternativ oder als Glukose-Fallback in xDrip+ die Ausgabe von Daten über lokale
 Intents aktivieren und in Sugarlicious unter **Einstellungen → Anzeige →
 Datenquelle** `Automatisch` oder `xDrip+` wählen. `Automatisch` verwendet einen

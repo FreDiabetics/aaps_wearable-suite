@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.6.2 - 2026-08-09
+
+- Watch-Menü vom großen Karussell auf vier einzelne, untereinander angeordnete
+  Tiles für Analog, Orbit, Rings und Graph umgestellt. Jedes Tile zeigt Typ,
+  Slotanzahl, Graph-/Ring-Fähigkeit und AOD; die Complication-Vorschauen folgen
+  geschlossen darunter. Das Schnellwechsel-Karussell bleibt auf der Übersicht.
+- Complication 02 trennt im `RANGED_VALUE` den Glukosewert als Haupttext und den
+  Trend als Titel. Mobile Vorschau und kontrollierte Sugarlicious-Slots haben
+  dickere Fortschrittsbalken/-ringe, einen größeren Trendpfeil sowie einen
+  engeren und tiefer gesetzten Textblock.
+- Vier eigenständige, codefreie Sugarlicious-WFF-Release-APKs dokumentiert und ein geprüftes
+  ADB-Installationsskript ergänzt; die Wear-App enthält diese separaten Pakete
+  bewusst nicht.
+- CGM-Graph auf eine feste logarithmische Glukoseskala von 40 bis 400 mg/dL
+  umgestellt. Stunden- und Zielbereichsbeschriftungen liegen innerhalb des
+  abgerundeten Skalencontainers hinter den Daten; Plotfläche und Höhe wurden
+  vergrößert, die invertierte Basalspur verkleinert.
+
+- Mobile 0.6.2/Code 10, Wear 0.6.2/Code 12 sowie Analog/Orbit/Rings/Graph
+  einheitlich auf 0.6.2 mit erhöhtem VersionCode gesetzt.
+
 ## 0.6.1 - 2026-08-09
 
 - Watchface-Karussell auf exakt einen Schritt pro Wischgeste begrenzt und

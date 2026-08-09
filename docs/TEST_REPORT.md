@@ -321,3 +321,26 @@ WFF-Validators auf. Nach der eng begrenzten Cache-Reparatur bestand sowohl der
 isolierte Validatorlauf als auch der vollständige Release-Lauf. Die öffentliche
 AndroidAPS-Dev-Referenz blieb währenddessen unverändert auf
 `e1068e77db4f801c046340c8313cd7a2856f4e7c`.
+
+## Sugarlicious 0.6.2 – Abschlusslauf 2026-08-09
+
+- `DashboardChartsTest`: 5 Tests, 0 Fehler; feste logarithmische CGM-Skala,
+  Ziel-/Prediction-Farben sowie IOB/COB/SMB/Insulinaktivität gerendert.
+- `OverviewWatchFaceTileTest`: 4 Tests, 0 Fehler; Karussell-Einzelschritt,
+  Nachbarsichtbarkeit und vier Watchface-Karten geprüft.
+- `MainActivityTest`: 7 Tests, 0 Fehler; Navigation, Aktualisierung und Erhalt
+  der Compose-Ansicht geprüft.
+- `PersistentBridgeServiceTest`: 3 Tests, 0 Fehler; Notification-Layout und
+  gerundeter Graph-Renderer geprüft.
+- `TherapyComplicationsTest`: 6 Tests, 0 Fehler; Complication 02 liefert im
+  `RANGED_VALUE` Wert `123`, Trend `↗`, Bereich 40–260 und keine Bilddaten.
+- `:app-mobile:assembleDebug`, `:app-wear:assembleDebug`: erfolgreich;
+  Versionen Mobile 0.6.2/10 und Wear 0.6.2/12 per `aapt` verifiziert.
+- `:app-mobile:lintDebug`: 0 Fehler, 3 bestehende Warnungen (SDK-/Ressourcen-
+  Hinweise, keine neue Quellcodewarnung).
+- Offizieller Google-WFF-Validator: Analog, Orbit, Rings und Graph jeweils
+  gültig gegen WFF v1.
+- WFF-Release-Paketcheck: vier APKs signiert, jeweils `android.hardware.type.watch`,
+  eindeutige Application-ID, Version 0.6.2 und 0 DEX-Dateien.
+- Nicht ausgeführt: Installation auf Hardware, Galaxy-Wearable-Erkennung,
+  aktive/AOD-Screenshotkontrolle; beim Abschluss war kein ADB-Gerät verbunden.

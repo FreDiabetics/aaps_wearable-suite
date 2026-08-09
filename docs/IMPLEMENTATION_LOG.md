@@ -331,3 +331,32 @@
   weiterhin offen.
 - Nächster Schritt: Änderungen kontrolliert committen und in das öffentliche
   GitHub-Repository übertragen; danach gezielten Reconnect-Test durchführen.
+
+## 2026-08-09, 21:45 +02:00, Sugarlicious 0.6.2 – Watchfaces, Complication 02 und Graphlayout
+
+- Geändert: Mobile-Watch-Menü, Watchface-Vorschau, Complication-Katalog,
+  `GlucoseTrendComplication`, statische Wear-Vorschau, die vier WFF-Module
+  Analog/Orbit/Rings/Graph, CGM-/IOB-/COB-Graphen, Notification-Renderer,
+  Versionsstände, Installation, Changelog und zugehörige Tests.
+- Zweck: die vier realen WFF-Pakete in der Entwicklung eindeutig installierbar
+  machen, das Watch-Menü auf einzelne Watchface-Tiles umstellen, Complication 02
+  lesbarer machen und Skalen/Flächennutzung des CGM-Graphs korrigieren.
+- Umsetzung: vier separate codefreie WFF-Release-APKs mit eindeutigen Paket-IDs
+  und Version 0.6.2; ADB-Installationsskript; Glukosewert und Trend als getrennte
+  Ranged-Value-Felder; dickere kontrollierte Ringe/Balken; vier Watchface-Tiles
+  vor dem Complication Studio; feste logarithmische 40–400-mg/dL-Skala mit
+  Innenbeschriftung, kompakter Basalspur und größerer Plotfläche. Wiederholte
+  Activity-Aktualisierungen behalten die Compose-Ansicht bei; Notification- und
+  Stoffwechselgraph wurden im selben Arbeitspaket vergrößert beziehungsweise an
+  die Nightscout-Toolkit-Darstellung angenähert.
+- Tests: 25 ausgewählte Unit-/Robolectric-Tests bestanden; Mobile- und Wear-
+  Debug-APKs gebaut; Mobile-Lint ohne Fehler; alle vier WFFs mit dem offiziellen
+  Google-Validator als WFF v1 gültig; vier signierte Release-APKs ohne DEX und
+  mit den erwarteten Paket-IDs verifiziert.
+- Ergebnis: automatisierte Prüfungen grün. `adb devices -l` lieferte zum
+  Abschluss kein verbundenes Gerät; Installation, Darstellung in Galaxy
+  Wearable und visuelle Kontrolle auf der realen Watch wurden daher in diesem
+  Arbeitspaket nicht behauptet.
+- Nächster Schritt: Watch per WLAN-/USB-Debugging verbinden, vier WFF-Release-
+  APKs installieren, Galaxy-Wearable-Liste aktualisieren und aktive/AOD-
+  Screenshots von Complication 02 sowie allen vier Watchfaces aufnehmen.

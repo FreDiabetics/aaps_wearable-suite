@@ -113,7 +113,7 @@ internal fun SugarliciousOverviewScreen(
         GlucoseGraphSurface(
             state = state,
             preferences = preferences,
-            chartHeightDp = maxOf(metrics.glucoseChartHeight - 10, 108),
+            chartHeightDp = maxOf(metrics.glucoseChartHeight + 34, 148),
         )
 
         if (preferences.showMetabolicGraph) {

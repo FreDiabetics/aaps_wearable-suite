@@ -1,6 +1,7 @@
 package app.aapswear.mobile
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class OverviewWatchFaceTileTest {
@@ -23,5 +24,12 @@ class OverviewWatchFaceTileTest {
         assertEquals(1f, carouselPageVisibility(1f))
         assertEquals(0f, carouselPageVisibility(2f))
         assertEquals(0.5f, carouselPageVisibility(1.125f))
+    }
+
+    @Test
+    fun `watch menu lists the four installable Sugarlicious faces as cards`() {
+        assertEquals(sugarliciousWatchFaceNames, sugarliciousWatchFaceCards.map { it.name })
+        assertEquals(4, sugarliciousWatchFaceCards.size)
+        assertTrue(sugarliciousWatchFaceCards.all { it.slots > 0 && "AOD" in it.features })
     }
 }

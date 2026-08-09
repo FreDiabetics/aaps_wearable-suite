@@ -190,6 +190,20 @@ class DashboardViewFactory(
     private val context: Context,
     private val callbacks: DashboardCallbacks,
 ) {
+    private data class ComposeRenderState(
+        val state: TherapyDisplayState?,
+        val diagnostics: DiagnosticsSnapshot,
+        val preferences: DashboardUiPreferences,
+        val now: Long,
+    )
+
+    private val overviewRenderState =
+        androidx.compose.runtime.mutableStateOf<ComposeRenderState?>(null)
+    private val watchRenderState =
+        androidx.compose.runtime.mutableStateOf<ComposeRenderState?>(null)
+    private var activeComposeScreen: DashboardScreen? = null
+    private var activeComposeView: androidx.compose.ui.platform.ComposeView? = null
+
     private val density =
         context.resources.displayMetrics.density
 
@@ -225,8 +239,6 @@ class DashboardViewFactory(
         preferences: DashboardUiPreferences,
         now: Long,
     ) {
-        parent.removeAllViews()
-
         when (screen) {
             DashboardScreen.OVERVIEW ->
                 renderOverview(
@@ -263,6 +275,15 @@ class DashboardViewFactory(
         preferences: DashboardUiPreferences,
         now: Long,
     ) {
+        overviewRenderState.value = ComposeRenderState(state, diagnostics, preferences, now)
+        if (activeComposeScreen == DashboardScreen.OVERVIEW &&
+            activeComposeView?.parent === parent
+        ) {
+            return
+        }
+
+        parent.removeAllViews()
+        watchRenderState.value = null
         val composeView =
             androidx.compose.ui.platform.ComposeView(
                 context,
@@ -274,13 +295,15 @@ class DashboardViewFactory(
                 )
                 setContent {
                     SugarliciousTheme {
-                        SugarliciousOverviewScreen(
-                            state = state,
-                            diagnostics = diagnostics,
-                            preferences = preferences,
-                            now = now,
-                            callbacks = callbacks,
-                        )
+                        overviewRenderState.value?.let { rendered ->
+                            SugarliciousOverviewScreen(
+                                state = rendered.state,
+                                diagnostics = rendered.diagnostics,
+                                preferences = rendered.preferences,
+                                now = rendered.now,
+                                callbacks = callbacks,
+                            )
+                        }
                     }
                 }
             }
@@ -289,6 +312,8 @@ class DashboardViewFactory(
             composeView,
             fullWidth(),
         )
+        activeComposeScreen = DashboardScreen.OVERVIEW
+        activeComposeView = composeView
     }
 
     private fun renderWatch(
@@ -298,6 +323,15 @@ class DashboardViewFactory(
         preferences: DashboardUiPreferences,
         now: Long,
     ) {
+        watchRenderState.value = ComposeRenderState(state, diagnostics, preferences, now)
+        if (activeComposeScreen == DashboardScreen.WATCH &&
+            activeComposeView?.parent === parent
+        ) {
+            return
+        }
+
+        parent.removeAllViews()
+        overviewRenderState.value = null
         val composeView =
             androidx.compose.ui.platform.ComposeView(
                 context,
@@ -309,14 +343,14 @@ class DashboardViewFactory(
                 )
                 setContent {
                     SugarliciousTheme {
-                        SugarliciousWatchScreen(
-                            state = state,
-                            diagnostics = diagnostics,
-                            preferences = preferences,
-                            now = now,
-                            onSyncNow = callbacks.syncNow,
-                            onSelectedFace = callbacks.setWatchFaceIndex,
-                        )
+                        watchRenderState.value?.let { rendered ->
+                            SugarliciousWatchScreen(
+                                state = rendered.state,
+                                preferences = rendered.preferences,
+                                now = rendered.now,
+                                onSelectedFace = callbacks.setWatchFaceIndex,
+                            )
+                        }
                     }
                 }
             }
@@ -325,6 +359,8 @@ class DashboardViewFactory(
             composeView,
             fullWidth(),
         )
+        activeComposeScreen = DashboardScreen.WATCH
+        activeComposeView = composeView
     }
 
     private fun renderSettings(
@@ -333,6 +369,11 @@ class DashboardViewFactory(
         diagnostics: DiagnosticsSnapshot,
         preferences: DashboardUiPreferences,
     ) {
+        parent.removeAllViews()
+        overviewRenderState.value = null
+        watchRenderState.value = null
+        activeComposeScreen = null
+        activeComposeView = null
         parent.addView(
             screenTitle(),
         )

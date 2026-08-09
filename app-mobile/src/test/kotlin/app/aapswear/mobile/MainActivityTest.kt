@@ -45,6 +45,7 @@ class MainActivityTest {
 
         assertNotNull(dashboard)
         assertTrue(dashboard.childCount > 0)
+        val originalComposeView = dashboard.getChildAt(0)
 
         diagnostics.edit()
             .putLong("received", 1_000L)
@@ -56,6 +57,7 @@ class MainActivityTest {
         shadowOf(android.os.Looper.getMainLooper()).idle()
 
         assertTrue(dashboard.childCount > 0)
+        assertSame(originalComposeView, dashboard.getChildAt(0))
 
         activity.findViewById<View>(R.id.nav_settings).performClick()
         shadowOf(android.os.Looper.getMainLooper()).idle()

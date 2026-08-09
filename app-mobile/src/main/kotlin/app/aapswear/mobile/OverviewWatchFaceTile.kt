@@ -68,7 +68,7 @@ import kotlin.math.cos
 import kotlin.math.roundToInt
 import kotlin.math.sin
 
-private val watchFaces = listOf(
+internal val sugarliciousWatchFaceNames = listOf(
     "Sugarlicious Analog",
     "Sugarlicious Orbit",
     "Sugarlicious Rings",
@@ -140,19 +140,19 @@ internal fun OverviewWatchFaceTile(
     onSelectedFace: (Int) -> Unit,
     onEdit: () -> Unit,
 ) {
-    val selected = selectedFaceIndex.coerceIn(0, watchFaces.lastIndex)
+    val selected = selectedFaceIndex.coerceIn(0, sugarliciousWatchFaceNames.lastIndex)
     val midpoint = carouselPages / 2
-    val aligned = midpoint - midpoint % watchFaces.size
+    val aligned = midpoint - midpoint % sugarliciousWatchFaceNames.size
     val pager = rememberPagerState(initialPage = aligned + selected, pageCount = { carouselPages })
     val carouselScope = rememberCoroutineScope()
     LaunchedEffect(pager.settledPage) {
-        val index = pager.settledPage % watchFaces.size
+        val index = pager.settledPage % sugarliciousWatchFaceNames.size
         if (index != selected) onSelectedFace(index)
     }
 
     val connected = diagnostics.reachableWatches > 0
     val error = connected && diagnostics.syncStatus !in listOf(null, "ok", "pending")
-    val currentIndex = pager.currentPage % watchFaces.size
+    val currentIndex = pager.currentPage % sugarliciousWatchFaceNames.size
 
     Column(
         modifier = Modifier.fillMaxWidth().padding(top = 2.dp, bottom = 5.dp),
@@ -198,7 +198,7 @@ internal fun OverviewWatchFaceTile(
                 userScrollEnabled = false,
                 verticalAlignment = Alignment.CenterVertically,
             ) { page ->
-                val index = page % watchFaces.size
+                val index = page % sugarliciousWatchFaceNames.size
                 Box(
                     modifier = Modifier
                         .offset(y = carouselFaceVerticalOffset)
@@ -215,7 +215,12 @@ internal fun OverviewWatchFaceTile(
                         .clickable(onClick = onEdit),
                     contentAlignment = Alignment.Center,
                 ) {
-                    FaceDial(index, state, now)
+                    FaceDial(
+                        index = index,
+                        state = state,
+                        now = now,
+                        modifier = Modifier.size(carouselFaceSize),
+                    )
                 }
             }
             Box(
@@ -254,7 +259,7 @@ internal fun OverviewWatchFaceTile(
             }
         }
         Text(
-            watchFaces[currentIndex],
+            sugarliciousWatchFaceNames[currentIndex],
             color = SugarliciousColors.TextSecondary,
             fontSize = 9.sp,
             textAlign = TextAlign.Center,
@@ -282,7 +287,12 @@ private fun GalaxyWatchUltraFrame() {
 }
 
 @Composable
-private fun FaceDial(index: Int, state: TherapyDisplayState?, now: Long) {
+internal fun FaceDial(
+    index: Int,
+    state: TherapyDisplayState?,
+    now: Long,
+    modifier: Modifier = Modifier,
+) {
     val glucose = state?.glucose?.valueMgDl?.roundToInt()?.toString() ?: "—"
     val trend = when (state?.glucose?.trend) {
         Trend.DOUBLE_UP -> "⇈"
@@ -301,7 +311,7 @@ private fun FaceDial(index: Int, state: TherapyDisplayState?, now: Long) {
         else -> Color.White
     }
     Box(
-        Modifier.size(carouselFaceSize).clip(CircleShape).background(Color.Black),
+        modifier.clip(CircleShape).background(Color.Black),
         contentAlignment = Alignment.Center,
     ) {
         Canvas(Modifier.fillMaxSize()) {

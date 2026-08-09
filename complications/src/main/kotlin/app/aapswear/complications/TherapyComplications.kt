@@ -262,22 +262,16 @@ abstract class TherapyComplicationService(
                     val trendValue =
                         trendText.ifBlank { "→" }
 
-                    val visibleText =
-                        if (
-                            kind == ProviderKind.GLUCOSE_TREND ||
+                    val exposesTrend =
+                        kind == ProviderKind.GLUCOSE_TREND ||
                             kind == ProviderKind.GLUCOSE_RANGED
-                        ) {
-                            "$glucoseText\n$trendValue"
-                        } else {
-                            glucoseText
-                        }
 
                     val rangedDescription =
                         PlainComplicationText.Builder(
-                            visibleText.replace('\n', ' '),
+                            if (exposesTrend) "$glucoseText $trendValue" else glucoseText,
                         ).build()
 
-                    return RangedValueComplicationData.Builder(
+                    val builder = RangedValueComplicationData.Builder(
                         value,
                         GLUCOSE_GAUGE_MIN,
                         GLUCOSE_GAUGE_MAX,
@@ -285,11 +279,18 @@ abstract class TherapyComplicationService(
                     )
                         .setText(
                             PlainComplicationText.Builder(
-                                visibleText,
+                                glucoseText,
                             ).build(),
                         )
                         .setTapAction(tap)
-                        .build()
+
+                    if (exposesTrend) {
+                        builder.setTitle(
+                            PlainComplicationText.Builder(trendValue).build(),
+                        )
+                    }
+
+                    return builder.build()
                 }
 
 

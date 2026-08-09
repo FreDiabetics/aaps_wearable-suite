@@ -4,6 +4,8 @@ import android.app.Notification
 import android.app.NotificationManager
 import android.app.Service
 import android.content.Intent
+import android.graphics.Bitmap
+import android.graphics.Color
 import androidx.test.core.app.ApplicationProvider
 import app.aapswear.model.GlucoseState
 import app.aapswear.model.GlucoseUnit
@@ -21,8 +23,10 @@ import org.robolectric.Robolectric
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
 
 @RunWith(RobolectricTestRunner::class)
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
 class PersistentBridgeServiceTest {
 
     @Test
@@ -49,6 +53,7 @@ class PersistentBridgeServiceTest {
     fun `live preference requests promoted status with current glucose and graph`() {
         val context = ApplicationProvider.getApplicationContext<android.content.Context>()
         context.getSharedPreferences("dashboard_ui", android.content.Context.MODE_PRIVATE).edit()
+            .clear()
             .putBoolean(PersistentBridgeService.PREFERENCE_LIVE_NOTIFICATION, true)
             .commit()
         context.getSharedPreferences("diagnostics", android.content.Context.MODE_PRIVATE).edit()
@@ -56,18 +61,15 @@ class PersistentBridgeServiceTest {
             .putInt("reachableWatches", 1)
             .commit()
         val now = System.currentTimeMillis()
-        runBlocking {
-            TherapyStateStore(context).save(
-                TherapyDisplayState(
-                    receivedAtEpochMs = now,
-                    glucose = GlucoseState(123.0, GlucoseUnit.MG_DL, Trend.FLAT, now),
-                    glucoseHistory = listOf(
-                        app.aapswear.model.GlucoseSample(115.0, now - 10 * 60_000L),
-                        app.aapswear.model.GlucoseSample(120.0, now - 5 * 60_000L),
-                    ),
-                ),
-            )
-        }
+        val therapyState = TherapyDisplayState(
+            receivedAtEpochMs = now,
+            glucose = GlucoseState(123.0, GlucoseUnit.MG_DL, Trend.FLAT, now),
+            glucoseHistory = listOf(
+                app.aapswear.model.GlucoseSample(115.0, now - 10 * 60_000L),
+                app.aapswear.model.GlucoseSample(120.0, now - 5 * 60_000L),
+            ),
+        )
+        runBlocking { TherapyStateStore(context).save(therapyState) }
 
         val controller = Robolectric.buildService(PersistentBridgeService::class.java).create().startCommand(0, 1)
         shadowOf(android.os.Looper.getMainLooper()).idle()
@@ -79,7 +81,23 @@ class PersistentBridgeServiceTest {
         assertTrue(notification.extras.getBoolean(PersistentBridgeService.EXTRA_REQUEST_PROMOTED_ONGOING))
         assertTrue(content.contains("mg/dL"))
         assertNotNull(notification.getLargeIcon())
-        assertNotNull(notification.extras.getParcelable<android.graphics.Bitmap>(Notification.EXTRA_PICTURE))
+        val picture = notification.extras.getParcelable(Notification.EXTRA_PICTURE, Bitmap::class.java)
+        assertNotNull(picture)
+        val rendered = requireNotNull(picture)
+        assertTrue(rendered.width > 0)
+        assertTrue("height=${rendered.height}", rendered.height >= 280)
+        assertEquals(
+            NotificationGraphRenderer.HEIGHT.toDouble() / NotificationGraphRenderer.WIDTH,
+            rendered.height.toDouble() / rendered.width,
+            0.02,
+        )
+        val sourceGraph = NotificationGraphRenderer.render(
+            context,
+            therapyState,
+            context.getSharedPreferences("dashboard_ui", android.content.Context.MODE_PRIVATE),
+        )
+        assertEquals(0, Color.alpha(sourceGraph.getPixel(0, 0)))
+        assertTrue(Color.alpha(sourceGraph.getPixel(sourceGraph.width / 2, sourceGraph.height / 2)) > 0)
         assertEquals(null, notification.extras.getCharSequence(Notification.EXTRA_SUB_TEXT))
         assertEquals(1, notification.actions.size)
         controller.destroy()

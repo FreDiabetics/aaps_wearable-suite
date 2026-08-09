@@ -3,7 +3,7 @@ android {
     enableKotlin = false
     namespace = "app.aapswear.watchface.sugarlicious.rings"
     compileSdk = 36
-    defaultConfig { applicationId = "app.aapswear.watchface.sugarlicious.rings"; minSdk = 33; targetSdk = 35; versionCode = 2; versionName = "0.6.1" }
+    defaultConfig { applicationId = "app.aapswear.watchface.sugarlicious.rings"; minSdk = 33; targetSdk = 35; versionCode = 3; versionName = "0.6.2" }
     buildTypes { release { isMinifyEnabled = true; isShrinkResources = false; signingConfig = signingConfigs.getByName("debug") } }
     buildFeatures { buildConfig = false }
     sourceSets.getByName("main").res.setSrcDirs(
