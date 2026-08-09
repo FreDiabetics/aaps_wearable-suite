@@ -2,6 +2,16 @@
 
 ## Sugarlicious 0.6.1, 2026-08-09
 
+- Carousel-Nachprüfung auf Samsung SM-S948B, 1440×3120: Rahmen und Zifferblatt
+  wurden gemeinsam auf 135 dp vergrößert. Der aktive Inhalt liegt konzentrisch
+  im Galaxy-Watch-Ultra-Rahmen; links und rechts ist jeweils genau ein Nachbar
+  mit symmetrischem Mittelpunkt sichtbar, weiter außen liegende Seiten sind
+  ausgeblendet.
+- Zwei gezielte JUnit-Suites mit zehn Tests: 0 Fehler, 0 Fehlschläge, 0
+  übersprungen. Der neue Regressionstest bestätigt, dass das Speichern von
+  `watchFaceIndex` dieselbe ComposeView behält und keinen Dashboard-Neuaufbau
+  mehr auslöst. Mobile-Debug-Build und Mobile-Lint erfolgreich, 0 Lint-Fehler.
+
 - AndroidAPS `dev` unmittelbar vor Abschluss erneut live bei
   `7fc8205e9a73259cec2982fc199f3d2055f84347` bestätigt; kein Upstream-Delta
   während des Arbeitspakets.
@@ -23,23 +33,23 @@
   Performancehinweis wurde behoben und verschwand im Wiederholungslauf.
 - API-35-Phone-Emulator, 1080×2400: finalen Build nach vollständigem Emulator-
   Neustart installiert. Die einzige Uhrenressource ist die gelieferte SVG;
-  Gehäuse und 100-dp-Zifferblatt lagen sichtbar konzentrisch und das Zifferblatt
+  Gehäuse und damaliges 100-dp-Zifferblatt lagen sichtbar konzentrisch und das Zifferblatt
   füllte den runden Displayausschnitt. Drei absichtlich sehr lange Wischgesten
   schalteten jeweils exakt eine Stufe (`Graph → Analog → Orbit → Rings`). Kein
   ANR oder Absturz trat mit dem finalen asynchronen Loader auf.
 - Ein früher Versuch, die 3,8-MB-SVG über WebView zu rendern, verursachte im
   Emulator reproduzierbar einen ANR und wurde vollständig entfernt. Dieser
   verworfene Zwischenstand ist nicht Teil des finalen Builds.
-- Mobile-Debug-APK: 16.855.270 Byte, SHA-256
-  `26EB9041E5BF72BABCC0D391FE0C951712E0A1700D4DF8E79280D0585988A1D2`.
+- Mobile-Debug-APK nach Carousel-Nachprüfung: 16.855.659 Byte, SHA-256
+  `F7DDA7D54AFC55C294DCC0B61105BE4C74E1F90AE8131A3ED57190E0AF93EB9B`.
 - Wear-Debug-APK: 14.440.432 Byte, SHA-256
   `CBB40AA17BA570A9FF12E020647C4203F70354C1CC93B9D4931705D9EA57922B`.
 - Sugarlicious-Rings-Release-APK: SHA-256
   `92F05248F59D20E1D4ECDF718BCEDA2559DB7C2E57C3CDE2041D01711D373F56`.
 
-Nicht als bestanden behauptet werden die aktuelle Darstellung auf dem realen
-Telefon, die reale Galaxy-Watch-Ultra-Installation, AOD der geänderten Rings-
-Version und die One-UI-Live-Hervorhebung.
+Nicht als bestanden behauptet werden die reale Galaxy-Watch-Ultra-Installation,
+AOD der geänderten Rings-Version, die One-UI-Live-Hervorhebung und eine
+archivierte Zeitlupen-Goldenaufnahme des Carousel-Wechsels.
 
 ## Sugarlicious 0.6.0, 2026-08-09
 

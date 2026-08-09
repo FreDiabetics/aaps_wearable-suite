@@ -16,4 +16,12 @@ class OverviewWatchFaceTileTest {
         assertEquals(0, carouselTargetPage(0, 500f, 400))
         assertEquals(399, carouselTargetPage(399, -500f, 400))
     }
+
+    @Test
+    fun `only the immediate carousel neighbours remain visible when settled`() {
+        assertEquals(1f, carouselPageVisibility(0f))
+        assertEquals(1f, carouselPageVisibility(1f))
+        assertEquals(0f, carouselPageVisibility(2f))
+        assertEquals(0.5f, carouselPageVisibility(1.125f))
+    }
 }

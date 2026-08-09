@@ -3,8 +3,13 @@
 ## 0.6.1 - 2026-08-09
 
 - Watchface-Karussell auf exakt einen Schritt pro Wischgeste begrenzt und
-  dynamisch mittig ausgerichtet. Das aktive 100-dp-Zifferblatt sitzt jetzt
-  mittig im Displayausschnitt und füllt ihn ohne das frühere Hochspringen.
+  dynamisch mittig ausgerichtet. Uhrenrahmen und Zifferblätter sind gegenüber
+  dem ersten SVG-Stand um 35 Prozent auf 135 dp vergrößert; links und rechts
+  bleibt jeweils exakt ein symmetrisch platzierter Nachbar sichtbar.
+- Beim Speichern der Auswahl bleibt die laufende Compose-Ansicht erhalten,
+  statt das gesamte Dashboard neu aufzubauen. Der bereits dekodierte SVG-
+  Rahmen wird außerdem unmittelbar aus dem Prozess-Cache übernommen; das
+  einmalige Aufblinken beim Einrasten entfällt.
 - Die bisherige gezeichnete/PNG-basierte Uhren-Silhouette durch die vom
   Projektinhaber gelieferte `galaxy_watch_ultra_mockup_exact.svg` ersetzt. Im
   App-Ressourcenbaum existiert dafür nur die SVG; ihr eingebettetes Raster wird

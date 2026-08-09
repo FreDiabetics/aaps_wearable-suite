@@ -35,6 +35,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.asImageBitmap
@@ -74,10 +75,17 @@ private val watchFaces = listOf(
     "Sugarlicious Graph",
 )
 private const val carouselPages = 400
+private val carouselHeight = 224.dp
+private val carouselFaceSize = 135.dp
+private val carouselPageSpacing = 8.dp
+private val carouselFaceVerticalOffset = (-7).dp
 
 private object GalaxyWatchUltraFrameLoader {
     private val mutex = Mutex()
+    @Volatile
     private var cached: androidx.compose.ui.graphics.ImageBitmap? = null
+
+    fun cachedOrNull(): androidx.compose.ui.graphics.ImageBitmap? = cached
 
     suspend fun load(context: Context): androidx.compose.ui.graphics.ImageBitmap? {
         cached?.let { return it }
@@ -117,6 +125,12 @@ internal fun carouselTargetPage(currentPage: Int, dragDistance: Float, pageCount
     return (currentPage + direction).coerceIn(0, pageCount - 1)
 }
 
+internal fun carouselPageVisibility(distanceFromCenter: Float): Float = when {
+    distanceFromCenter <= 1f -> 1f
+    distanceFromCenter >= 1.25f -> 0f
+    else -> (1.25f - distanceFromCenter) / 0.25f
+}
+
 @Composable
 internal fun OverviewWatchFaceTile(
     state: TherapyDisplayState?,
@@ -153,7 +167,7 @@ internal fun OverviewWatchFaceTile(
         )
 
         BoxWithConstraints(
-            Modifier.fillMaxWidth().height(166.dp),
+            Modifier.fillMaxWidth().height(carouselHeight).clipToBounds(),
             contentAlignment = Alignment.Center,
         ) {
             val oneStepSwipe = Modifier.pointerInput(pager.settledPage) {
@@ -173,30 +187,30 @@ internal fun OverviewWatchFaceTile(
                     onDragCancel = { dragDistance = 0f },
                 )
             }
-            val faceSize = 100.dp
-            val centeredPadding = ((maxWidth - faceSize) / 2).coerceAtLeast(0.dp)
+            val centeredPadding = ((maxWidth - carouselFaceSize) / 2).coerceAtLeast(0.dp)
             GalaxyWatchUltraFrame()
             HorizontalPager(
                 state = pager,
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(horizontal = centeredPadding),
-                pageSpacing = 6.dp,
-                pageSize = PageSize.Fixed(faceSize),
+                pageSpacing = carouselPageSpacing,
+                pageSize = PageSize.Fixed(carouselFaceSize),
                 userScrollEnabled = false,
                 verticalAlignment = Alignment.CenterVertically,
             ) { page ->
                 val index = page % watchFaces.size
                 Box(
                     modifier = Modifier
-                        .offset(y = (-5).dp)
+                        .offset(y = carouselFaceVerticalOffset)
                         .graphicsLayer {
-                            val distance = abs(
+                            val rawDistance = abs(
                                 (pager.currentPage - page) + pager.currentPageOffsetFraction,
-                            ).coerceIn(0f, 1f)
+                            )
+                            val distance = rawDistance.coerceIn(0f, 1f)
                             val scale = lerp(1f, 0.73f, distance)
                             scaleX = scale
                             scaleY = scale
-                            alpha = lerp(1f, 0.52f, distance)
+                            alpha = lerp(1f, 0.52f, distance) * carouselPageVisibility(rawDistance)
                         }
                         .clickable(onClick = onEdit),
                     contentAlignment = Alignment.Center,
@@ -251,7 +265,10 @@ internal fun OverviewWatchFaceTile(
 @Composable
 private fun GalaxyWatchUltraFrame() {
     val context = LocalContext.current.applicationContext
-    val frame by produceState<androidx.compose.ui.graphics.ImageBitmap?>(null, context) {
+    val frame by produceState(
+        initialValue = GalaxyWatchUltraFrameLoader.cachedOrNull(),
+        key1 = context,
+    ) {
         value = GalaxyWatchUltraFrameLoader.load(context)
     }
     frame?.let { bitmap ->
@@ -284,7 +301,7 @@ private fun FaceDial(index: Int, state: TherapyDisplayState?, now: Long) {
         else -> Color.White
     }
     Box(
-        Modifier.size(100.dp).clip(CircleShape).background(Color.Black),
+        Modifier.size(carouselFaceSize).clip(CircleShape).background(Color.Black),
         contentAlignment = Alignment.Center,
     ) {
         Canvas(Modifier.fillMaxSize()) {

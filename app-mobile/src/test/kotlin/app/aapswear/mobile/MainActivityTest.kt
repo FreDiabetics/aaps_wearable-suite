@@ -11,6 +11,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertSame
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.Robolectric
@@ -85,6 +86,23 @@ class MainActivityTest {
         shadowOf(android.os.Looper.getMainLooper()).idle()
         assertTrue(preferences.getBoolean(PersistentBridgeService.PREFERENCE_LIVE_NOTIFICATION, false))
 
+        controller.pause().stop().destroy()
+    }
+
+    @Test fun `saving carousel position does not rebuild the visible dashboard`() {
+        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+        val preferences = context.getSharedPreferences("dashboard_ui", android.content.Context.MODE_PRIVATE)
+        preferences.edit().clear().putInt("watchFaceIndex", 1).commit()
+        val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
+        val activity = controller.get()
+        val dashboard = activity.findViewById<ViewGroup>(R.id.dashboard_content)
+        val originalComposeView = dashboard.getChildAt(0)
+
+        preferences.edit().putInt("watchFaceIndex", 2).commit()
+        shadowOf(android.os.Looper.getMainLooper()).idle()
+
+        assertEquals(2, preferences.getInt("watchFaceIndex", -1))
+        assertSame(originalComposeView, dashboard.getChildAt(0))
         controller.pause().stop().destroy()
     }
 

@@ -1,5 +1,30 @@
 # Implementation Log
 
+## 2026-08-09, 19:47 +02:00, Carousel-Geometrie und flackerfreier Wechsel
+
+- Geändert: `OverviewWatchFaceTile.kt`, `MainActivity.kt`, die zugehörigen
+  Mobile-Tests sowie Changelog und Testbericht.
+- Zweck: nur den unmittelbaren linken und rechten Watchface-Nachbarn zeigen,
+  beide exakt symmetrisch zum festen Uhrenrahmen ausrichten, die komplette
+  Uhrendarstellung um 35 Prozent vergrößern und das gemeldete Aufblinken beim
+  Einrasten beseitigen.
+- Umsetzung: Carousel-Höhe 224 dp, Face-Größe 135 dp und symmetrisch berechnete
+  Seitenränder; Seiten ab Abstand 1,25 sind vollständig transparent. Der SVG-
+  Cache liefert bei einer erneuten Komposition sofort sein Bild. Änderungen
+  von `watchFaceIndex` speichern und übertragen weiterhin die Auswahl, lösen
+  aber keinen vollständigen Dashboard-Neuaufbau mehr aus.
+- Tests: zehn gezielte Mobile-Tests in zwei Suites ohne Fehler, Fehlschlag oder
+  Skip; darunter unmittelbare-Nachbarn-Logik, Ein-Schritt-Geste und Erhalt
+  derselben ComposeView beim Speichern. Mobile-Debug-Build und Lint erfolgreich,
+  Lint mit 0 Fehlern. APK auf Samsung SM-S948B installiert; die aktive Uhr und
+  jeweils genau ein gleich weit entfernter Nachbar wurden auf dem 1440×3120-
+  Display visuell geprüft. Kein Fatal- oder ANR-Eintrag im kontrollierten Log.
+- Einschränkungen: Der Touchwechsel wurde automatisiert funktional und über
+  View-Identität geprüft; eine Zeitlupenaufnahme auf dem realen Gerät wurde
+  nicht als separater Golden-Test archiviert.
+- Nächster Schritt: dieselbe Carousel-Geste zusätzlich auf einer kleineren
+  Displaybreite und mit aktiviertem hellen Modus visuell abnehmen.
+
 ## 2026-08-09, 18:42 +02:00, Graphparität, SMB, Karussell und SVG-Uhrenrahmen 0.6.1
 
 - Geändert: Mobile-Graphen, Verlaufsakkumulator, AAPS-SMB-Parser, Kernmodell,

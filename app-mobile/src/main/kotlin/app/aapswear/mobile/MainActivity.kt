@@ -55,10 +55,12 @@ class MainActivity : ComponentActivity() {
 
     private val diagnosticsListener = SharedPreferences.OnSharedPreferenceChangeListener { _, _ -> runOnUiThread(::refresh) }
     private val uiListener =
-        SharedPreferences.OnSharedPreferenceChangeListener { _, _ ->
-            runOnUiThread {
-                SugarliciousColors.apply(SugarliciousColorStore.load(uiPreferences))
-                refresh()
+        SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+            if (uiPreferenceRequiresDashboardRefresh(key)) {
+                runOnUiThread {
+                    SugarliciousColors.apply(SugarliciousColorStore.load(uiPreferences))
+                    refresh()
+                }
             }
             scope.launch(Dispatchers.IO) {
                 runCatching {
@@ -66,6 +68,9 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+
+    internal fun uiPreferenceRequiresDashboardRefresh(key: String?): Boolean =
+        key != "watchFaceIndex"
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
