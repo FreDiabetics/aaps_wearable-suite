@@ -59,7 +59,7 @@ class MainActivity : ComponentActivity() {
             if (uiPreferenceRequiresDashboardRefresh(key)) {
                 runOnUiThread {
                     SugarliciousColors.apply(SugarliciousColorStore.load(uiPreferences))
-                    refresh()
+                    refresh(forceSettingsRender = true)
                 }
             }
             scope.launch(Dispatchers.IO) {
@@ -114,7 +114,7 @@ class MainActivity : ComponentActivity() {
                 refresh()
             }
         }
-        refresh()
+        refresh(forceSettingsRender = true)
     }
 
     override fun onStart() {
@@ -142,13 +142,15 @@ class MainActivity : ComponentActivity() {
         super.onDestroy()
     }
 
-    private fun refresh() {
+    private fun refresh(forceSettingsRender: Boolean = false) {
         if (!::content.isInitialized || !::factory.isInitialized) return
         SugarliciousColors.apply(SugarliciousColorStore.load(uiPreferences))
         applyRuntimeColors()
         val diagnosticState = DiagnosticsSnapshot.read(diagnostics)
         val uiState = DashboardUiPreferences.read(uiPreferences)
-        factory.render(content, screen, state, diagnosticState, uiState, System.currentTimeMillis())
+        if (screen != DashboardScreen.SETTINGS || forceSettingsRender) {
+            factory.render(content, screen, state, diagnosticState, uiState, System.currentTimeMillis())
+        }
         val sourceAvailable = diagnosticState.sourceVersion != null
         findViewById<ImageView>(R.id.source_shield).apply {
             alpha = if (sourceAvailable) 1f else 0.45f
@@ -221,7 +223,7 @@ styleTitle()
         if (screen == target) return
         screen = target
         scroll.scrollTo(0, 0)
-        refresh()
+        refresh(forceSettingsRender = true)
     }
 
     private fun updateNavigation() {

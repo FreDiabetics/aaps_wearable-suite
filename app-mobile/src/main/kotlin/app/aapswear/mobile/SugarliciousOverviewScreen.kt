@@ -276,19 +276,19 @@ private fun TirProgressColumn(
         TirProgress(
             modifier = Modifier.fillMaxWidth(),
             percent = stats.above,
-            accent = SugarliciousColors.color(app.aapswear.mobile.ui.theme.SugarliciousColorRole.RANGE_HIGH),
+            accent = SugarliciousColors.color(app.aapswear.mobile.ui.theme.SugarliciousColorRole.PROGRESS_ABOVE),
         )
 
         TirProgress(
             modifier = Modifier.fillMaxWidth(),
             percent = stats.inRange,
-            accent = SugarliciousColors.color(app.aapswear.mobile.ui.theme.SugarliciousColorRole.RANGE_IN_RANGE),
+            accent = SugarliciousColors.color(app.aapswear.mobile.ui.theme.SugarliciousColorRole.PROGRESS_IN_RANGE),
         )
 
         TirProgress(
             modifier = Modifier.fillMaxWidth(),
             percent = stats.below,
-            accent = SugarliciousColors.color(app.aapswear.mobile.ui.theme.SugarliciousColorRole.RANGE_LOW),
+            accent = SugarliciousColors.color(app.aapswear.mobile.ui.theme.SugarliciousColorRole.PROGRESS_BELOW),
         )
     }
 }

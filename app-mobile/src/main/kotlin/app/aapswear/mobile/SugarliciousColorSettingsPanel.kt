@@ -401,6 +401,32 @@ private fun ColorRoleExample(
                 )
             }
 
+            SugarliciousColorRole.PROGRESS_BELOW,
+            SugarliciousColorRole.PROGRESS_IN_RANGE,
+            SugarliciousColorRole.PROGRESS_ABOVE
+            -> {
+                Box(
+                    Modifier
+                        .fillMaxWidth()
+                        .height(12.dp)
+                        .background(
+                            SugarliciousColors.SurfaceRaised,
+                            RoundedCornerShape(999.dp),
+                        ),
+                    contentAlignment = Alignment.CenterStart,
+                ) {
+                    Box(
+                        Modifier
+                            .fillMaxWidth(0.68f)
+                            .height(12.dp)
+                            .background(
+                                selectedColor,
+                                RoundedCornerShape(999.dp),
+                            ),
+                    )
+                }
+            }
+
             SugarliciousColorRole.TARGET_BAND -> {
                 Box(
                     Modifier

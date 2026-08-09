@@ -32,7 +32,7 @@ enum class SugarliciousColorRole(
     SURFACE_HIGH("surface_high", "Erhöhte Fläche", SugarliciousColorGroup.APP, 0xFF303030.toInt(), 0xFFE7E7E7.toInt()),
     SURFACE_RAISED("surface_raised", "Progress-/Raised-Fläche", SugarliciousColorGroup.APP, 0xFF363636.toInt(), 0xFFDDDDDD.toInt()),
     SURFACE_SELECTED("surface_selected", "Ausgewählte Fläche", SugarliciousColorGroup.APP, 0xFF3A3A3A.toInt(), 0xFFDCE8DF.toInt()),
-    BORDER("border", "Konturen / Rahmen", SugarliciousColorGroup.APP, 0xFF404040.toInt(), 0xFFD0D0D0.toInt()),
+    BORDER("border", "Tile-Kontur / Rahmen", SugarliciousColorGroup.APP, 0xFF404040.toInt(), 0xFFD0D0D0.toInt(), configurable = true),
     TEXT_PRIMARY("text_primary", "Haupttext", SugarliciousColorGroup.APP, 0xFFF5F5F5.toInt(), 0xFF252525.toInt()),
     TEXT_SECONDARY("text_secondary", "Sekundärtext", SugarliciousColorGroup.APP, 0xFFB5B5B5.toInt(), 0xFF666666.toInt()),
 
@@ -42,6 +42,9 @@ enum class SugarliciousColorRole(
     RANGE_LOW("range_low", "Bereich · tief", SugarliciousColorGroup.GLUCOSE, 0xFFFF5C69.toInt(), configurable = true),
     RANGE_IN_RANGE("range_in_range", "Bereich · im Ziel", SugarliciousColorGroup.GLUCOSE, 0xFF54DF30.toInt(), 0xFF2E9C45.toInt(), true),
     RANGE_HIGH("range_high", "Bereich · hoch", SugarliciousColorGroup.GLUCOSE, 0xFFFFD040.toInt(), 0xFFD47D00.toInt(), true),
+    PROGRESS_BELOW("progress_below", "Progressbar · unter Ziel", SugarliciousColorGroup.GLUCOSE, 0xFFFF5C69.toInt(), configurable = true),
+    PROGRESS_IN_RANGE("progress_in_range", "Progressbar · im Ziel", SugarliciousColorGroup.GLUCOSE, 0xFF54DF30.toInt(), 0xFF2E9C45.toInt(), true),
+    PROGRESS_ABOVE("progress_above", "Progressbar · über Ziel", SugarliciousColorGroup.GLUCOSE, 0xFFFFD040.toInt(), 0xFFD47D00.toInt(), true),
     CGM_DOT_LOW("cgm_dot_low", "CGM-Punkte · tief", SugarliciousColorGroup.GLUCOSE, 0xFFFF5C69.toInt(), configurable = true),
     CGM_DOT_IN_RANGE("cgm_dot_in_range", "CGM-Punkte · im Ziel", SugarliciousColorGroup.GLUCOSE, 0xFF54DF30.toInt(), 0xFF2E9C45.toInt(), true),
     CGM_DOT_HIGH("cgm_dot_high", "CGM-Punkte · hoch", SugarliciousColorGroup.GLUCOSE, 0xFFFFD040.toInt(), 0xFFD47D00.toInt(), true),

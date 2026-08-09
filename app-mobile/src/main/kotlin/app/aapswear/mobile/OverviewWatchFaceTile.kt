@@ -44,6 +44,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -150,8 +151,19 @@ internal fun OverviewWatchFaceTile(
         if (index != selected) onSelectedFace(index)
     }
 
-    val connected = diagnostics.reachableWatches > 0
-    val error = connected && diagnostics.syncStatus !in listOf(null, "ok", "pending")
+    val syncStatus = diagnostics.syncStatus
+    val connected =
+        diagnostics.reachableWatches > 0 ||
+            syncStatus == "ok"
+    val pending =
+        !connected &&
+            syncStatus == "pending"
+    val error =
+        syncStatus !in listOf(
+            null,
+            "ok",
+            "pending",
+        )
     val currentIndex = pager.currentPage % sugarliciousWatchFaceNames.size
 
     Column(
@@ -230,32 +242,79 @@ internal fun OverviewWatchFaceTile(
             )
         }
 
+        val statusColor =
+            when {
+                connected ->
+                    SugarliciousColors.Primary
+
+                pending ->
+                    SugarliciousColors.Yellow
+
+                error ->
+                    SugarliciousColors.Red
+
+                else ->
+                    SugarliciousColors.Red
+            }
+
+        val statusText =
+            when {
+                connected ->
+                    "Verbunden"
+
+                pending ->
+                    "Verbindung wird geprüft"
+
+                else ->
+                    "Nicht verbunden"
+            }
+
         Surface(
             shape = RoundedCornerShape(999.dp),
-            color = SugarliciousColors.SurfaceHigh,
+            color = statusColor.copy(alpha = 0.14f),
+            border =
+                androidx.compose.foundation.BorderStroke(
+                    width = 1.dp,
+                    color = statusColor.copy(alpha = 0.72f),
+                ),
         ) {
             Row(
-                modifier = Modifier.padding(horizontal = 13.dp, vertical = 6.dp),
-                verticalAlignment = Alignment.CenterVertically,
+                modifier =
+                    Modifier.padding(
+                        horizontal = 12.dp,
+                        vertical = 6.dp,
+                    ),
+                verticalAlignment =
+                    Alignment.CenterVertically,
             ) {
-                Text(
-                    when {
-                        error -> "!"
-                        connected -> "●"
-                        else -> "—"
-                    },
-                    color = when {
-                        error -> SugarliciousColors.Red
-                        connected -> SugarliciousColors.Primary
-                        else -> SugarliciousColors.TextSecondary
-                    },
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold,
+                Image(
+                    painter =
+                        painterResource(
+                            R.drawable.ic_watch_status,
+                        ),
+                    contentDescription = null,
+                    modifier =
+                        Modifier
+                            .size(14.dp)
+                            .graphicsLayer {
+                                alpha = 1f
+                            },
+                    colorFilter =
+                        androidx.compose.ui.graphics.ColorFilter.tint(
+                            statusColor,
+                        ),
                 )
-                if (connected) {
-                    Spacer(Modifier.width(6.dp))
-                    Text("Verbunden", color = SugarliciousColors.TextPrimary, fontSize = 10.sp)
-                }
+
+                Spacer(
+                    Modifier.width(6.dp),
+                )
+
+                Text(
+                    text = statusText,
+                    color = statusColor,
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.SemiBold,
+                )
             }
         }
         Text(
