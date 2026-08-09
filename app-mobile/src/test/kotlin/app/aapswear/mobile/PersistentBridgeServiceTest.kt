@@ -79,6 +79,8 @@ class PersistentBridgeServiceTest {
         assertTrue(notification.extras.getBoolean(PersistentBridgeService.EXTRA_REQUEST_PROMOTED_ONGOING))
         assertTrue(content.contains("mg/dL"))
         assertNotNull(notification.getLargeIcon())
+        assertNotNull(notification.extras.getParcelable<android.graphics.Bitmap>(Notification.EXTRA_PICTURE))
+        assertEquals(null, notification.extras.getCharSequence(Notification.EXTRA_SUB_TEXT))
         assertEquals(1, notification.actions.size)
         controller.destroy()
     }

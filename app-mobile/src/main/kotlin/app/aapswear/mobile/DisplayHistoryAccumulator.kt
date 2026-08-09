@@ -48,9 +48,20 @@ internal object DisplayHistoryAccumulator {
                 tempBasalUnitsPerHour = current.basal?.tempAbsoluteUnitsPerHour,
             )
             if (sample.totalIob != null || sample.cobGrams != null || sample.basalUnitsPerHour != null) add(sample)
+            val loop = current.loop
+            loop?.smbUnits?.takeIf { it.isFinite() && it > 0.0 }?.let { units ->
+                add(
+                    TherapyHistorySample(
+                        measuredAtEpochMs = loop.smbAtEpochMs
+                            ?: loop.enactedAtEpochMs
+                            ?: current.receivedAtEpochMs,
+                        smbUnits = units,
+                    ),
+                )
+            }
         }.filter { it.measuredAtEpochMs in earliest..latest }
-            .associateBy { it.measuredAtEpochMs }
-            .values
+            .groupBy { it.measuredAtEpochMs }
+            .map { (timestamp, samples) -> samples.reduce { first, second -> first.merge(second, timestamp) } }
             .sortedBy { it.measuredAtEpochMs }
             .takeLast(MAX_POINTS)
             .withEstimatedInsulinActivity()
@@ -109,10 +120,27 @@ internal object DisplayHistoryAccumulator {
         return deduplicated.sortedBy { it.measuredAtEpochMs }.takeLast(MAX_POINTS)
     }
 
-    private fun List<TherapyHistorySample>.withEstimatedInsulinActivity(): List<TherapyHistorySample> =
-        mapIndexed { index, sample ->
-            if (sample.insulinActivityUnitsPerMinute != null || index == 0) return@mapIndexed sample
-            val previous = this[index - 1]
+    private fun TherapyHistorySample.merge(other: TherapyHistorySample, timestamp: Long) =
+        TherapyHistorySample(
+            measuredAtEpochMs = timestamp,
+            totalIob = other.totalIob ?: totalIob,
+            cobGrams = other.cobGrams ?: cobGrams,
+            basalUnitsPerHour = other.basalUnitsPerHour ?: basalUnitsPerHour,
+            baseBasalUnitsPerHour = other.baseBasalUnitsPerHour ?: baseBasalUnitsPerHour,
+            tempBasalUnitsPerHour = other.tempBasalUnitsPerHour ?: tempBasalUnitsPerHour,
+            insulinActivityUnitsPerMinute = other.insulinActivityUnitsPerMinute ?: insulinActivityUnitsPerMinute,
+            smbUnits = other.smbUnits ?: smbUnits,
+        )
+
+    private fun List<TherapyHistorySample>.withEstimatedInsulinActivity(): List<TherapyHistorySample> {
+        var previousIobSample: TherapyHistorySample? = null
+        return map { sample ->
+            if (sample.totalIob == null) return@map sample
+            if (sample.insulinActivityUnitsPerMinute != null) {
+                previousIobSample = sample
+                return@map sample
+            }
+            val previous = previousIobSample.also { previousIobSample = sample } ?: return@map sample
             val minutes = (sample.measuredAtEpochMs - previous.measuredAtEpochMs) / 60_000.0
             val priorIob = previous.totalIob
             val currentIob = sample.totalIob
@@ -123,4 +151,5 @@ internal object DisplayHistoryAccumulator {
             }
             sample.copy(insulinActivityUnitsPerMinute = decay?.takeIf { it > 0.0001 })
         }
+    }
 }

@@ -1,5 +1,46 @@
 # Test Report
 
+## Sugarlicious 0.6.1, 2026-08-09
+
+- AndroidAPS `dev` unmittelbar vor Abschluss erneut live bei
+  `7fc8205e9a73259cec2982fc199f3d2055f84347` bestätigt; kein Upstream-Delta
+  während des Arbeitspakets.
+- Gezielte Regression für AAPS-Adapter, Wear-Protokoll, Mobile, Wear und
+  Complications erzeugte 14 JUnit-Suites mit 48 Tests: 0 Fehler,
+  0 Fehlschläge, 0 übersprungen. Neu geprüft werden SMB-Parsing,
+  Verlaufsakkumulation, Graphrollen, Notification und Ein-Schritt-Karussell.
+- Mobile-Debug, Wear-Debug, Complications-Debug und Sugarlicious-Rings-Release
+  erfolgreich gebaut. Der kombinierte Gradle-Aufruf überschritt nach Abschluss
+  der XML-Testausgabe das 120-Sekunden-Clientfenster; deshalb wurde der Timeout
+  nicht als Erfolg gewertet. Die Module und Artefakte wurden anschließend
+  einzeln geprüft.
+- Der gepinnte offizielle Google-Validator akzeptierte das geänderte
+  Sugarlicious-Rings-Dokument als WFF v1. Das Release-APK enthält kein
+  `classes*.dex`.
+- Mobile- und Wear-Lint: 0 Fehler. Mobile enthält drei bekannte Hinweise
+  (API-37-Verfügbarkeit, Ziel-API 36 und bestehender Adaptive-Icon-v26-Ordner),
+  Wear einen bestehenden Icon-Ordner-Hinweis. Der neu erkannte Pager-
+  Performancehinweis wurde behoben und verschwand im Wiederholungslauf.
+- API-35-Phone-Emulator, 1080×2400: finalen Build nach vollständigem Emulator-
+  Neustart installiert. Die einzige Uhrenressource ist die gelieferte SVG;
+  Gehäuse und 100-dp-Zifferblatt lagen sichtbar konzentrisch und das Zifferblatt
+  füllte den runden Displayausschnitt. Drei absichtlich sehr lange Wischgesten
+  schalteten jeweils exakt eine Stufe (`Graph → Analog → Orbit → Rings`). Kein
+  ANR oder Absturz trat mit dem finalen asynchronen Loader auf.
+- Ein früher Versuch, die 3,8-MB-SVG über WebView zu rendern, verursachte im
+  Emulator reproduzierbar einen ANR und wurde vollständig entfernt. Dieser
+  verworfene Zwischenstand ist nicht Teil des finalen Builds.
+- Mobile-Debug-APK: 16.855.270 Byte, SHA-256
+  `26EB9041E5BF72BABCC0D391FE0C951712E0A1700D4DF8E79280D0585988A1D2`.
+- Wear-Debug-APK: 14.440.432 Byte, SHA-256
+  `CBB40AA17BA570A9FF12E020647C4203F70354C1CC93B9D4931705D9EA57922B`.
+- Sugarlicious-Rings-Release-APK: SHA-256
+  `92F05248F59D20E1D4ECDF718BCEDA2559DB7C2E57C3CDE2041D01711D373F56`.
+
+Nicht als bestanden behauptet werden die aktuelle Darstellung auf dem realen
+Telefon, die reale Galaxy-Watch-Ultra-Installation, AOD der geänderten Rings-
+Version und die One-UI-Live-Hervorhebung.
+
 ## Sugarlicious 0.6.0, 2026-08-09
 
 - AndroidAPS `dev` erneut live bei

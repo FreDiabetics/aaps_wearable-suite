@@ -6,6 +6,7 @@ import app.aapswear.model.GlucoseSample
 import app.aapswear.model.GlucoseState
 import app.aapswear.model.GlucoseUnit
 import app.aapswear.model.InsulinState
+import app.aapswear.model.LoopState
 import app.aapswear.model.TherapyDisplayState
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -80,5 +81,25 @@ class DisplayHistoryAccumulatorTest {
         assertEquals(1, merged.glucoseHistory.size)
         assertEquals(DataSourceId.ANDROID_APS, merged.glucoseHistory.single().source)
         assertEquals(123.0, merged.glucoseHistory.single().valueMgDl, 0.0)
+    }
+
+    @Test
+    fun `stores a public enacted SMB as a therapy marker without losing IOB`() {
+        val now = 2_000_000L
+        val state = TherapyDisplayState(
+            receivedAtEpochMs = now,
+            glucose = GlucoseState(123.0, GlucoseUnit.MG_DL, measuredAtEpochMs = now),
+            insulin = InsulinState(totalIob = 1.2),
+            loop = LoopState(
+                enactedAtEpochMs = now,
+                smbUnits = 0.25,
+                smbAtEpochMs = now,
+            ),
+        )
+
+        val sample = DisplayHistoryAccumulator.merge(null, state, now).therapyHistory.single()
+
+        assertEquals(1.2, sample.totalIob!!, 0.0)
+        assertEquals(0.25, sample.smbUnits!!, 0.0)
     }
 }

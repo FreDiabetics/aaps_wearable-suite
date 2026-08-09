@@ -48,6 +48,7 @@ import app.aapswear.mobile.ui.theme.SugarliciousColorGroup
 import app.aapswear.mobile.ui.theme.SugarliciousColorRole
 import app.aapswear.mobile.ui.theme.SugarliciousColorStore
 import app.aapswear.mobile.ui.theme.SugarliciousColors
+import kotlin.math.roundToInt
 
 @Composable
 internal fun SugarliciousColorSettingsPanel() {
@@ -584,11 +585,17 @@ private fun ColorEditorDialog(
     var hue by remember(role, initialArgb) { mutableFloatStateOf(initialHsv[0]) }
     var saturation by remember(role, initialArgb) { mutableFloatStateOf(initialHsv[1]) }
     var brightness by remember(role, initialArgb) { mutableFloatStateOf(initialHsv[2]) }
+    var alpha by remember(role, initialArgb) {
+        mutableFloatStateOf(AndroidColor.alpha(initialArgb) / 255f)
+    }
     var hex by remember(role, initialArgb) {
         mutableStateOf(toHex(initialArgb))
     }
 
-    fun currentArgb(): Int = AndroidColor.HSVToColor(floatArrayOf(hue, saturation, brightness))
+    fun currentArgb(): Int = AndroidColor.HSVToColor(
+        (alpha * 255f).roundToInt().coerceIn(0, 255),
+        floatArrayOf(hue, saturation, brightness),
+    )
 
     fun syncHex() {
         hex = toHex(currentArgb())
@@ -625,7 +632,7 @@ private fun ColorEditorDialog(
                                     if (it.startsWith("#")) it
                                     else "#$it"
                                 }
-                                .take(7)
+                                .take(9)
 
                         hex = normalized
 
@@ -634,6 +641,7 @@ private fun ColorEditorDialog(
                             hue = hsv[0]
                             saturation = hsv[1]
                             brightness = hsv[2]
+                            alpha = AndroidColor.alpha(parsed) / 255f
                         }
                     },
                     label = {
@@ -657,6 +665,19 @@ private fun ColorEditorDialog(
                     hue = hue,
                     onChange = {
                         hue = it
+                        syncHex()
+                    },
+                )
+                Text(
+                    text = "Transparenz ${(100f - alpha * 100f).roundToInt()} %",
+                    color = SugarliciousColors.TextSecondary,
+                    fontSize = 11.sp,
+                )
+                AlphaPicker(
+                    color = Color(AndroidColor.HSVToColor(floatArrayOf(hue, saturation, brightness))),
+                    alpha = alpha,
+                    onChange = {
+                        alpha = it
                         syncHex()
                     },
                 )
@@ -737,9 +758,47 @@ private fun HuePicker(hue: Float, onChange: (Float) -> Unit) {
     }
 }
 
+@Composable
+private fun AlphaPicker(color: Color, alpha: Float, onChange: (Float) -> Unit) {
+    Canvas(
+        modifier = Modifier.fillMaxWidth().height(28.dp)
+            .pointerInput(Unit) {
+                fun update(offset: Offset) = onChange((offset.x / size.width).coerceIn(0f, 1f))
+                detectDragGestures(onDragStart = ::update) { change, _ -> update(change.position) }
+            },
+    ) {
+        val cell = 7.dp.toPx()
+        var row = 0
+        var y = 0f
+        while (y < size.height) {
+            var column = 0
+            var x = 0f
+            while (x < size.width) {
+                drawRect(
+                    color = if ((row + column) % 2 == 0) Color(0xFFBEBEBE) else Color(0xFF707070),
+                    topLeft = Offset(x, y),
+                    size = androidx.compose.ui.geometry.Size(cell, cell),
+                )
+                x += cell
+                column++
+            }
+            y += cell
+            row++
+        }
+        drawRoundRect(
+            brush = Brush.horizontalGradient(listOf(color.copy(alpha = 0f), color.copy(alpha = 1f))),
+            cornerRadius = androidx.compose.ui.geometry.CornerRadius(size.height / 2f),
+        )
+        val x = alpha * size.width
+        drawCircle(Color.White, 7.dp.toPx(), Offset(x, size.height / 2f), style = Stroke(2.dp.toPx()))
+        drawCircle(Color.Black.copy(alpha = 0.55f), 9.dp.toPx(), Offset(x, size.height / 2f), style = Stroke(1.dp.toPx()))
+    }
+}
+
 private fun toHex(argb: Int): String =
     String.format(
-        "#%02X%02X%02X",
+        "#%02X%02X%02X%02X",
+        AndroidColor.alpha(argb),
         AndroidColor.red(argb),
         AndroidColor.green(argb),
         AndroidColor.blue(argb),
@@ -747,11 +806,9 @@ private fun toHex(argb: Int): String =
 
 private fun parseHex(value: String): Int? {
     val cleaned = value.removePrefix("#")
-    if (cleaned.length != 6) {
-        return null
-    }
-
-    return cleaned.toIntOrNull(16)?.let {
-        0xFF000000.toInt() or it
+    return when (cleaned.length) {
+        6 -> cleaned.toIntOrNull(16)?.let { 0xFF000000.toInt() or it }
+        8 -> cleaned.toLongOrNull(16)?.toInt()
+        else -> null
     }
 }

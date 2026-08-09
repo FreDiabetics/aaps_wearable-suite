@@ -531,13 +531,11 @@ private fun GlucoseGraphSurface(
     preferences: DashboardUiPreferences,
     chartHeightDp: Int,
 ) {
-    OverviewSurface {
-        AndroidView(
-            modifier = Modifier.fillMaxWidth().height(chartHeightDp.dp),
-            factory = { GlucoseDashboardChart(it) },
-            update = { it.bind(state, preferences.unitFor(state), preferences.showPredictions, preferences.graphHours) },
-        )
-    }
+    AndroidView(
+        modifier = Modifier.fillMaxWidth().height(chartHeightDp.dp),
+        factory = { GlucoseDashboardChart(it) },
+        update = { it.bind(state, preferences.unitFor(state), preferences.showPredictions, preferences.graphHours) },
+    )
 }
 
 @Composable
@@ -546,24 +544,11 @@ private fun MetabolicGraphSurface(
     preferences: DashboardUiPreferences,
     chartHeightDp: Int,
 ) {
-    OverviewSurface {
-        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                "Insulin & Kohlenhydrate",
-                color = SugarliciousColors.TextPrimary,
-                fontSize = 12.sp,
-                fontWeight = FontWeight.SemiBold,
-            )
-        }
-
-        Spacer(Modifier.height(2.dp))
-
-        AndroidView(
-            modifier = Modifier.fillMaxWidth().height(chartHeightDp.dp),
-            factory = { MetabolicDashboardChart(it) },
-            update = { it.bind(state, preferences.graphHours) },
-        )
-    }
+    AndroidView(
+        modifier = Modifier.fillMaxWidth().height(chartHeightDp.dp),
+        factory = { MetabolicDashboardChart(it) },
+        update = { it.bind(state, preferences.graphHours) },
+    )
 }
 
 @Composable

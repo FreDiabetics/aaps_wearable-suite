@@ -50,10 +50,21 @@
   Therapieinformationen. In `Automatisch` bleibt ein aktueller AAPS-Zustand
   deshalb vorrangig; die explizite xDrip+-Auswahl unterdrückt AAPS-Glukose.
 - Der öffentliche AAPS-Vertrag liefert keine verlässliche, vollständige
-  Insulinaktivitätskurve. Die cyanfarbene Kurve im Zielband ist ausschließlich
+  Insulinaktivitätskurve. Die gelbe Kurve im Zielband ist ausschließlich
   eine Display-Schätzung aus dem positiven IOB-Abfall benachbarter Messpunkte;
-  bei unzureichender Datenbasis wird sie nicht gezeichnet. Sie darf nicht für
-  Therapieentscheidungen verwendet werden.
+  der zukünftige Abschnitt ist gestrichelt. Bei unzureichender Datenbasis wird
+  sie nicht gezeichnet. Sie darf nicht für Therapieentscheidungen verwendet
+  werden.
+- Der öffentliche Enacted-Status kann eine einzelne abgegebene SMB-Menge samt
+  Zeit enthalten. Sugarlicious sammelt daraus lokale Marker ab Empfang; nach
+  einer Neuinstallation entsteht daraus keine vollständige historische SMB-
+  Reihe und fehlende Marker werden nicht rekonstruiert.
+- `galaxy_watch_ultra_mockup_exact.svg` ist technisch eine SVG-Hülle mit einem
+  eingebetteten, C2PA-signierten Rasterbild und kein Pfad-Vektor. Im Projekt
+  wird nur diese SVG gespeichert; ihre Rasterdaten werden offline asynchron
+  dekodiert. Sehr starke Vergrößerung gewinnt deshalb keine echte
+  Vektorauflösung. Herkunft und Veröffentlichungsprüfung stehen in
+  `LICENSES/USER_SUPPLIED_ASSETS.md`.
 - AAPS-`predBGs` werden nur dargestellt, wenn sie im Suggested-/Enacted-Payload
   vorhanden und gültig sind. Die App berechnet bewusst keine Ersatzprognosen.
 - Die Bildvorlage zeigt einen 24-Stunden-Insulin-Gesamtwert und einen Uhrenakku.

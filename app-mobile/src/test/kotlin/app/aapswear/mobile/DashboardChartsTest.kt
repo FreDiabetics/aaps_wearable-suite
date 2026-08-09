@@ -48,13 +48,22 @@ class DashboardChartsTest {
 
     @Test fun `metabolic chart renders independent iob and cob areas`() {
         val now = System.currentTimeMillis()
-        val history = (0..5).map { index -> TherapyHistorySample(now - (5 - index) * 15 * 60_000L, totalIob = 0.7 + index * 0.25, cobGrams = 8.0 + index * 5) }
+        val history = (0..5).map { index ->
+            TherapyHistorySample(
+                now - (5 - index) * 15 * 60_000L,
+                totalIob = 0.7 + index * 0.25,
+                cobGrams = 8.0 + index * 5,
+                smbUnits = if (index == 2) 0.3 else null,
+            )
+        }
         val state = TherapyDisplayState(receivedAtEpochMs = now, insulin = InsulinState(totalIob = 1.95), carbs = CarbState(cobGrams = 33.0), therapyHistory = history)
         val bitmap = render(MetabolicDashboardChart(context).apply { bind(state, 6) }, 420, 260)
         val bluePixels = count(bitmap) { Color.blue(it) > 170 && Color.blue(it) > Color.red(it) * 1.2 }
         val orangePixels = count(bitmap) { Color.red(it) > 170 && Color.green(it) > 70 && Color.blue(it) < 120 }
+        val smbPixels = count(bitmap) { Color.green(it) > 170 && Color.blue(it) > 150 && Color.red(it) < 100 }
         assertTrue("blue=$bluePixels", bluePixels > 20)
         assertTrue("orange=$orangePixels", orangePixels > 20)
+        assertTrue("smb=$smbPixels", smbPixels > 10)
     }
 
     @Test fun `glucose dots use alert color outside display range`() {

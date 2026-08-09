@@ -1,5 +1,39 @@
 # Implementation Log
 
+## 2026-08-09, 18:42 +02:00, Graphparität, SMB, Karussell und SVG-Uhrenrahmen 0.6.1
+
+- Geändert: Mobile-Graphen, Verlaufsakkumulator, AAPS-SMB-Parser, Kernmodell,
+  Wear-Protokoll, Notification, Farbwahl, Watchface-Karussell, Watch-/Über-
+  Ansichten, Rings-WFF, Versionen, Tests, Lizenz- und Projektdokumentation.
+- Zweck: die gemeldeten Graph-, Gesten-, Ausrichtungs-, Notification- und
+  Einstellungsabweichungen korrigieren und den gelieferten Galaxy-Watch-Ultra-
+  Rahmen ohne zusätzliche PNG-Ressource einsetzen.
+- Umsetzung: lineare dynamische Graphskalen; AAPS-orientierte invertierte
+  Basal/TBR-Spur samt gestricheltem Basisbasal; gelbe Aktivität mit
+  gestrichelter Zukunft; IOB/COB-Lanes und SMB-Dreiecke; Alpha-/AARRGGBB-
+  Farbeingabe; größerer Notification-Graph; exakt ein Karussellschritt pro
+  Geste; 100-dp-Zifferblatt mit gemessenem -5-dp-Vertikalversatz. Die gelieferte
+  SVG enthält selbst ein Base64-PNG. Dieses wird auf einem IO-Dispatcher
+  validiert, mit Sample-Faktor 2 dekodiert und pro Prozess zwischengespeichert;
+  JavaScript, WebView und Netzverkehr sind nicht beteiligt.
+- Tests: 14 JUnit-Suites/48 Tests ohne Fehler, Fehlschlag oder Skip; Mobile,
+  Wear, Complications und Rings gebaut; Rings offiziell als WFF v1 validiert
+  und ohne DEX geprüft. Im API-35-Emulator waren SVG-Rahmen und Zifferblatt
+  konzentrisch; drei sehr lange Wischgesten wechselten jeweils genau ein Face.
+  Mobile-/Wear-Lint meldete keine Fehler; ein neuer Pager-Performancehinweis
+  wurde durch Layer-lokales Lesen des laufenden Offsets behoben.
+- Während der Prüfung behoben: WebView- und synchroner SVG-Ladeversuch führten
+  wegen der großen eingebetteten Rastergrafik zum ANR. Beide Wege wurden
+  entfernt und durch den asynchronen Loader ersetzt; der saubere Neustart des
+  finalen Builds zeigte keinen ANR.
+- Einschränkungen: Die SVG ist keine echte Pfad-Vektorgrafik. Historische SMBs
+  existieren nur ab lokalem Empfang. Realtelefon, reale Galaxy Watch Ultra,
+  Rings-AOD und One-UI-Live-Notification wurden in diesem Paket nicht visuell
+  abgenommen.
+- Nächster Schritt: Mobile-/Wear-/Rings-APKs auf den angeschlossenen Geräten
+  installieren und dort Touch, Complication-Picker, AOD und Notification
+  prüfen.
+
 ## 2026-08-09, 10:36 +02:00, interaktive Graphen, xDrip+, vereinfachte UI und vier Analog-WFFs
 
 - Geändert: Mobile-Dashboard und Graph-Canvas, Verlaufsakkumulator, Farbrollen

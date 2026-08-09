@@ -242,6 +242,7 @@ class DashboardViewFactory(
                     parent,
                     state,
                     diagnostics,
+                    preferences,
                     now,
                 )
 
@@ -294,6 +295,7 @@ class DashboardViewFactory(
         parent: LinearLayout,
         state: TherapyDisplayState?,
         diagnostics: DiagnosticsSnapshot,
+        preferences: DashboardUiPreferences,
         now: Long,
     ) {
         val composeView =
@@ -310,8 +312,10 @@ class DashboardViewFactory(
                         SugarliciousWatchScreen(
                             state = state,
                             diagnostics = diagnostics,
+                            preferences = preferences,
                             now = now,
                             onSyncNow = callbacks.syncNow,
+                            onSelectedFace = callbacks.setWatchFaceIndex,
                         )
                     }
                 }
@@ -510,8 +514,8 @@ class DashboardViewFactory(
                         ImageView.ScaleType.FIT_CENTER
                 },
                 LinearLayout.LayoutParams(
-                    58.dp,
-                    58.dp,
+                    64.dp,
+                    64.dp,
                 ),
             )
 
@@ -537,6 +541,7 @@ class DashboardViewFactory(
                         },
                     ),
                 ).also { row ->
+                    row.gravity = Gravity.CENTER
                     row.getChildAt(0).id =
                         R.id.dashboard_contact_email
                     row.getChildAt(1).id =

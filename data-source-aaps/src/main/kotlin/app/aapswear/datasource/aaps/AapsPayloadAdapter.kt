@@ -35,6 +35,7 @@ object AapsPayloadAdapter {
   val enactedAt=values.number("enactedTimeStamp")?.toLong()?.takeIf { it>0 }
   val suggestedPayload=values["suggested"] as? String
   val enactedPayload=values["enacted"] as? String
+  val smb=AapsSmbParser.parse(enactedPayload,enactedAt)
   val predictions=AapsPredictionParser.parse(suggestedPayload?:enactedPayload,suggestedAt?:enactedAt?:measured)
   val pumpStatus=values["pumpStatus"] as? String
   val reservoir=values.number("pumpReservoir")
@@ -44,7 +45,7 @@ object AapsPayloadAdapter {
   val caps=buildSet {
    add(DataCapability.GLUCOSE); if(trend!=Trend.UNKNOWN)add(DataCapability.TREND); if(delta!=null)add(DataCapability.DELTA); if(averageDelta!=null)add(DataCapability.AVERAGE_DELTA)
    if(low!=null||high!=null)add(DataCapability.TARGET); if(iob!=null)add(DataCapability.IOB); if(bolusIob!=null)add(DataCapability.BOLUS_IOB); if(basalIob!=null)add(DataCapability.BASAL_IOB)
-   if(cob!=null)add(DataCapability.COB); if(futureCarbs!=null)add(DataCapability.FUTURE_CARBS); if(baseBasal!=null)add(DataCapability.BASAL); if(tempStart!=null||tempAbsolute!=null||tempPercent!=null)add(DataCapability.TEMP_BASAL); if(predictions.isNotEmpty())add(DataCapability.PREDICTIONS)
+   if(smb!=null)add(DataCapability.SMB); if(cob!=null)add(DataCapability.COB); if(futureCarbs!=null)add(DataCapability.FUTURE_CARBS); if(baseBasal!=null)add(DataCapability.BASAL); if(tempStart!=null||tempAbsolute!=null||tempPercent!=null)add(DataCapability.TEMP_BASAL); if(predictions.isNotEmpty())add(DataCapability.PREDICTIONS)
    if(profile!=null)add(DataCapability.PROFILE); if(suggestedAt!=null||enactedAt!=null)add(DataCapability.LOOP); if(pumpStatus!=null)add(DataCapability.PUMP); if(reservoir!=null)add(DataCapability.RESERVOIR); if(pumpBattery!=null)add(DataCapability.PUMP_BATTERY); if(phoneBattery!=null)add(DataCapability.PHONE_BATTERY)
   }
   val detectedContract=AapsCapabilityDetector.detectContract(values).id
@@ -56,6 +57,8 @@ object AapsPayloadAdapter {
     enactedAtEpochMs = enactedAt,
     suggestedPayload = suggestedPayload,
     enactedPayload = enactedPayload,
+    smbUnits = smb?.units,
+    smbAtEpochMs = smb?.deliveredAtEpochMs,
    )
   } else null
   return TherapyDisplayState(

@@ -6,7 +6,7 @@ import kotlinx.serialization.Serializable
 @Serializable enum class GlucoseUnit { MG_DL, MMOL_L }
 @Serializable enum class Trend { DOUBLE_DOWN, SINGLE_DOWN, FORTY_FIVE_DOWN, FLAT, FORTY_FIVE_UP, SINGLE_UP, DOUBLE_UP, UNKNOWN }
 @Serializable enum class Freshness { CURRENT, DELAYED, STALE, NO_DATA }
-@Serializable enum class DataCapability { GLUCOSE, TREND, DELTA, AVERAGE_DELTA, TARGET, IOB, BOLUS_IOB, BASAL_IOB, COB, FUTURE_CARBS, BASAL, TEMP_BASAL, TEMP_TARGET, PROFILE, LOOP, PUMP, RESERVOIR, PUMP_BATTERY, PHONE_BATTERY, PREDICTIONS }
+@Serializable enum class DataCapability { GLUCOSE, TREND, DELTA, AVERAGE_DELTA, TARGET, IOB, BOLUS_IOB, BASAL_IOB, SMB, COB, FUTURE_CARBS, BASAL, TEMP_BASAL, TEMP_TARGET, PROFILE, LOOP, PUMP, RESERVOIR, PUMP_BATTERY, PHONE_BATTERY, PREDICTIONS }
 @Serializable enum class PredictionKind { IOB, COB, ACOB, UAM, ZERO_TEMP }
 
 @Serializable data class GlucoseState(val valueMgDl: Double, val displayUnit: GlucoseUnit, val trend: Trend = Trend.UNKNOWN, val measuredAtEpochMs: Long, val deltaMgDl: Double? = null, val averageDeltaMgDl: Double? = null)
@@ -26,12 +26,14 @@ import kotlinx.serialization.Serializable
     val tempBasalUnitsPerHour: Double? = null,
     /** Display-only estimate derived from the recent IOB decay when AAPS exposes no activity. */
     val insulinActivityUnitsPerMinute: Double? = null,
+    /** Read-only SMB marker normalized from the public AAPS enacted payload. */
+    val smbUnits: Double? = null,
 )
 @Serializable data class InsulinState(val totalIob: Double? = null, val bolusIob: Double? = null, val basalIob: Double? = null)
 @Serializable data class CarbState(val cobGrams: Double? = null, val futureCarbsGrams: Double? = null)
 @Serializable data class BasalState(val currentUnitsPerHour: Double? = null, val tempAbsoluteUnitsPerHour: Double? = null, val tempPercent: Int? = null, val tempStartedAtEpochMs: Long? = null, val tempDurationMinutes: Long? = null, val tempEndsAtEpochMs: Long? = null, val displayText: String? = null)
 @Serializable data class TargetState(val lowMgDl: Double? = null, val highMgDl: Double? = null, val temporary: Boolean = false)
-@Serializable data class LoopState(val status: String? = null, val lastRunAtEpochMs: Long? = null, val suggestedAtEpochMs: Long? = null, val enactedAtEpochMs: Long? = null, val suggestedPayload: String? = null, val enactedPayload: String? = null)
+@Serializable data class LoopState(val status: String? = null, val lastRunAtEpochMs: Long? = null, val suggestedAtEpochMs: Long? = null, val enactedAtEpochMs: Long? = null, val suggestedPayload: String? = null, val enactedPayload: String? = null, val smbUnits: Double? = null, val smbAtEpochMs: Long? = null)
 @Serializable data class PumpState(val status: String? = null, val reservoirUnits: Double? = null, val batteryPercent: Int? = null)
 @Serializable data class DeviceState(val phoneBatteryPercent: Int? = null, val rigBatteryPercent: Int? = null)
 @Serializable data class ProfileState(val name: String? = null)
@@ -55,7 +57,7 @@ import kotlinx.serialization.Serializable
     val device: DeviceState? = null,
     val profile: ProfileState? = null,
     val capabilities: Set<DataCapability> = emptySet()
-) { companion object { const val CURRENT_SCHEMA = 4 } }
+) { companion object { const val CURRENT_SCHEMA = 5 } }
 
 object FreshnessPolicy {
     const val CURRENT_MAX_MS = 6 * 60_000L

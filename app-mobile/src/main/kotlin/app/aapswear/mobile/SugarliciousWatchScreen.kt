@@ -31,8 +31,10 @@ import app.aapswear.model.TherapyDisplayState
 internal fun SugarliciousWatchScreen(
     state: TherapyDisplayState?,
     diagnostics: DiagnosticsSnapshot,
+    preferences: DashboardUiPreferences,
     now: Long,
     onSyncNow: () -> Unit,
+    onSelectedFace: (Int) -> Unit,
 ) {
     val connected = diagnostics.reachableWatches > 0
     val hasProblem = connected && diagnostics.syncStatus !in listOf(null, "ok", "pending")
@@ -79,6 +81,15 @@ internal fun SugarliciousWatchScreen(
                 }
             }
         }
+        Spacer(Modifier.size(10.dp))
+        OverviewWatchFaceTile(
+            state = state,
+            diagnostics = diagnostics,
+            selectedFaceIndex = preferences.watchFaceIndex,
+            now = now,
+            onSelectedFace = onSelectedFace,
+            onEdit = {},
+        )
         Spacer(Modifier.size(10.dp))
         ComplicationStudio(state = state)
     }

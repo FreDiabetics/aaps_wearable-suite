@@ -556,7 +556,7 @@ private fun CircularGlucoseComplicationPreview(
             contentAlignment = Alignment.Center,
         ) {
             Canvas(modifier = Modifier.fillMaxSize()) {
-                val stroke = 9.dp.toPx()
+                val stroke = 12.dp.toPx()
                 val diameter = size.minDimension - stroke
                 val topLeft = Offset(
                     (size.width - diameter) / 2f,

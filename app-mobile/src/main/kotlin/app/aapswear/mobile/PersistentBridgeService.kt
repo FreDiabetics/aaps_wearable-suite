@@ -103,19 +103,23 @@ class PersistentBridgeService : Service(), SharedPreferences.OnSharedPreferenceC
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
         val display = notificationDisplay(latestState)
+        val graph = NotificationGraphRenderer.render(this, latestState, uiPreferences)
         val builder = Notification.Builder(this, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_notification_outlined)
             .setColor(getColor(R.color.app_accent))
             .setContentTitle(display.title)
             .setContentText(display.subtitle)
-            .setSubText(if (liveCapable) "Sugarlicious · Live" else "Sugarlicious")
-            .setLargeIcon(NotificationGraphRenderer.render(this, latestState, uiPreferences))
+            .setLargeIcon(graph)
             .setCategory(Notification.CATEGORY_SERVICE)
             .setContentIntent(openApp)
             .setOngoing(true)
             .setOnlyAlertOnce(true)
             .setShowWhen(false)
-            .setStyle(Notification.BigTextStyle().bigText(display.subtitle))
+            .setStyle(
+                Notification.BigPictureStyle()
+                    .bigPicture(graph)
+                    .setSummaryText(display.subtitle),
+            )
 
         if (liveCapable) {
             val disableLive = PendingIntent.getService(
@@ -191,8 +195,8 @@ class PersistentBridgeService : Service(), SharedPreferences.OnSharedPreferenceC
 
 private object NotificationGraphRenderer {
     fun render(context: Context, state: TherapyDisplayState?, preferences: SharedPreferences): Bitmap {
-        val width = 220
-        val height = 100
+        val width = 420
+        val height = 180
         val bitmap = createBitmap(width, height)
         val canvas = Canvas(bitmap)
         val palette = SugarliciousColorStore.load(preferences)
@@ -216,14 +220,12 @@ private object NotificationGraphRenderer {
             val last = points.last().measuredAtEpochMs.coerceAtLeast(first + 1L)
             points.forEach { point ->
                 val x = 6f + (point.measuredAtEpochMs - first).toFloat() / (last - first) * (width - 12f)
-                paint.color = palette.argb(
-                    when {
-                        point.valueMgDl < targetLow -> SugarliciousColorRole.CGM_DOT_LOW
-                        point.valueMgDl > targetHigh -> SugarliciousColorRole.CGM_DOT_HIGH
-                        else -> SugarliciousColorRole.CGM_DOT_IN_RANGE
-                    },
-                )
-                canvas.drawCircle(x, y(point.valueMgDl), 3.1f, paint)
+                paint.color = when {
+                    point.valueMgDl < targetLow -> palette.argb(SugarliciousColorRole.CGM_DOT_LOW)
+                    point.valueMgDl > targetHigh -> palette.argb(SugarliciousColorRole.CGM_DOT_HIGH)
+                    else -> android.graphics.Color.WHITE
+                }
+                canvas.drawCircle(x, y(point.valueMgDl), 5.0f, paint)
             }
         }
         paint.style = Paint.Style.STROKE

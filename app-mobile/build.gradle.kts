@@ -6,7 +6,7 @@ android {
 
     namespace="app.aapswear.mobile"
     compileSdk=36
-    defaultConfig { applicationId="app.aapswear"; minSdk=26; targetSdk=36; versionCode=8; versionName="0.6.0" }
+    defaultConfig { applicationId="app.aapswear"; minSdk=26; targetSdk=36; versionCode=9; versionName="0.6.1" }
     testOptions { unitTests.isIncludeAndroidResources = true }
 }
 dependencies {

@@ -1,5 +1,30 @@
 # Changelog
 
+## 0.6.1 - 2026-08-09
+
+- Watchface-Karussell auf exakt einen Schritt pro Wischgeste begrenzt und
+  dynamisch mittig ausgerichtet. Das aktive 100-dp-Zifferblatt sitzt jetzt
+  mittig im Displayausschnitt und füllt ihn ohne das frühere Hochspringen.
+- Die bisherige gezeichnete/PNG-basierte Uhren-Silhouette durch die vom
+  Projektinhaber gelieferte `galaxy_watch_ultra_mockup_exact.svg` ersetzt. Im
+  App-Ressourcenbaum existiert dafür nur die SVG; ihr eingebettetes Raster wird
+  asynchron, offline und zwischengespeichert dekodiert.
+- CGM-Graph auf lineare dynamische AAPS-orientierte Skalen korrigiert: Basal/TBR
+  liegt in einer getrennten invertierten Cyan-Spur am oberen Rand, Basisbasal
+  ist gestrichelt, Aktivität gelb und ihr zukünftiger Abschnitt gestrichelt.
+  Predictions liegen rechts der Jetzt-Linie, CGM-Punkte besitzen eine knappe
+  Kontur und der aktuelle Punkt nur eine stärkere Kontur statt eines Außenrings.
+- IOB-/COB-Graphen ohne Überschrift und ohne Basalspur neu gezeichnet; SMBs aus
+  dem öffentlichen AAPS-Enacted-Payload erscheinen als größenabhängige
+  cyanfarbene Dreiecke. Modell-Schema 5 und Wear-Protokoll 6 transportieren
+  diese Marker abwärtskompatibel.
+- Notification-Graph vergrößert, Sugarlicious-Zusatztext entfernt und
+  Zielbereichspunkte dort weiß dargestellt. Farbwahl um Alpha/Transparenz und
+  `#AARRGGBB` erweitert; Rings-Ranged-Value und mobile Vorschau verstärkt.
+- Watch-Menü zeigt Watchfaces vor Complications; Über-Bereich und Kontakt-
+  Buttons sind zentriert. Mobile 0.6.1/Code 9, Wear 0.6.1/Code 11 und
+  Sugarlicious Rings 0.6.1/Code 2.
+
 ## 0.6.0 - 2026-08-09
 
 - Smartphone-Graphen vollständig interaktiv gemacht: stufenloses horizontales

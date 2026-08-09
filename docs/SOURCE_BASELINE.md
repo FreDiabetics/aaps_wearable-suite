@@ -1,5 +1,22 @@
 # AndroidAPS Source Baseline
 
+## Kontrollstand vom 2026-08-09, Abschluss 0.6.1
+
+`refs/heads/dev` wurde am Ende des Graph-/SMB-/Karussell-Arbeitspakets erneut
+direkt bei `nightscout/AndroidAPS` abgefragt.
+
+- Commit: `7fc8205e9a73259cec2982fc199f3d2055f84347`
+- Commit-Datum: 2026-08-06 15:43:52 +02:00
+- Nachricht: `Fix scenes expiration`
+- Delta gegen den 0.6.0-Kontrollstand: keines
+
+Für die Darstellung wurden die aktuelle AAPS-Graphaufbereitung, die getrennte
+invertierte Basal/TBR-Spur, Basisbasal, Aktivitätsdarstellung und SMB-Marker
+erneut als Verhaltensreferenz geprüft. Sugarlicious übernimmt daraus keine
+private AAPS-Klasse: Gelesen wird weiterhin ausschließlich der öffentliche
+Status-Broadcast. SMB-Marker werden nur dann normalisiert, wenn das öffentliche
+Enacted-JSON sichere Einheiten und einen gültigen Zeitstempel enthält.
+
 ## Kontrollstand vom 2026-08-09
 
 `refs/heads/dev` wurde vor dem Sugarlicious-0.6.0-Abschluss erneut direkt im
