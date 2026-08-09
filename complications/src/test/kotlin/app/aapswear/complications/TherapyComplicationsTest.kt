@@ -17,18 +17,17 @@ import java.time.Instant
 class TherapyComplicationsTest {
 
     @Test
-    fun `only the six selected providers remain active`() {
-        assertEquals(
-            listOf(
-                GlucoseTrendComplication::class.java,
-                GlucoseDeltaComplication::class.java,
-                GlucoseGraphComplication::class.java,
-                GlucoseGraphLargeComplication::class.java,
-                IobComplication::class.java,
-                CobComplication::class.java,
-            ),
-            AllProviders.classes,
-        )
+    fun `all documented providers remain active`() {
+        assertEquals(27, AllProviders.classes.distinct().size)
+        assertEquals(GlucoseComplication::class.java, AllProviders.classes.first())
+        assertEquals(LongStatusComplication::class.java, AllProviders.classes.last())
+    }
+
+    @Test
+    fun `glucose trend also supplies short text`() {
+        val service = Robolectric.buildService(GlucoseTrendComplication::class.java).create().get()
+        val data = service.getPreviewData(ComplicationType.SHORT_TEXT) as ShortTextComplicationData
+        assertEquals("123↗", data.text.getTextAt(service.resources, Instant.now()).toString())
     }
 
     @Test

@@ -39,6 +39,9 @@ $watchFaces = [ordered]@{
     "steam-punk" = "app.aapswear.watchface.steampunk"
     "sugarlicious-digital" = "app.aapswear.watchface.sugarlicious.digital"
     "sugarlicious-analog" = "app.aapswear.watchface.sugarlicious.analog"
+    "sugarlicious-orbit" = "app.aapswear.watchface.sugarlicious.orbit"
+    "sugarlicious-rings" = "app.aapswear.watchface.sugarlicious.rings"
+    "sugarlicious-graph" = "app.aapswear.watchface.sugarlicious.graph"
 }
 
 if ($Names.Count -gt 0) {

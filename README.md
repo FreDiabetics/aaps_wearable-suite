@@ -6,25 +6,26 @@ keine Telemetrie und keine Werbung. Das Projekt steht unter GNU AGPL v3.
 
 ## Enthalten
 
-- Mobile Bridge für den offiziellen lokalen AAPS-Status-Broadcast
+- Mobile Bridge für den offiziellen lokalen AAPS-Status-Broadcast und optional
+  den lokalen xDrip+-Glukose-Broadcast
 - versioniertes, fehlertolerantes Datenmodell und Wear-Data-Layer-Protokoll
 - DataStore-Persistenz und klare Kennzeichnung aktueller/verzögerter/veralteter Daten
 - kachelbasiertes Smartphone-Dashboard mit echten AAPS-Graphdaten, flacher
   Navigation und direkt erreichbaren Anzeigeeinstellungen
 - neutrale graue Tile-Oberfläche mit FreDiabetics-Grün als Systemakzent,
   pillenförmigen Menüs und ohne farbige Kartenumrandungen
-- normale dauerhafte Hintergrund-Benachrichtigung sowie optionaler
-  Android-16-/One-UI-8.5-Live-Status ohne Gesundheitswerte
+- normale dauerhafte Hintergrund-Benachrichtigung mit Glukose, Trend, Alter
+  und Minigraph sowie optionaler Android-16-/One-UI-Live-Status
 - 27 frei auswählbare Complication-Provider
-- 25 veröffentlichbare, codefreie WFF-v1-Watchface-Pakete plus technisches Testface
-- zwei originale Sugarlicious-Watchfaces: Digital mit Graph-Tile und Analog mit
-  eigenständig gezeichneten, schlanken Zeigern
+- 28 veröffentlichbare, codefreie WFF-v1-Watchface-Pakete plus technisches Testface
+- fünf originale Sugarlicious-Watchfaces: Digital sowie vier analoge Varianten
+  Analog, Orbit, Rings und Graph mit eigenständig gezeichneten Baton-Zeigern
 - sichere CWF-Analyse, degradationsbewusster WFF-Generator und PNG-Vergleichswerkzeug
 - CI, gepinnter offizieller WFF-Validator, No-DEX-Prüfung und DIY-Release-Skript
 
 Der Datenfluss lautet:
 
-`AndroidAPS External Companion Apps → Mobile Bridge → DataClient → Watch DataStore → Complications → WFF`
+`AndroidAPS External Companion Apps / xDrip+ → Mobile Bridge → DataClient → Watch DataStore → Complications → WFF`
 
 Der aktuelle AndroidAPS-Kontrollstand ist `dev` bei
 `7fc8205e9a73259cec2982fc199f3d2055f84347`. Die reproduzierbare 0.3.0-

@@ -1,5 +1,38 @@
 # Changelog
 
+## 0.6.0 - 2026-08-09
+
+- Smartphone-Graphen vollständig interaktiv gemacht: stufenloses horizontales
+  Verschieben mit einem Finger, Pinch-Zoom mit zwei Fingern, logarithmisch-
+  dynamische Skalierung, abgerundete durchgehende Kontur und ausschließlich
+  Zielgrenzen an der rechten Achse.
+- CGM-Graph um AAPS-Basal/TBR im invertierten cyanfarbenen oberen Bereich,
+  gestrichelte Basisrate, Ausblendfläche, echte rechtsseitige Predictions,
+  Punktkonturen und eine ausdrücklich als Anzeige-Schätzung behandelte
+  IOB-Abklingkurve ergänzt. Zeitnahe Duplikate werden quellenpriorisiert
+  zusammengeführt; AndroidAPS gewinnt gegenüber xDrip+.
+- Farben systemweit nach klaren Rollen getrennt, HSV-/Hex-Farbwähler und
+  augenschonenden hellen Modus ergänzt. Zielbalken, Glukosewert und CGM-Punkte
+  lassen sich unabhängig konfigurieren; Graphfarben werden zur Uhr und zu
+  Bild-/Graph-Complications übertragen.
+- Watchface-Karussell ohne umgebende Kachel neu aufgebaut: feste zentrierte
+  Galaxy-Watch-Ultra-Silhouette, bewegte Watchfaces, kompakte Statuspille und
+  Bearbeitung durch Antippen des Watchfaces. Technische Endnutzer-Tiles,
+  Hamburger-/Overflow-Menüs und der Nightscout-Backfill wurden entfernt.
+- xDrip+ als optionale, rein lokale Glukosequelle ergänzt. Automatisch bevorzugt
+  aktuelle AAPS-Daten; xDrip+ übernimmt nur bei fehlendem/veraltetem AAPS oder
+  ausdrücklicher Auswahl. Therapieinformationen bleiben AAPS-only.
+- Laufende Benachrichtigung zeigt aktuellen Glukosewert, Trend, Alter und einen
+  abgerundeten Minigraphen. Der optionale Android-16-/One-UI-Live-Modus nutzt
+  weiterhin einen offiziellen Standard-Benachrichtigungsstil.
+- Alle 27 Complication-Provider im Wear-Manifest registriert und mit statischer
+  Vorschau versehen. Provider 02 unterstützt `SHORT_TEXT` und `RANGED_VALUE`.
+- Vier analoge Sugarlicious-WFFs bereitgestellt: Analog, Orbit, Rings und Graph;
+  jeweils codefrei, mit kräftigen eigenständigen Baton-Zeigern, AOD, Graph- und
+  Ranged-Value-Slots. Keine Apple-Ressourcen oder kopierte Apple-Geometrie.
+- Mobile 0.6.0/Code 8, Wear 0.6.0/Code 10, Modell-Schema 4,
+  Wear-Protokoll 5 und Watch-Konfiguration 2.
+
 ## 0.5.1 - 2026-08-07
 
 - Smartphone- und Wear-Oberfläche auf neutrale Grautöne mit dem Grün des

@@ -23,12 +23,11 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -36,7 +35,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -46,7 +48,6 @@ import app.aapswear.mobile.ui.theme.SugarliciousColorGroup
 import app.aapswear.mobile.ui.theme.SugarliciousColorRole
 import app.aapswear.mobile.ui.theme.SugarliciousColorStore
 import app.aapswear.mobile.ui.theme.SugarliciousColors
-import kotlin.math.roundToInt
 
 @Composable
 internal fun SugarliciousColorSettingsPanel() {
@@ -101,7 +102,7 @@ internal fun SugarliciousColorSettingsPanel() {
                     letterSpacing = 0.6.sp,
                 )
                 Text(
-                    text = "Mobile App vollständig anpassen",
+                    text = "Bereiche anpassen",
                     color = SugarliciousColors.TextPrimary,
                     fontSize = 17.sp,
                     fontWeight = FontWeight.SemiBold,
@@ -123,16 +124,9 @@ internal fun SugarliciousColorSettingsPanel() {
             }
         }
 
-        Text(
-            text =
-                "Jede Zeile zeigt rechts ein Beispiel der betroffenen " +
-                    "Darstellung. Tippen öffnet HEX- und RGB-Einstellung.",
-            color = SugarliciousColors.TextSecondary,
-            fontSize = 10.sp,
-            lineHeight = 14.sp,
-        )
-
         SugarliciousColorGroup.entries.forEach { group ->
+            val roles = SugarliciousColorRole.entries.filter { it.group == group && it.configurable }
+            if (roles.isEmpty()) return@forEach
             Text(
                 text = group.label.uppercase(),
                 color = SugarliciousColors.TextSecondary,
@@ -141,8 +135,7 @@ internal fun SugarliciousColorSettingsPanel() {
                 modifier = Modifier.padding(top = 6.dp),
             )
 
-            SugarliciousColorRole.entries
-                .filter { it.group == group }
+            roles
                 .forEach { role ->
                     val argb = palette.argb(role)
 
@@ -391,7 +384,13 @@ private fun ColorRoleExample(
 
             SugarliciousColorRole.GLUCOSE_LOW,
             SugarliciousColorRole.GLUCOSE_IN_RANGE,
-            SugarliciousColorRole.GLUCOSE_HIGH
+            SugarliciousColorRole.GLUCOSE_HIGH,
+            SugarliciousColorRole.RANGE_LOW,
+            SugarliciousColorRole.RANGE_IN_RANGE,
+            SugarliciousColorRole.RANGE_HIGH,
+            SugarliciousColorRole.CGM_DOT_LOW,
+            SugarliciousColorRole.CGM_DOT_IN_RANGE,
+            SugarliciousColorRole.CGM_DOT_HIGH
             -> {
                 Text(
                     text = "123",
@@ -490,7 +489,8 @@ private fun ColorRoleExample(
                 )
             }
 
-            SugarliciousColorRole.GRAPH_MUTED -> {
+            SugarliciousColorRole.GRAPH_MUTED,
+            SugarliciousColorRole.GRAPH_DIVIDER -> {
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(4.dp),
                     verticalAlignment = Alignment.CenterVertically,
@@ -522,6 +522,10 @@ private fun ColorRoleExample(
                         center = center,
                     )
                 }
+            }
+
+            SugarliciousColorRole.GRAPH_BACKGROUND -> {
+                Box(Modifier.fillMaxSize().background(selectedColor, RoundedCornerShape(10.dp)))
             }
 
             else -> {
@@ -574,21 +578,17 @@ private fun ColorEditorDialog(
     onDismiss: () -> Unit,
     onSave: (Int) -> Unit,
 ) {
-    var red by remember(role, initialArgb) {
-        mutableIntStateOf(AndroidColor.red(initialArgb))
+    val initialHsv = remember(role, initialArgb) {
+        FloatArray(3).also { AndroidColor.colorToHSV(initialArgb, it) }
     }
-    var green by remember(role, initialArgb) {
-        mutableIntStateOf(AndroidColor.green(initialArgb))
-    }
-    var blue by remember(role, initialArgb) {
-        mutableIntStateOf(AndroidColor.blue(initialArgb))
-    }
+    var hue by remember(role, initialArgb) { mutableFloatStateOf(initialHsv[0]) }
+    var saturation by remember(role, initialArgb) { mutableFloatStateOf(initialHsv[1]) }
+    var brightness by remember(role, initialArgb) { mutableFloatStateOf(initialHsv[2]) }
     var hex by remember(role, initialArgb) {
         mutableStateOf(toHex(initialArgb))
     }
 
-    fun currentArgb(): Int =
-        AndroidColor.rgb(red, green, blue)
+    fun currentArgb(): Int = AndroidColor.HSVToColor(floatArrayOf(hue, saturation, brightness))
 
     fun syncHex() {
         hex = toHex(currentArgb())
@@ -630,9 +630,10 @@ private fun ColorEditorDialog(
                         hex = normalized
 
                         parseHex(normalized)?.let { parsed ->
-                            red = AndroidColor.red(parsed)
-                            green = AndroidColor.green(parsed)
-                            blue = AndroidColor.blue(parsed)
+                            val hsv = FloatArray(3).also { AndroidColor.colorToHSV(parsed, it) }
+                            hue = hsv[0]
+                            saturation = hsv[1]
+                            brightness = hsv[2]
                         }
                     },
                     label = {
@@ -642,27 +643,20 @@ private fun ColorEditorDialog(
                     modifier = Modifier.fillMaxWidth(),
                 )
 
-                ChannelSlider(
-                    label = "Rot",
-                    value = red,
-                    onChange = {
-                        red = it
+                SaturationBrightnessPicker(
+                    hue = hue,
+                    saturation = saturation,
+                    brightness = brightness,
+                    onChange = { newSaturation, newBrightness ->
+                        saturation = newSaturation
+                        brightness = newBrightness
                         syncHex()
                     },
                 )
-                ChannelSlider(
-                    label = "Grün",
-                    value = green,
+                HuePicker(
+                    hue = hue,
                     onChange = {
-                        green = it
-                        syncHex()
-                    },
-                )
-                ChannelSlider(
-                    label = "Blau",
-                    value = blue,
-                    onChange = {
-                        blue = it
+                        hue = it
                         syncHex()
                     },
                 )
@@ -696,38 +690,50 @@ private fun ColorEditorDialog(
 }
 
 @Composable
-private fun ChannelSlider(
-    label: String,
-    value: Int,
-    onChange: (Int) -> Unit,
+private fun SaturationBrightnessPicker(
+    hue: Float,
+    saturation: Float,
+    brightness: Float,
+    onChange: (Float, Float) -> Unit,
 ) {
-    Column {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(
-                label,
-                color = SugarliciousColors.TextSecondary,
-                fontSize = 11.sp,
-                modifier = Modifier.weight(1f),
-            )
-            Text(
-                value.toString(),
-                color = SugarliciousColors.TextPrimary,
-                fontSize = 11.sp,
-            )
-        }
-
-        Slider(
-            value = value.toFloat(),
-            onValueChange = {
-                onChange(
-                    it.roundToInt().coerceIn(0, 255),
-                )
+    Canvas(
+        modifier = Modifier.fillMaxWidth().height(180.dp)
+            .pointerInput(hue) {
+                fun update(offset: Offset) {
+                    onChange(
+                        (offset.x / size.width).coerceIn(0f, 1f),
+                        (1f - offset.y / size.height).coerceIn(0f, 1f),
+                    )
+                }
+                detectDragGestures(onDragStart = ::update) { change, _ -> update(change.position) }
             },
-            valueRange = 0f..255f,
+    ) {
+        drawRect(Brush.horizontalGradient(listOf(Color.White, Color(AndroidColor.HSVToColor(floatArrayOf(hue, 1f, 1f))))))
+        drawRect(Brush.verticalGradient(listOf(Color.Transparent, Color.Black)))
+        val marker = Offset(saturation * size.width, (1f - brightness) * size.height)
+        drawCircle(Color.White, 7.dp.toPx(), marker, style = Stroke(2.dp.toPx()))
+        drawCircle(Color.Black.copy(alpha = 0.65f), 9.dp.toPx(), marker, style = Stroke(1.dp.toPx()))
+    }
+}
+
+@Composable
+private fun HuePicker(hue: Float, onChange: (Float) -> Unit) {
+    Canvas(
+        modifier = Modifier.fillMaxWidth().height(28.dp)
+            .pointerInput(Unit) {
+                fun update(offset: Offset) = onChange((offset.x / size.width).coerceIn(0f, 1f) * 360f)
+                detectDragGestures(onDragStart = ::update) { change, _ -> update(change.position) }
+            },
+    ) {
+        drawRoundRect(
+            brush = Brush.horizontalGradient(
+                listOf(Color.Red, Color.Yellow, Color.Green, Color.Cyan, Color.Blue, Color.Magenta, Color.Red),
+            ),
+            cornerRadius = androidx.compose.ui.geometry.CornerRadius(size.height / 2f),
         )
+        val x = hue / 360f * size.width
+        drawCircle(Color.White, 7.dp.toPx(), Offset(x, size.height / 2f), style = Stroke(2.dp.toPx()))
+        drawCircle(Color.Black.copy(alpha = 0.55f), 9.dp.toPx(), Offset(x, size.height / 2f), style = Stroke(1.dp.toPx()))
     }
 }
 

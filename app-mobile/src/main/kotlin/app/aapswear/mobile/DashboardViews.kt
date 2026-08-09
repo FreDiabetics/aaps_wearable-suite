@@ -26,6 +26,7 @@ import java.util.Date
 
 enum class DashboardScreen { OVERVIEW, WATCH, SETTINGS }
 enum class DisplayUnitPreference { AAPS, MG_DL, MMOL_L }
+enum class DashboardThemeMode { DARK, LIGHT }
 
 data class DashboardUiPreferences(
     val unit: DisplayUnitPreference = DisplayUnitPreference.AAPS,
@@ -36,6 +37,8 @@ data class DashboardUiPreferences(
     val graphHours: Int = 3,
     val liveNotification: Boolean = false,
     val watchFaceIndex: Int = 1,
+    val dataSource: DataSourcePreference = DataSourcePreference.AUTOMATIC,
+    val themeMode: DashboardThemeMode = DashboardThemeMode.DARK,
 ) {
     fun unitFor(state: TherapyDisplayState?): GlucoseUnit = when (unit) {
         DisplayUnitPreference.AAPS ->
@@ -91,7 +94,15 @@ data class DashboardUiPreferences(
                             "watchFaceIndex",
                             1,
                         )
-                        .coerceIn(0, 2),
+                        .coerceIn(0, 3),
+                dataSource = runCatching {
+                    DataSourcePreference.valueOf(
+                        preferences.getString("dataSource", "AUTOMATIC")!!,
+                    )
+                }.getOrDefault(DataSourcePreference.AUTOMATIC),
+                themeMode = runCatching {
+                    DashboardThemeMode.valueOf(preferences.getString("themeMode", "DARK")!!)
+                }.getOrDefault(DashboardThemeMode.DARK),
             )
     }
 }
@@ -106,10 +117,6 @@ data class DiagnosticsSnapshot(
     val lastSyncAt: Long,
     val syncStatus: String?,
     val syncError: String?,
-    val historyBackfillStatus: String?,
-    val historyBackfillPointCount: Int,
-    val historyBackfillRequestedAt: Long,
-    val historyBackfillReceivedAt: Long,
 ) {
     companion object {
         fun read(preferences: SharedPreferences) =
@@ -159,36 +166,15 @@ data class DiagnosticsSnapshot(
                         "lastSyncError",
                         null,
                     ),
-                historyBackfillStatus =
-                    preferences.getString(
-                        "historyBackfillStatus",
-                        null,
-                    ),
-                historyBackfillPointCount =
-                    preferences.getInt(
-                        "historyBackfillPointCount",
-                        0,
-                    ),
-                historyBackfillRequestedAt =
-                    preferences.getLong(
-                        "historyBackfillRequestedAt",
-                        0L,
-                    ),
-                historyBackfillReceivedAt =
-                    preferences.getLong(
-                        "historyBackfillReceivedAt",
-                        0L,
-                    ),
             )
     }
 }
 
 data class DashboardCallbacks(
     val navigate: (DashboardScreen) -> Unit,
-    val cycleUnit: () -> Unit,
-    val cycleGraphHours: () -> Unit,
-    val setGraphHours: (Int) -> Unit,
     val setUnit: (DisplayUnitPreference) -> Unit,
+    val setDataSource: (DataSourcePreference) -> Unit,
+    val setThemeMode: (DashboardThemeMode) -> Unit,
     val setShowDetails: (Boolean) -> Unit,
     val setShowPredictions: (Boolean) -> Unit,
     val setShowMetabolicGraph: (Boolean) -> Unit,
@@ -196,9 +182,6 @@ data class DashboardCallbacks(
     val setLiveNotification: (Boolean) -> Unit,
     val setWatchFaceIndex: (Int) -> Unit,
     val syncNow: () -> Unit,
-    val configureNightscout: () -> Unit,
-    val syncNightscout: () -> Unit,
-    val copyDiagnostics: () -> Unit,
     val openContactEmail: () -> Unit,
     val openGithub: () -> Unit,
 )
@@ -350,36 +333,25 @@ class DashboardViewFactory(
             screenTitle(),
         )
 
-        parent.addView(
-            infoCard(
-                "BRIDGE-STATUS",
-                listOf(
-                    "AndroidAPS" to
-                        diagnostics.sourceVersion.orDash(),
-                    "Datenvertrag" to
-                        diagnostics.sourceContract.orDash(),
-                    "Watch erreichbar" to
-                        if (diagnostics.reachableWatches > 0) {
-                            diagnostics.reachableWatches.toString()
-                        } else {
-                            "nein"
-                        },
-                    "Letzte Übertragung" to
-                        diagnostics.lastSyncAt
-                            .takeIf { it > 0L }
-                            .asDateTime(),
-                    "Sync-Status" to
-                        syncText(diagnostics.syncStatus),
-                ),
-                action =
-                    "JETZT AN WATCH SENDEN" to
-                        callbacks.syncNow,
-            ),
-            cardParams(),
-        )
-
         val display =
-            tile("SMARTPHONE-VORSCHAU")
+            tile("ANZEIGE")
+
+        display.addView(sectionLabel("Datenquelle"))
+        display.addView(
+            chipRow(
+                listOf(
+                    Triple("Automatisch", preferences.dataSource == DataSourcePreference.AUTOMATIC) {
+                        callbacks.setDataSource(DataSourcePreference.AUTOMATIC)
+                    },
+                    Triple("AndroidAPS", preferences.dataSource == DataSourcePreference.ANDROID_APS) {
+                        callbacks.setDataSource(DataSourcePreference.ANDROID_APS)
+                    },
+                    Triple("xDrip+", preferences.dataSource == DataSourcePreference.XDRIP_PLUS) {
+                        callbacks.setDataSource(DataSourcePreference.XDRIP_PLUS)
+                    },
+                ),
+            ),
+        )
 
         display.addView(
             sectionLabel("Glukose-Einheit"),
@@ -419,9 +391,12 @@ class DashboardViewFactory(
         )
 
         display.addView(
-            helper(
-                "Die Smartphone-App bleibt eine Vorschau der Wear-Bridge. AndroidAPS ist die Live-Datenquelle.",
-            ),
+            switchRow(
+                "Heller Modus",
+                "Sanfte helle Oberfläche",
+                preferences.themeMode == DashboardThemeMode.LIGHT,
+                View.generateViewId(),
+            ) { callbacks.setThemeMode(if (it) DashboardThemeMode.LIGHT else DashboardThemeMode.DARK) },
         )
 
         display.addView(
@@ -437,7 +412,7 @@ class DashboardViewFactory(
         display.addView(
             switchRow(
                 "AAPS-Prognosen anzeigen",
-                "Nur vorhandene predBGs; Sugarlicious berechnet keine Therapieprognose",
+                "Vorhandene Vorhersagewerte anzeigen",
                 preferences.showPredictions,
                 R.id.dashboard_predictions_switch,
                 callbacks.setShowPredictions,
@@ -457,7 +432,7 @@ class DashboardViewFactory(
         display.addView(
             switchRow(
                 "Kompakte Übersicht",
-                "Dichte Darstellung für die Bridge-Übersicht",
+                "Dichte Darstellung",
                 preferences.compact,
                 R.id.dashboard_compact_switch,
                 callbacks.setCompact,
@@ -467,26 +442,10 @@ class DashboardViewFactory(
         display.addView(
             switchRow(
                 "Live-Benachrichtigung",
-                "Optionaler Android-16-Live-Status; normale Benachrichtigung bleibt sonst aktiv",
+                "Auf unterstützten Geräten als Live-Status anzeigen",
                 preferences.liveNotification,
                 R.id.dashboard_live_notification_switch,
                 callbacks.setLiveNotification,
-            ),
-        )
-
-        display.addView(
-            sectionLabel("Graph-Zeitraum"),
-        )
-        display.addView(
-            chipRow(
-                listOf(3, 6, 12, 24).map { hours ->
-                    Triple(
-                        "$hours h",
-                        preferences.graphHours == hours,
-                    ) {
-                        callbacks.setGraphHours(hours)
-                    }
-                },
             ),
         )
 
@@ -516,146 +475,6 @@ class DashboardViewFactory(
             cardParams(),
         )
 
-        val nightscoutConfig =
-            NightscoutConfigStore.load(context)
-
-        val nightscout =
-            tile("NIGHTSCOUT · HISTORISCHER BACKFILL")
-
-        nightscout.addView(
-            infoRow(
-                "Konfiguration",
-                nightscoutConfig?.baseUrl
-                    ?: "nicht eingerichtet",
-            ),
-        )
-        nightscout.addView(
-            infoRow(
-                "Access Token",
-                if (
-                    nightscoutConfig?.accessToken != null
-                ) {
-                    "verschlüsselt gespeichert"
-                } else {
-                    "nicht gesetzt"
-                },
-            ),
-        )
-        nightscout.addView(
-            infoRow(
-                "Status",
-                backfillText(diagnostics),
-            ),
-        )
-        nightscout.addView(
-            infoRow(
-                "Punkte im 24h-Puffer",
-                diagnostics.historyBackfillPointCount
-                    .toString(),
-            ),
-        )
-        nightscout.addView(
-            infoRow(
-                "Letzter Backfill",
-                diagnostics.historyBackfillReceivedAt
-                    .takeIf { it > 0L }
-                    .asDateTime(),
-            ),
-        )
-        nightscout.addView(
-            helper(
-                "Nightscout dient nur für 24h-Historie und Gap-Reparatur. Live-Daten kommen weiterhin aus AndroidAPS.",
-                3,
-            ),
-        )
-        nightscout.addView(
-            chipRow(
-                listOf(
-                    Triple(
-                        if (nightscoutConfig == null) {
-                            "EINRICHTEN"
-                        } else {
-                            "BEARBEITEN"
-                        },
-                        true,
-                    ) {
-                        callbacks.configureNightscout()
-                    },
-                    Triple(
-                        "24H AKTUALISIEREN",
-                        nightscoutConfig != null,
-                    ) {
-                        callbacks.syncNightscout()
-                    },
-                ),
-            ),
-        )
-
-        parent.addView(
-            nightscout,
-            cardParams(),
-        )
-
-        parent.addView(
-            infoCard(
-                "DIAGNOSE",
-                listOf(
-                    "AAPS-Paket" to
-                        diagnostics.sourcePackage.orDash(),
-                    "AAPS-Version" to
-                        diagnostics.sourceVersion.orDash(),
-                    "Vertrag" to
-                        diagnostics.sourceContract.orDash(),
-                    "Schema" to
-                        (
-                            state?.schemaVersion
-                                ?.toString()
-                                ?: "—"
-                            ),
-                    "Fähigkeiten" to
-                        (
-                            state?.capabilities
-                                ?.size
-                                ?.toString()
-                                ?: "0"
-                            ),
-                    "Letzter AAPS-Empfang" to
-                        diagnostics.receivedAt
-                            .takeIf { it > 0L }
-                            .asDateTime(),
-                    "Letzter Messwert" to
-                        diagnostics.measuredAt
-                            .takeIf { it > 0L }
-                            .asDateTime(),
-                    "Sync-Fehler" to
-                        diagnostics.syncError.orDash(),
-                ),
-                action =
-                    "DIAGNOSE KOPIEREN" to
-                        callbacks.copyDiagnostics,
-            ),
-            cardParams(),
-        )
-
-        parent.addView(
-            infoCard(
-                "DATENSCHUTZ & SICHERHEIT",
-                listOf(
-                    "Betriebsart" to
-                        "strikt read-only",
-                    "Datenweg" to
-                        "AndroidAPS → Sugarlicious → Wear OS",
-                    "Nightscout" to
-                        "nur lesend für Historie / Gap-Reparatur",
-                    "Cloud / Telemetrie" to
-                        "keine Sugarlicious-Telemetrie",
-                    "Token" to
-                        "Android Keystore · AES/GCM",
-                ),
-            ),
-            cardParams(),
-        )
-
         parent.addView(
             aboutCard(),
             cardParams(bottom = 10),
@@ -663,13 +482,13 @@ class DashboardViewFactory(
     }
 
     private fun aboutCard(): View =
-        tile("ÜBER SUGARLICIOUS").apply {
+        tile("ÜBER").apply {
             val header =
                 LinearLayout(context).apply {
                     orientation =
-                        LinearLayout.HORIZONTAL
+                        LinearLayout.VERTICAL
                     gravity =
-                        Gravity.CENTER_VERTICAL
+                        Gravity.CENTER
                     setPadding(
                         0,
                         8.dp,
@@ -696,61 +515,10 @@ class DashboardViewFactory(
                 ),
             )
 
-            header.addView(
-                LinearLayout(context).apply {
-                    orientation =
-                        LinearLayout.VERTICAL
-                    setPadding(
-                        12.dp,
-                        0,
-                        0,
-                        0,
-                    )
-                    addView(
-                        value(
-                            "Sugarlicious",
-                            text,
-                            20f,
-                            1,
-                        ),
-                    )
-                    addView(
-                        helper(
-                            "Version 0.5.1 · FreDiabetics · Open Source",
-                            2,
-                            accent,
-                        ),
-                    )
-                    addView(
-                        helper(
-                            "Lokale, strikt read-only AndroidAPS-Anzeige",
-                            2,
-                        ),
-                    )
-                },
-                LinearLayout.LayoutParams(
-                    0,
-                    ViewGroup.LayoutParams.WRAP_CONTENT,
-                    1f,
-                ),
-            )
+            header.addView(value("Sugarlicious", accent, 22f, 1).apply { gravity = Gravity.CENTER })
+            header.addView(value("by FreDiabetics", secondary, 12f, 1).apply { gravity = Gravity.CENTER })
 
             addView(header)
-
-            addView(
-                infoRow(
-                    "Kontakt",
-                    context.getString(
-                        R.string.contact_email,
-                    ),
-                ),
-            )
-            addView(
-                infoRow(
-                    "GitHub",
-                    "FreDiabetics/aaps_wearable-suite",
-                ),
-            )
 
             addView(
                 chipRow(
@@ -776,211 +544,6 @@ class DashboardViewFactory(
                 },
             )
         }
-
-    @Suppress("unused")
-    private fun connectionCard(
-        state: TherapyDisplayState?,
-        diagnostics: DiagnosticsSnapshot,
-        current: Boolean,
-    ): View {
-        val connected =
-            diagnostics.reachableWatches > 0 &&
-                diagnostics.syncStatus == "ok"
-
-        val nightscoutText =
-            when (
-                diagnostics.historyBackfillStatus
-            ) {
-                "ok" ->
-                    "${diagnostics.historyBackfillPointCount} Punkte"
-
-                "not_configured" ->
-                    "nicht eingerichtet"
-
-                null ->
-                    "—"
-
-                else ->
-                    diagnostics.historyBackfillStatus
-                        .orDash()
-            }
-
-        return LinearLayout(context).apply {
-            orientation =
-                LinearLayout.HORIZONTAL
-            gravity =
-                Gravity.CENTER_VERTICAL
-            setPadding(
-                14.dp,
-                9.dp,
-                14.dp,
-                9.dp,
-            )
-            minimumHeight =
-                54.dp
-            background =
-                roundedBackground(
-                    SugarliciousColors.argb(
-                        SugarliciousColorRole.SURFACE,
-                    ),
-                    SugarliciousColors.argb(
-                        SugarliciousColorRole.BORDER,
-                    ),
-                    18,
-                )
-
-            addView(
-                View(context).apply {
-                    background =
-                        GradientDrawable().apply {
-                            shape =
-                                GradientDrawable.OVAL
-                            setColor(
-                                if (connected) {
-                                    green
-                                } else {
-                                    secondary
-                                },
-                            )
-                        }
-                },
-                LinearLayout.LayoutParams(
-                    9.dp,
-                    9.dp,
-                ),
-            )
-
-            val center =
-                LinearLayout(context).apply {
-                    orientation =
-                        LinearLayout.VERTICAL
-                    setPadding(
-                        10.dp,
-                        0,
-                        0,
-                        0,
-                    )
-                    addView(
-                        value(
-                            if (connected) {
-                                "Watch verbunden"
-                            } else {
-                                "Keine Watch erreichbar"
-                            },
-                            text,
-                            14f,
-                            maxLines = 1,
-                        ),
-                    )
-                    addView(
-                        helper(
-                            syncText(
-                                diagnostics.syncStatus,
-                            ),
-                            1,
-                        ),
-                    )
-                }
-
-            addView(
-                center,
-                LinearLayout.LayoutParams(
-                    0,
-                    ViewGroup.LayoutParams.WRAP_CONTENT,
-                    1f,
-                ),
-            )
-
-            val right =
-                LinearLayout(context).apply {
-                    orientation =
-                        LinearLayout.VERTICAL
-                    gravity =
-                        Gravity.END
-
-                    addView(
-                        TextView(context).apply {
-                            text =
-                                context.getString(
-                                    R.string.dashboard_nightscout_label,
-                                )
-                            textSize =
-                                9f
-                            setTextColor(
-                                secondary,
-                            )
-                            gravity =
-                                Gravity.END
-                            letterSpacing =
-                                0.04f
-                        },
-                    )
-                    addView(
-                        TextView(context).apply {
-                            text =
-                                nightscoutText
-                            textSize =
-                                11f
-                            setTextColor(
-                                if (
-                                    diagnostics.historyBackfillStatus ==
-                                    "ok"
-                                ) {
-                                    accent
-                                } else {
-                                    secondary
-                                },
-                            )
-                            gravity =
-                                Gravity.END
-                            maxLines =
-                                1
-                        },
-                    )
-                }
-
-            addView(right)
-
-            val battery =
-                state
-                    .takeIf { current }
-                    ?.device
-                    ?.phoneBatteryPercent
-
-            if (battery != null) {
-                addView(
-                    TextView(context).apply {
-                        text =
-                            context.getString(
-                                R.string.dashboard_phone_battery_inline,
-                                battery,
-                            )
-                        textSize =
-                            11f
-                        setTextColor(
-                            secondary,
-                        )
-                        gravity =
-                            Gravity.CENTER_VERTICAL
-                    },
-                )
-            }
-
-            id =
-                R.id.dashboard_sync_status
-            isClickable =
-                true
-            isFocusable =
-                true
-            foreground =
-                selectableForeground()
-            setOnClickListener {
-                callbacks.navigate(
-                    DashboardScreen.WATCH,
-                )
-            }
-        }
-    }
 
     private fun infoCard(
         title: String,
@@ -1472,28 +1035,6 @@ addView(
                 "ungültige Nachricht"
             else ->
                 "noch nicht versucht"
-        }
-
-    private fun backfillText(
-        diagnostics: DiagnosticsSnapshot,
-    ) =
-        when (
-            diagnostics.historyBackfillStatus
-        ) {
-            "ok" ->
-                "${diagnostics.historyBackfillPointCount} Punkte · 24 h synchronisiert"
-
-            "requested" ->
-                "wird synchronisiert"
-
-            "not_configured" ->
-                "nicht eingerichtet"
-
-            "error" ->
-                "Fehler"
-
-            else ->
-                "noch nicht konfiguriert"
         }
 
     private val Int.dp: Int

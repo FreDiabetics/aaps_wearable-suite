@@ -9,6 +9,7 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import app.aapswear.model.Freshness
 import app.aapswear.model.FreshnessPolicy
+import app.aapswear.model.DataSourceId
 import app.aapswear.model.GlucoseUnit
 import app.aapswear.model.TherapyDisplayState
 import app.aapswear.protocol.WatchGlucoseUnit
@@ -48,8 +49,6 @@ class WearActivity : Activity() {
     private lateinit var connection: TextView
     private lateinit var syncHint: TextView
     private lateinit var historyInfo: TextView
-    private lateinit var configInfo: TextView
-    private lateinit var presetInfo: TextView
     private lateinit var iob: TextView
     private lateinit var cob: TextView
     private lateinit var basal: TextView
@@ -57,14 +56,6 @@ class WearActivity : Activity() {
     private lateinit var chart: WearGlucoseChart
 
     private val displayPreferencesListener =
-        SharedPreferences.OnSharedPreferenceChangeListener {
-                _,
-                _,
-            ->
-            runOnUiThread(::render)
-        }
-
-    private val complicationPreferencesListener =
         SharedPreferences.OnSharedPreferenceChangeListener {
                 _,
                 _,
@@ -106,13 +97,6 @@ class WearActivity : Activity() {
             displayPreferencesListener,
         )
 
-        getSharedPreferences(
-            "complication_setup",
-            Context.MODE_PRIVATE,
-        ).registerOnSharedPreferenceChangeListener(
-            complicationPreferencesListener,
-        )
-
         clockJob =
             scope.launch {
                 while (true) {
@@ -131,13 +115,6 @@ class WearActivity : Activity() {
             Context.MODE_PRIVATE,
         ).unregisterOnSharedPreferenceChangeListener(
             displayPreferencesListener,
-        )
-
-        getSharedPreferences(
-            "complication_setup",
-            Context.MODE_PRIVATE,
-        ).unregisterOnSharedPreferenceChangeListener(
-            complicationPreferencesListener,
         )
 
         super.onStop()
@@ -160,8 +137,6 @@ class WearActivity : Activity() {
         connection = findViewById(R.id.wear_connection)
         syncHint = findViewById(R.id.wear_sync_hint)
         historyInfo = findViewById(R.id.wear_history_info)
-        configInfo = findViewById(R.id.wear_config_info)
-        presetInfo = findViewById(R.id.wear_preset_info)
         iob = findViewById(R.id.wear_iob)
         cob = findViewById(R.id.wear_cob)
         basal = findViewById(R.id.wear_basal)
@@ -175,7 +150,7 @@ class WearActivity : Activity() {
         if (!::connection.isInitialized) return
 
         if (!initial) {
-            syncHint.text = "Synchronisiere Zustand + Konfiguration …"
+            syncHint.text = getString(R.string.syncing_values)
         }
 
         scope.launch {
@@ -221,6 +196,8 @@ class WearActivity : Activity() {
                     Freshness.CURRENT,
                     Freshness.DELAYED,
                 )
+        val targetLow = state?.target?.lowMgDl ?: 80.0
+        val targetHigh = state?.target?.highMgDl ?: 160.0
 
         clock.text =
             SimpleDateFormat(
@@ -235,7 +212,7 @@ class WearActivity : Activity() {
             )
 
         glucose.text =
-            if (canShowValue && glucoseState != null) {
+            if (canShowValue) {
                 formatGlucose(
                     glucoseState.valueMgDl,
                     resolvedUnit,
@@ -247,14 +224,13 @@ class WearActivity : Activity() {
         glucose.setTextColor(
             getColor(
                 when {
-                    !canShowValue ||
-                        glucoseState == null ->
+                    !canShowValue ->
                         R.color.wear_text
 
-                    glucoseState.valueMgDl < 80.0 ->
+                    glucoseState.valueMgDl < targetLow ->
                         R.color.wear_red
 
-                    glucoseState.valueMgDl > 160.0 ->
+                    glucoseState.valueMgDl > targetHigh ->
                         R.color.wear_yellow
 
                     else ->
@@ -276,14 +252,14 @@ class WearActivity : Activity() {
             }
 
         trend.text =
-            if (canShowValue && glucoseState != null) {
+            if (canShowValue) {
                 trendArrow(glucoseState.trend)
             } else {
                 "—"
             }
 
         delta.text =
-            if (canShowValue && glucoseState != null) {
+            if (canShowValue) {
                 formatDelta(
                     glucoseState.deltaMgDl,
                     resolvedUnit,
@@ -344,7 +320,7 @@ class WearActivity : Activity() {
             if (history.isEmpty()) {
                 "Keine Historie"
             } else {
-                "${preferences.graphHours} h · ${history.size} Punkte im 24h-Cache"
+                "${preferences.graphHours} h · ${history.size} Werte"
             }
 
         chart.bind(
@@ -352,6 +328,7 @@ class WearActivity : Activity() {
             graphHours = preferences.graphHours,
             showPredictions =
                 preferences.showPredictions,
+            colors = preferences.graphColors,
         )
 
         therapyRow.visibility =
@@ -382,55 +359,12 @@ class WearActivity : Activity() {
                 " IE/h",
             )
 
-        configInfo.text =
-            buildString {
-                append("${preferences.graphHours}h")
-                append(" · Prognose ")
-                append(
-                    if (preferences.showPredictions) {
-                        "an"
-                    } else {
-                        "aus"
-                    },
-                )
-                append(" · ")
-                append(
-                    when (preferences.glucoseUnit) {
-                        WatchGlucoseUnit.AAPS ->
-                            "AAPS-Einheit"
-
-                        WatchGlucoseUnit.MG_DL ->
-                            "mg/dL"
-
-                        WatchGlucoseUnit.MMOL_L ->
-                            "mmol/L"
-                    },
-                )
-            }
-
-        val preset =
-            getSharedPreferences(
-                "complication_setup",
-                Context.MODE_PRIVATE,
-            )
-                .getString(
-                    "selected_ids",
-                    "",
-                )
-                .orEmpty()
-
-        presetInfo.text =
-            if (preset.isBlank()) {
-                "Complication-Preset: keines"
-            } else {
-                "Preset: $preset"
-            }
-
         source.text =
-            state
-                ?.sourceVersion
-                ?.let { "AndroidAPS $it" }
-                ?: "AndroidAPS nicht erkannt"
+            when (state?.source) {
+                DataSourceId.ANDROID_APS -> state.sourceVersion?.let { "AndroidAPS $it" } ?: "AndroidAPS"
+                DataSourceId.XDRIP_PLUS -> state.sourceVersion?.let { "xDrip+ $it" } ?: "xDrip+"
+                null -> getString(R.string.data_source_unavailable)
+            }
 
         connection.text =
             if (connectedNodes > 0) {

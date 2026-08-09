@@ -1,8 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/wear_background">
+    tools:ignore="HardcodedText,MergeRootFrame,SmallSp,UselessParent">
 
     <ScrollView
         android:layout_width="match_parent"
@@ -289,36 +290,6 @@
                         android:textSize="13sp"
                         android:textStyle="bold" />
                 </LinearLayout>
-            </LinearLayout>
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="7dp"
-                android:background="@drawable/bg_wear_tile"
-                android:orientation="vertical"
-                android:paddingStart="11dp"
-                android:paddingTop="8dp"
-                android:paddingEnd="11dp"
-                android:paddingBottom="8dp">
-
-                <TextView
-                    android:id="@+id/wear_config_info"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:text="3h · Prognose an · AAPS-Einheit"
-                    android:textColor="@color/wear_text"
-                    android:textSize="9sp"
-                    android:textStyle="bold" />
-
-                <TextView
-                    android:id="@+id/wear_preset_info"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="2dp"
-                    android:text="Complication-Preset: keines"
-                    android:textColor="@color/wear_text_secondary"
-                    android:textSize="8sp" />
             </LinearLayout>
 
             <LinearLayout

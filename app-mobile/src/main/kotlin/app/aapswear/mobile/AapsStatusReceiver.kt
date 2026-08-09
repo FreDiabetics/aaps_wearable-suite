@@ -6,7 +6,6 @@ import android.content.Intent
 import androidx.core.content.edit
 import app.aapswear.datasource.aaps.AapsCapabilityDetector
 import app.aapswear.datasource.aaps.AapsPayloadAdapter
-import app.aapswear.model.GlucoseSample
 import app.aapswear.model.TherapyDisplayState
 import app.aapswear.model.Trend
 import app.aapswear.protocol.WearProtocol
@@ -31,6 +30,13 @@ class AapsStatusReceiver : BroadcastReceiver() {
         CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
             try {
                 val now = System.currentTimeMillis()
+                val sourcePreference = runCatching {
+                    DataSourcePreference.valueOf(
+                        app.getSharedPreferences("dashboard_ui", Context.MODE_PRIVATE)
+                            .getString("dataSource", "AUTOMATIC")!!,
+                    )
+                }.getOrDefault(DataSourcePreference.AUTOMATIC)
+                if (sourcePreference == DataSourcePreference.XDRIP_PLUS) return@launch
                 val parsedState = intent.extras?.let { AapsPayloadAdapter.parse(it, now) }
                 if (parsedState == null) {
                     app.diagnostics().edit {
@@ -44,14 +50,6 @@ class AapsStatusReceiver : BroadcastReceiver() {
                 val store = TherapyStateStore(app)
 
                 var displayState = DisplayHistoryAccumulator.merge(store.state.first(), state, now)
-                val nightscoutHistory = NightscoutHistoryStore.load(app, now)
-                if (nightscoutHistory.isNotEmpty()) {
-                    displayState = DisplayHistoryAccumulator.mergeExternalHistory(
-                        displayState,
-                        nightscoutHistory,
-                        now,
-                    )
-                }
 
                 val glucose = displayState.glucose
                 if (glucose != null && glucose.trend == Trend.UNKNOWN) {
@@ -74,14 +72,6 @@ class AapsStatusReceiver : BroadcastReceiver() {
                     putString("sourcePackage", installation?.packageName)
                     putLong("sourceVersionCode", installation?.versionCode ?: 0L)
                     putString("lastSyncStatus", "pending")
-                }
-
-                val historyWithCurrent = buildList {
-                    addAll(displayState.glucoseHistory)
-                    displayState.glucose?.let { add(GlucoseSample(it.valueMgDl, it.measuredAtEpochMs)) }
-                }
-                if (DisplayHistoryAccumulator.hasGap(historyWithCurrent)) {
-                    NightscoutBackfillCoordinator.syncIfNeeded(app)
                 }
 
                 runCatching {

@@ -6,6 +6,8 @@ Sie zeigt lokal von AndroidAPS gesendete Glukose-, Trend-, Delta-, IOB-, COB-,
 Basal-, Profil-, Pumpen- und Batteriedaten auf Wear OS an. Sie kann keine
 Therapie auslösen oder ändern. Die 27 Provider lassen sich auch in fremden
 Watchfaces verwenden; deren Layout wird dann vom jeweiligen Watchface bestimmt.
+xDrip+ kann alternativ lokale Glukose-, Trend- und Zeitdaten liefern;
+Therapieinformationen bleiben ausschließlich AndroidAPS-Daten.
 
 ## Voraussetzungen
 
@@ -28,17 +30,24 @@ Watchfaces verwenden; deren Layout wird dann vom jeweiligen Watchface bestimmt.
    das betreffende Watchface-Paket entfernen und nach der Wear-App erneut
    installieren oder die AAPS-Complications einmal manuell zuweisen.
 
+Alternativ oder als Glukose-Fallback in xDrip+ die Ausgabe von Daten über lokale
+Intents aktivieren und in Sugarlicious unter **Einstellungen → Anzeige →
+Datenquelle** `Automatisch` oder `xDrip+` wählen. `Automatisch` verwendet einen
+aktuellen AndroidAPS-Wert zuerst und wechselt erst bei fehlendem/veraltetem
+AAPS zu xDrip+.
+
 Beim ersten Öffnen fragt Sugarlicious ab Android 13 nach der Erlaubnis für
 Benachrichtigungen. Sie sollte zugelassen werden, damit die normale laufende
-Hintergrund-Benachrichtigung sichtbar bleibt. Sie enthält keine Glukose- oder
-Therapiewerte, sondern kennzeichnet nur den lokalen Empfangsdienst.
+Hintergrund-Benachrichtigung sichtbar bleibt. Sie zeigt Glukosewert, Trend,
+Datenalter und einen kleinen abgerundeten Verlauf; bei alten/fehlenden Daten
+erscheint kein Wert als aktuell.
 
 Unter **Einstellungen → Anzeige → Live-Benachrichtigung (One UI 8.5)** kann
 auf Android 16 ein Live-Status angefordert werden. Wenn das System eine weitere
 Freigabe verlangt, öffnet Sugarlicious die offizielle App-Einstellung dafür.
-Der Live-Status enthält nur, ob AndroidAPS erkannt und eine Watch erreichbar
-ist. Auf älteren oder nicht freigeschalteten Systemen bleibt automatisch die
-normale Benachrichtigung aktiv.
+Der Live-Status verwendet dieselben aktuellen Anzeigedaten. Auf älteren oder
+nicht freigeschalteten Systemen bleibt automatisch die normale
+Benachrichtigung aktiv; die genaue Hervorhebung entscheidet One UI.
 
 ## Erwartete Anzeige
 
@@ -58,11 +67,10 @@ sind semantisch; Farbe, Schrift und Anordnung bestimmt das fremde Watchface.
 Für kontrollierte Optik stehen die Bild-/Graph-Provider und die mitgelieferten
 WFF-Pakete bereit.
 
-Die beiden neuen Originalpakete heißen `sugarlicious-digital.apk` und
-`sugarlicious-analog.apk`. Digital zeigt Zeit, Glukose/Trend/Delta, Graph und
-vier Status-Tiles. Analog zeigt Glukose im oberen Tile, schlanke eigene Zeiger
-und sechs kompakte Statusbereiche. Alle acht Slots sind über die normale
-Watchface-Konfiguration austauschbar.
+Die Originalpakete heißen Sugarlicious Digital, Analog, Orbit, Rings und Graph.
+Die vier analogen Varianten besitzen kräftige eigene Baton-Zeiger, AOD sowie
+Graph- und kreisförmig nutzbare `RANGED_VALUE`-Slots. Die Zeiger sind eine
+Eigenentwicklung und keine kopierten Apple-Assets.
 
 ## DIY-Hinweis
 

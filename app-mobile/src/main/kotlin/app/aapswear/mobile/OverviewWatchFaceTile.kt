@@ -9,8 +9,10 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -26,12 +28,10 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.aapswear.mobile.ui.theme.SugarliciousColors
@@ -39,11 +39,17 @@ import app.aapswear.model.TherapyDisplayState
 import app.aapswear.model.Trend
 import java.text.DateFormat
 import java.util.Date
+import java.util.Locale
 import kotlin.math.absoluteValue
 import kotlin.math.roundToInt
 
-private val watchFaces = listOf("AAPS", "AAPS V2", "AAPS V2 Dark")
-private const val carouselPages = 300
+private val watchFaces = listOf(
+    "Sugarlicious Analog",
+    "Sugarlicious Orbit",
+    "Sugarlicious Rings",
+    "Sugarlicious Graph",
+)
+private const val carouselPages = 400
 
 @Composable
 internal fun OverviewWatchFaceTile(
@@ -53,158 +59,124 @@ internal fun OverviewWatchFaceTile(
     now: Long,
     onSelectedFace: (Int) -> Unit,
     onEdit: () -> Unit,
-    onSync: () -> Unit,
 ) {
     val selected = selectedFaceIndex.coerceIn(0, watchFaces.lastIndex)
     val midpoint = carouselPages / 2
     val aligned = midpoint - midpoint % watchFaces.size
-    val pager = rememberPagerState(
-        initialPage = aligned + selected,
-        pageCount = { carouselPages },
-    )
-
+    val pager = rememberPagerState(initialPage = aligned + selected, pageCount = { carouselPages })
     LaunchedEffect(pager.settledPage) {
         val index = pager.settledPage % watchFaces.size
         if (index != selected) onSelectedFace(index)
     }
 
     val connected = diagnostics.reachableWatches > 0
-    val syncOk = diagnostics.syncStatus == "ok"
-    val statusColor = when {
-        connected && syncOk -> SugarliciousColors.Primary
-        connected -> SugarliciousColors.Yellow
-        else -> SugarliciousColors.Red
-    }
-    val shape = RoundedCornerShape(28.dp)
+    val error = connected && diagnostics.syncStatus !in listOf(null, "ok", "pending")
+    val currentIndex = pager.currentPage % watchFaces.size
 
     Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(
-                Brush.linearGradient(listOf(SugarliciousColors.SurfaceHigh, SugarliciousColors.Surface)),
-                shape,
-            )
-            .border(1.dp, SugarliciousColors.Border.copy(alpha = 0.85f), shape)
-            .clip(shape)
-            .padding(vertical = 11.dp),
-        verticalArrangement = Arrangement.spacedBy(7.dp),
+        modifier = Modifier.fillMaxWidth().padding(top = 2.dp, bottom = 5.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(3.dp),
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Box(Modifier.size(8.dp).background(statusColor, CircleShape))
-            Spacer(Modifier.width(7.dp))
-            Column(Modifier.weight(1f)) {
-                Text(
-                    "GALAXY WATCH",
-                    color = SugarliciousColors.TextSecondary,
-                    fontSize = 9.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    letterSpacing = 0.55.sp,
-                )
-                Text(
-                    when {
-                        connected && syncOk -> "Watch verbunden"
-                        connected -> "Watch erreichbar"
-                        else -> "Keine Watch erreichbar"
-                    },
-                    color = SugarliciousColors.TextPrimary,
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-            PillAction("BEARBEITEN", onEdit)
-        }
+        Text(
+            "Galaxy Watch Ultra",
+            color = SugarliciousColors.TextPrimary,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.SemiBold,
+        )
 
-        HorizontalPager(
-            state = pager,
-            modifier = Modifier.fillMaxWidth().height(150.dp),
-            contentPadding = PaddingValues(horizontal = 88.dp),
-            pageSpacing = 8.dp,
-            pageSize = PageSize.Fixed(168.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) { page ->
-            val index = page % watchFaces.size
-            val distance = (pager.currentPage - page).absoluteValue
-            Column(
-                modifier = Modifier.graphicsLayer {
-                    val scale = if (distance == 0) 1f else 0.78f
-                    scaleX = scale
-                    scaleY = scale
-                    alpha = if (distance == 0) 1f else 0.46f
-                },
-                horizontalAlignment = Alignment.CenterHorizontally,
-            ) {
-                GalaxyWatchPreview(index, state, now)
-                Spacer(Modifier.height(3.dp))
-                Text(
-                    watchFaces[index],
-                    color = if (distance == 0) SugarliciousColors.TextPrimary else SugarliciousColors.TextSecondary,
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.SemiBold,
-                )
-            }
-        }
-
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp),
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            StatusChip(
-                Modifier.weight(1f),
-                "SYNC",
-                if (diagnostics.lastSyncAt > 0L) DateFormat.getTimeInstance(DateFormat.SHORT).format(Date(diagnostics.lastSyncAt)) else "—",
-                statusColor,
-            )
-            StatusChip(
-                Modifier.weight(1.2f),
-                "NIGHTSCOUT",
-                when (diagnostics.historyBackfillStatus) {
-                    "ok" -> "${diagnostics.historyBackfillPointCount} Punkte"
-                    "not_configured" -> "nicht aktiv"
-                    else -> diagnostics.historyBackfillStatus ?: "—"
-                },
-                if (diagnostics.historyBackfillStatus == "ok") SugarliciousColors.Primary else SugarliciousColors.TextSecondary,
-            )
-            StatusChip(
-                Modifier.weight(0.72f),
-                "HANDY",
-                state?.device?.phoneBatteryPercent?.let { "$it%" } ?: "—",
-                SugarliciousColors.TextSecondary,
-            )
-            Surface(
-                modifier = Modifier.height(38.dp).clickable(onClick = onSync),
-                shape = RoundedCornerShape(14.dp),
-                color = SugarliciousColors.Primary,
-            ) {
-                Box(Modifier.padding(horizontal = 11.dp), contentAlignment = Alignment.Center) {
-                    Text("SENDEN", color = SugarliciousColors.OnPrimary, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+        Box(Modifier.fillMaxWidth().height(166.dp), contentAlignment = Alignment.Center) {
+            GalaxyWatchUltraFrame()
+            HorizontalPager(
+                state = pager,
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(horizontal = 118.dp),
+                pageSpacing = 2.dp,
+                pageSize = PageSize.Fixed(116.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) { page ->
+                val index = page % watchFaces.size
+                val distance = (pager.currentPage - page).absoluteValue
+                Box(
+                    modifier = Modifier
+                        .graphicsLayer {
+                            val scale = if (distance == 0) 1f else 0.73f
+                            scaleX = scale
+                            scaleY = scale
+                            alpha = if (distance == 0) 1f else 0.52f
+                        }
+                        .clickable(onClick = onEdit),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    FaceDial(index, state, now)
                 }
             }
         }
 
+        Surface(
+            shape = RoundedCornerShape(999.dp),
+            color = SugarliciousColors.SurfaceHigh,
+        ) {
+            Row(
+                modifier = Modifier.padding(horizontal = 13.dp, vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    when {
+                        error -> "!"
+                        connected -> "●"
+                        else -> "—"
+                    },
+                    color = when {
+                        error -> SugarliciousColors.Red
+                        connected -> SugarliciousColors.Primary
+                        else -> SugarliciousColors.TextSecondary
+                    },
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                )
+                if (connected) {
+                    Spacer(Modifier.width(6.dp))
+                    Text("Verbunden", color = SugarliciousColors.TextPrimary, fontSize = 10.sp)
+                }
+            }
+        }
         Text(
-            "${watchFaces[pager.currentPage % watchFaces.size]} · nach links/rechts wischen",
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp),
+            watchFaces[currentIndex],
             color = SugarliciousColors.TextSecondary,
-            fontSize = 8.sp,
+            fontSize = 9.sp,
             textAlign = TextAlign.Center,
-            maxLines = 1,
         )
     }
 }
 
 @Composable
-private fun GalaxyWatchPreview(index: Int, state: TherapyDisplayState?, now: Long) {
-    val faceBackground = when (index) {
-        0 -> Color(0xFF111315)
-        1 -> Color(0xFF090B0C)
-        else -> Color.Black
+private fun GalaxyWatchUltraFrame() {
+    Box(
+        Modifier.size(146.dp)
+            .background(Color(0xFF767676), RoundedCornerShape(43.dp))
+            .border(2.dp, Color(0xFFAAAAAA), RoundedCornerShape(43.dp)),
+    ) {
+        Box(
+            Modifier.align(Alignment.CenterEnd).offset(x = 7.dp).width(10.dp).height(46.dp)
+                .background(Color(0xFF666666), RoundedCornerShape(7.dp))
+                .border(1.dp, Color(0xFFB0B0B0), RoundedCornerShape(7.dp)),
+        )
+        Box(
+            Modifier.align(Alignment.CenterEnd).offset(x = 10.dp, y = (-16).dp).size(13.dp)
+                .background(Color(0xFFFF6C2C), CircleShape)
+                .border(2.dp, Color(0xFF333333), CircleShape),
+        )
+        Box(
+            Modifier.align(Alignment.Center).size(126.dp)
+                .background(Color.Black, CircleShape)
+                .border(3.dp, Color(0xFF343434), CircleShape),
+        )
     }
+}
+
+@Composable
+private fun FaceDial(index: Int, state: TherapyDisplayState?, now: Long) {
     val glucose = state?.glucose?.valueMgDl?.roundToInt()?.toString() ?: "—"
     val trend = when (state?.glucose?.trend) {
         Trend.DOUBLE_UP -> "⇈"
@@ -216,72 +188,36 @@ private fun GalaxyWatchPreview(index: Int, state: TherapyDisplayState?, now: Lon
         Trend.DOUBLE_DOWN -> "⇊"
         else -> "·"
     }
-    val time = DateFormat.getTimeInstance(DateFormat.SHORT).format(Date(now))
-
-    Box(Modifier.size(width = 138.dp, height = 126.dp), contentAlignment = Alignment.Center) {
-        Box(
-            Modifier.width(42.dp).height(126.dp)
-                .background(SugarliciousColors.SurfaceRaised, RoundedCornerShape(20.dp))
-                .border(1.dp, SugarliciousColors.Border, RoundedCornerShape(20.dp)),
-        )
-        Box(
-            Modifier.size(108.dp)
-                .background(SugarliciousColors.SurfaceSelected, CircleShape)
-                .border(3.dp, SugarliciousColors.Border, CircleShape),
-            contentAlignment = Alignment.Center,
-        ) {
-            Column(
-                modifier = Modifier.size(96.dp).clip(CircleShape).background(faceBackground),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center,
-            ) {
-                Text(time, color = Color.White.copy(alpha = 0.66f), fontSize = 7.sp)
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(glucose, color = if (index == 2) SugarliciousColors.Primary else Color.White, fontSize = 24.sp, fontWeight = FontWeight.Bold)
-                    Spacer(Modifier.width(2.dp))
-                    Text(trend, color = SugarliciousColors.Primary, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                }
-                Text(
-                    "IOB ${state?.insulin?.totalIob?.let { String.format("%.1f", it) } ?: "—"} · COB ${state?.carbs?.cobGrams?.roundToInt() ?: 0}",
-                    color = Color.White.copy(alpha = 0.62f),
-                    fontSize = 5.sp,
-                    maxLines = 1,
-                )
-            }
+    val accent = when (index) {
+        1 -> Color(0xFFFF8B60)
+        2 -> SugarliciousColors.Primary
+        3 -> SugarliciousColors.Secondary
+        else -> Color.White
+    }
+    Box(
+        Modifier.size(116.dp).clip(CircleShape).background(Color.Black),
+        contentAlignment = Alignment.Center,
+    ) {
+        repeat(12) { tick ->
+            Box(
+                Modifier.align(Alignment.TopCenter).padding(top = 5.dp)
+                    .graphicsLayer { rotationZ = tick * 30f; transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0.5f, 5.3f) }
+                    .width(if (tick % 3 == 0) 2.dp else 1.dp).height(6.dp)
+                    .background(Color.White.copy(alpha = if (tick % 3 == 0) 0.9f else 0.35f), RoundedCornerShape(99.dp)),
+            )
         }
-        Box(
-            Modifier.align(Alignment.CenterEnd).padding(end = 7.dp).width(7.dp).height(24.dp)
-                .background(SugarliciousColors.SurfaceRaised, RoundedCornerShape(999.dp))
-                .border(1.dp, SugarliciousColors.Border, RoundedCornerShape(999.dp)),
-        )
-    }
-}
-
-@Composable
-private fun StatusChip(modifier: Modifier, label: String, value: String, accent: Color) {
-    Column(
-        modifier = modifier.height(38.dp).background(SugarliciousColors.SurfaceRaised, RoundedCornerShape(14.dp)).padding(horizontal = 8.dp, vertical = 5.dp),
-        verticalArrangement = Arrangement.Center,
-    ) {
-        Text(label, color = SugarliciousColors.TextSecondary, fontSize = 6.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
-        Text(value, color = accent, fontSize = 8.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-    }
-}
-
-@Composable
-private fun PillAction(label: String, onClick: () -> Unit) {
-    Surface(
-        modifier = Modifier.clickable(onClick = onClick),
-        shape = RoundedCornerShape(999.dp),
-        color = SugarliciousColors.SurfaceSelected,
-    ) {
-        Text(
-            label,
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
-            color = SugarliciousColors.Primary,
-            fontSize = 9.sp,
-            fontWeight = FontWeight.Bold,
-            letterSpacing = 0.4.sp,
-        )
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(DateFormat.getTimeInstance(DateFormat.SHORT).format(Date(now)), color = Color.White.copy(alpha = 0.68f), fontSize = 7.sp)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(glucose, color = accent, fontSize = 25.sp, fontWeight = FontWeight.Bold)
+                Spacer(Modifier.width(2.dp))
+                Text(trend, color = SugarliciousColors.Primary, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+            }
+            Text(
+                "IOB ${state?.insulin?.totalIob?.let { String.format(Locale.getDefault(), "%.1f", it) } ?: "—"}",
+                color = Color.White.copy(alpha = 0.58f),
+                fontSize = 5.5.sp,
+            )
+        }
     }
 }

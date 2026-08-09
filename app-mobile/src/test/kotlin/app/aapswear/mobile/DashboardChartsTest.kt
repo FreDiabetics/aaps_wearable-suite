@@ -38,11 +38,11 @@ class DashboardChartsTest {
             target = TargetState(80.0, 160.0),
         )
         val bitmap = render(GlucoseDashboardChart(context).apply { bind(state, GlucoseUnit.MG_DL, true, 6) }, 420, 230)
-        val whitePixels = count(bitmap) {
-            Color.red(it) > 235 && Color.green(it) > 235 && Color.blue(it) > 235
+        val inRangePixels = count(bitmap) {
+            Color.green(it) > 150 && Color.green(it) > Color.red(it) * 1.3
         }
         val predictionPixels = count(bitmap) { Color.blue(it) > 180 && Color.green(it) > 120 }
-        assertTrue("white=$whitePixels", whitePixels > 20)
+        assertTrue("inRange=$inRangePixels", inRangePixels > 20)
         assertTrue("prediction=$predictionPixels", predictionPixels > 2)
     }
 

@@ -3,15 +3,8 @@
     <string name="contact_email">typ1.diafreddy@gmail.com</string>
     <string name="github_url">https://github.com/FreDiabetics/aaps_wearable-suite</string>
     <string name="brand_logo">FreDiabetics-Logo</string>
-    <string name="menu">Menü</string>
-    <string name="more">Weitere Optionen</string>
     <string name="overview">Übersicht</string>
-    <string name="history">Verlauf</string>
-    <string name="data">Daten</string>
+    <string name="watch">Watch</string>
     <string name="settings">Einstellungen</string>
-    <string name="read_only">Nur Anzeige · read-only</string>
     <string name="source_protected">Datenquelle geschützt</string>
-    <string name="legend_item">%1$s  %2$s</string>
-    <string name="dashboard_nightscout_label">NIGHTSCOUT</string>
-    <string name="dashboard_battery_percent_inline">&#160;&#160;%1$d%%</string>
 </resources>

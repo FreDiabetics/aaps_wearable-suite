@@ -1,8 +1,10 @@
 # Watchface and Complication Parity Matrix
 
-Alle aufgeführten Pakete bauen als WFF v1, bestehen den offiziellen Validator,
-enthalten kein DEX und besitzen aktive plus Doze/AOD-Screenshots mit
-synthetischen Daten auf Wear OS 6.
+Alle aufgeführten Pakete bauen als WFF v1 und bestehen den offiziellen
+Validator. Die bis 0.5.1 veröffentlichten Pakete besitzen aktive plus
+Doze/AOD-Screenshots mit synthetischen Daten auf Wear OS 6. Für die drei neuen
+0.6.0-Varianten steht dieser Bildlauf noch aus; die vier 0.6.0-Analogpakete
+wurden separat als DEX-frei geprüft.
 
 | Watchface | Status | Wesentliche Abweichung |
 |---|---|---|
@@ -31,6 +33,9 @@ synthetischen Daten auf Wear OS 6.
 | SteamPunk | funktional gleichwertig | Originalbilder plus deklarative Zeiger/Slots |
 | Sugarlicious Digital | identisch | neues Originaldesign; keine Portierung |
 | Sugarlicious Analog | identisch | neues Originaldesign; eigenständige deklarative Zeiger |
+| Sugarlicious Orbit | identisch | neues Originaldesign; eigenständige deklarative Zeiger |
+| Sugarlicious Rings | identisch | neues Originaldesign; eigenständige deklarative Zeiger |
+| Sugarlicious Graph | identisch | neues Originaldesign; eigenständige deklarative Zeiger |
 | PinkFloydTheWall | blockiert | geschützte Drittmotive/Marke ungeklärt |
 
 | Complications | Status |

@@ -1,6 +1,7 @@
 package app.aapswear.complications
 import android.annotation.SuppressLint
 import android.app.PendingIntent
+import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.Canvas
@@ -38,6 +39,7 @@ import app.aapswear.model.TherapyDisplayFormatter
 import app.aapswear.model.TherapyDisplayState
 import app.aapswear.model.Trend
 import app.aapswear.storage.TherapyStateStore
+import app.aapswear.protocol.WatchGraphColors
 import kotlinx.coroutines.flow.first
 
 enum class ProviderKind {
@@ -456,33 +458,41 @@ abstract class TherapyComplicationService(
     ) {
         val width = canvas.width
         val glucose = state?.glucose
+        val colors = readGraphColors()
+        val targetLow = state?.target?.lowMgDl ?: DISPLAY_LOW_MGDL
+        val targetHigh = state?.target?.highMgDl ?: DISPLAY_HIGH_MGDL
 
         val plotLeft = 12f
         val plotRight = width - 12f
         val plotTop = 12f
         val plotBottom = height - 12f
 
+        Paint(Paint.ANTI_ALIAS_FLAG).also {
+            it.color = colors.graphBackground
+            canvas.drawRoundRect(0f, 0f, width.toFloat(), height.toFloat(), 22f, 22f, it)
+        }
+
         val targetPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.rgb(12, 62, 30)
-            alpha = 180
+            color = colors.rangeInRange
+            alpha = 55
             style = Paint.Style.FILL
         }
         val guidePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.rgb(105, 105, 105)
+            color = colors.divider
             alpha = 120
             style = Paint.Style.STROKE
             strokeWidth = 2f
         }
         val inRangePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.rgb(84, 223, 48)
+            color = colors.cgmInRange
             style = Paint.Style.FILL
         }
         val outOfRangePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.rgb(255, 92, 105)
+            color = colors.cgmLow
             style = Paint.Style.FILL
         }
         val currentRingPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.WHITE
+            color = colors.outline
             style = Paint.Style.STROKE
             strokeWidth = 3f
         }
@@ -496,8 +506,8 @@ abstract class TherapyComplicationService(
                 (fraction * (plotBottom - plotTop)).toFloat()
         }
 
-        val targetTop = yFor(DISPLAY_HIGH_MGDL)
-        val targetBottom = yFor(DISPLAY_LOW_MGDL)
+        val targetTop = yFor(targetHigh)
+        val targetBottom = yFor(targetLow)
         canvas.drawRoundRect(
             plotLeft,
             targetTop,
@@ -569,10 +579,10 @@ abstract class TherapyComplicationService(
 
         samples.forEach { sample ->
             val paint =
-                if (sample.valueMgDl in DISPLAY_LOW_MGDL..DISPLAY_HIGH_MGDL) {
-                    inRangePaint
-                } else {
-                    outOfRangePaint
+                when {
+                    sample.valueMgDl < targetLow -> outOfRangePaint.apply { color = colors.cgmLow }
+                    sample.valueMgDl > targetHigh -> outOfRangePaint.apply { color = colors.cgmHigh }
+                    else -> inRangePaint
                 }
 
             canvas.drawCircle(
@@ -591,6 +601,22 @@ abstract class TherapyComplicationService(
                 currentRingPaint,
             )
         }
+    }
+
+    private fun readGraphColors(): WatchGraphColors {
+        val defaults = WatchGraphColors()
+        val preferences = getSharedPreferences("watch_display", Context.MODE_PRIVATE)
+        return WatchGraphColors(
+            graphBackground = preferences.getInt("graph_color_background", defaults.graphBackground),
+            rangeLow = preferences.getInt("graph_color_range_low", defaults.rangeLow),
+            rangeInRange = preferences.getInt("graph_color_range_in", defaults.rangeInRange),
+            rangeHigh = preferences.getInt("graph_color_range_high", defaults.rangeHigh),
+            cgmLow = preferences.getInt("graph_color_cgm_low", defaults.cgmLow),
+            cgmInRange = preferences.getInt("graph_color_cgm_in", defaults.cgmInRange),
+            cgmHigh = preferences.getInt("graph_color_cgm_high", defaults.cgmHigh),
+            divider = preferences.getInt("graph_color_divider", defaults.divider),
+            outline = preferences.getInt("graph_color_outline", defaults.outline),
+        )
     }
 
     private fun glucoseColor(glucose: GlucoseState?): Int =
@@ -826,11 +852,32 @@ class LongStatusComplication :
 
 object AllProviders {
     val classes = listOf(
+        GlucoseComplication::class.java,
         GlucoseTrendComplication::class.java,
         GlucoseDeltaComplication::class.java,
+        GlucoseTrendDeltaComplication::class.java,
+        GlucoseAgeComplication::class.java,
+        GlucoseImageComplication::class.java,
+        GlucoseRangeComplication::class.java,
+        GlucoseRangedComplication::class.java,
         GlucoseGraphComplication::class.java,
         GlucoseGraphLargeComplication::class.java,
         IobComplication::class.java,
+        BolusIobComplication::class.java,
+        BasalIobComplication::class.java,
         CobComplication::class.java,
+        IobCobComplication::class.java,
+        BasalComplication::class.java,
+        TempBasalComplication::class.java,
+        TempTargetComplication::class.java,
+        LoopComplication::class.java,
+        LastLoopComplication::class.java,
+        ProfileComplication::class.java,
+        ReservoirComplication::class.java,
+        PumpBatteryComplication::class.java,
+        PhoneBatteryComplication::class.java,
+        SourceComplication::class.java,
+        AapsStatusComplication::class.java,
+        LongStatusComplication::class.java,
     )
 }

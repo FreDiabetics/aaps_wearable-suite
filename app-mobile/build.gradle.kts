@@ -6,11 +6,11 @@ android {
 
     namespace="app.aapswear.mobile"
     compileSdk=36
-    defaultConfig { applicationId="app.aapswear"; minSdk=26; targetSdk=36; versionCode=7; versionName="0.5.1" }
+    defaultConfig { applicationId="app.aapswear"; minSdk=26; targetSdk=36; versionCode=8; versionName="0.6.0" }
     testOptions { unitTests.isIncludeAndroidResources = true }
 }
 dependencies {
-    implementation(platform("androidx.compose:compose-bom:2026.06.00"))
+    implementation(platform("androidx.compose:compose-bom:2026.06.01"))
     implementation("androidx.activity:activity-compose:1.13.0")
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.foundation:foundation")
@@ -19,6 +19,7 @@ dependencies {
     debugImplementation("androidx.compose.ui:ui-tooling")
 
     implementation(project(":data-source-aaps"))
+    implementation(project(":data-source-xdrip"))
     implementation(project(":wear-protocol"))
     implementation(project(":wear-storage"))
     implementation("com.google.android.gms:play-services-wearable:20.0.1")

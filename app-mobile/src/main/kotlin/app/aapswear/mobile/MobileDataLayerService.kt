@@ -4,6 +4,9 @@ import android.content.Context
 import app.aapswear.protocol.WatchConfig
 import app.aapswear.protocol.WatchGlucoseUnit
 import app.aapswear.protocol.WearProtocol
+import app.aapswear.protocol.WatchGraphColors
+import app.aapswear.mobile.ui.theme.SugarliciousColorRole
+import app.aapswear.mobile.ui.theme.SugarliciousColorStore
 import app.aapswear.storage.TherapyStateStore
 import com.google.android.gms.wearable.MessageEvent
 import com.google.android.gms.wearable.PutDataRequest
@@ -62,6 +65,7 @@ internal fun readWatchConfig(context: Context): WatchConfig {
             )
         }.getOrDefault(WatchGlucoseUnit.AAPS)
 
+    val palette = SugarliciousColorStore.load(preferences)
     return WatchConfig(
         graphHours =
             preferences
@@ -71,6 +75,17 @@ internal fun readWatchConfig(context: Context): WatchConfig {
         showPredictions = preferences.getBoolean("showPredictions", true),
         glucoseUnit = unit,
         showTherapyStats = preferences.getBoolean("showDetails", true),
+        graphColors = WatchGraphColors(
+            graphBackground = palette.argb(SugarliciousColorRole.GRAPH_BACKGROUND),
+            rangeLow = palette.argb(SugarliciousColorRole.RANGE_LOW),
+            rangeInRange = palette.argb(SugarliciousColorRole.RANGE_IN_RANGE),
+            rangeHigh = palette.argb(SugarliciousColorRole.RANGE_HIGH),
+            cgmLow = palette.argb(SugarliciousColorRole.CGM_DOT_LOW),
+            cgmInRange = palette.argb(SugarliciousColorRole.CGM_DOT_IN_RANGE),
+            cgmHigh = palette.argb(SugarliciousColorRole.CGM_DOT_HIGH),
+            divider = palette.argb(SugarliciousColorRole.GRAPH_DIVIDER),
+            outline = palette.argb(SugarliciousColorRole.GRAPH_CURRENT_OUTLINE),
+        ),
         sentAtEpochMs = System.currentTimeMillis(),
     )
 }

@@ -5,6 +5,12 @@ import android.app.NotificationManager
 import android.app.Service
 import android.content.Intent
 import androidx.test.core.app.ApplicationProvider
+import app.aapswear.model.GlucoseState
+import app.aapswear.model.GlucoseUnit
+import app.aapswear.model.TherapyDisplayState
+import app.aapswear.model.Trend
+import app.aapswear.storage.TherapyStateStore
+import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -30,7 +36,7 @@ class PersistentBridgeServiceTest {
         val notification = shadowOf(manager).getNotification(PersistentBridgeService.NOTIFICATION_ID)
 
         assertNotNull(notification)
-        assertEquals("Sugarlicious ist aktiv", notification.extras.getCharSequence(Notification.EXTRA_TITLE).toString())
+        assertEquals("—", notification.extras.getCharSequence(Notification.EXTRA_TITLE).toString())
         assertTrue(notification.flags and Notification.FLAG_ONGOING_EVENT != 0)
         assertFalse(notification.extras.getBoolean(PersistentBridgeService.EXTRA_REQUEST_PROMOTED_ONGOING))
         assertEquals(NotificationManager.IMPORTANCE_LOW, manager.getNotificationChannel(PersistentBridgeService.CHANNEL_ID).importance)
@@ -40,7 +46,7 @@ class PersistentBridgeServiceTest {
 
     @Test
     @Config(sdk = [36])
-    fun `live preference requests promoted ongoing status without therapy values`() {
+    fun `live preference requests promoted status with current glucose and graph`() {
         val context = ApplicationProvider.getApplicationContext<android.content.Context>()
         context.getSharedPreferences("dashboard_ui", android.content.Context.MODE_PRIVATE).edit()
             .putBoolean(PersistentBridgeService.PREFERENCE_LIVE_NOTIFICATION, true)
@@ -49,17 +55,30 @@ class PersistentBridgeServiceTest {
             .putString("sourceVersion", "4.0.0-dev")
             .putInt("reachableWatches", 1)
             .commit()
+        val now = System.currentTimeMillis()
+        runBlocking {
+            TherapyStateStore(context).save(
+                TherapyDisplayState(
+                    receivedAtEpochMs = now,
+                    glucose = GlucoseState(123.0, GlucoseUnit.MG_DL, Trend.FLAT, now),
+                    glucoseHistory = listOf(
+                        app.aapswear.model.GlucoseSample(115.0, now - 10 * 60_000L),
+                        app.aapswear.model.GlucoseSample(120.0, now - 5 * 60_000L),
+                    ),
+                ),
+            )
+        }
 
         val controller = Robolectric.buildService(PersistentBridgeService::class.java).create().startCommand(0, 1)
+        shadowOf(android.os.Looper.getMainLooper()).idle()
         val manager = controller.get().getSystemService(NotificationManager::class.java)
         val notification = shadowOf(manager).getNotification(PersistentBridgeService.NOTIFICATION_ID)
         val content = notification.extras.getCharSequence(Notification.EXTRA_TEXT).toString()
 
-        assertEquals("Sugarlicious Live-Status", notification.extras.getCharSequence(Notification.EXTRA_TITLE).toString())
+        assertEquals("123 →", notification.extras.getCharSequence(Notification.EXTRA_TITLE).toString())
         assertTrue(notification.extras.getBoolean(PersistentBridgeService.EXTRA_REQUEST_PROMOTED_ONGOING))
-        assertTrue(content.contains("AndroidAPS erkannt"))
-        assertTrue(content.contains("Watch verbunden"))
-        assertFalse(content.contains("mg/dL"))
+        assertTrue(content.contains("mg/dL"))
+        assertNotNull(notification.getLargeIcon())
         assertEquals(1, notification.actions.size)
         controller.destroy()
     }

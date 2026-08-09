@@ -1,5 +1,31 @@
 # AndroidAPS Source Baseline
 
+## Kontrollstand vom 2026-08-09
+
+`refs/heads/dev` wurde vor dem Sugarlicious-0.6.0-Abschluss erneut direkt im
+offiziellen Repository `nightscout/AndroidAPS` abgefragt.
+
+- Commit: `7fc8205e9a73259cec2982fc199f3d2055f84347`
+- Commit-Datum: 2026-08-06 15:43:52 +02:00
+- Nachricht: `Fix scenes expiration`
+- Delta gegen den dokumentierten Kontrollstand vom 2026-08-07: keines
+
+Damit blieb der bereits vollständig geprüfte Wear-/WFF-/Broadcast-Stand während
+dieses Arbeitspakets stabil. Der externe AAPS-Statusadapter musste nicht an ein
+neues Upstream-Feld angepasst werden.
+
+Für die neue optionale Glukosequelle wurde zusätzlich das offizielle
+`NightscoutFoundation/xDrip`-Repository auf `master` fixiert:
+
+- Commit: `c2a0ba1a8f69d5f93610a83695656bd0fd15a142`
+- Commit-Datum: 2026-08-08 10:09:32 +01:00
+- Nachricht: `Merge pull request #4644 from simelis/fix-wear-service-fgs-crash`
+
+Geprüft wurden die öffentlichen lokalen Broadcast-Konstanten und der
+Opt-in-Schalter `broadcast_data_through_intents`. Es wurde kein xDrip-Code und
+kein xDrip-Asset übernommen; Sugarlicious implementiert nur einen eigenen,
+validierenden Empfänger für den veröffentlichten Intentvertrag.
+
 ## Kontrollstand vom 2026-08-07
 
 Vor dem Sugarlicious-0.5.1-Abschlusslauf wurde `refs/heads/dev` erneut direkt
@@ -97,4 +123,4 @@ Felder und migriert Schema 1 nach Schema 2.
 
 Ein reproduzierbarer Build dieses Arbeitspakets ist ausschließlich diesen SHAs
 zugeordnet. Vor einem späteren Arbeitspaket muss `origin/dev` erneut gegen
-`18101c8…` geprüft werden.
+`7fc8205e…` geprüft werden.

@@ -9,6 +9,9 @@
 | GlucoDataHandler | MIT | nur analysiert; kein Code oder Asset kopiert |
 | Sugarlicious Digital | Eigenentwicklung, AGPL-3.0 | enthalten; Originaldesign |
 | Sugarlicious Analog | Eigenentwicklung, AGPL-3.0 | enthalten; eigenständig gezeichnete Zeiger, keine Apple-Assets |
+| Sugarlicious Orbit | Eigenentwicklung, AGPL-3.0 | enthalten; Originaldesign und eigenständige Zeiger |
+| Sugarlicious Rings | Eigenentwicklung, AGPL-3.0 | enthalten; Originaldesign und eigenständige Zeiger |
+| Sugarlicious Graph | Eigenentwicklung, AGPL-3.0 | enthalten; Originaldesign und eigenständige Zeiger |
 | FreDiabetics-Logo | vom Projektinhaber bereitgestellt | in App-Branding enthalten; Herkunft in `LICENSES/FreDiabetics-Logo.md` |
 
 Die vollständige Zuordnung steht in

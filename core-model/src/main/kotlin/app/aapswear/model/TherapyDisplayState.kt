@@ -2,7 +2,7 @@ package app.aapswear.model
 
 import kotlinx.serialization.Serializable
 
-@Serializable enum class DataSourceId { ANDROID_APS }
+@Serializable enum class DataSourceId { ANDROID_APS, XDRIP_PLUS }
 @Serializable enum class GlucoseUnit { MG_DL, MMOL_L }
 @Serializable enum class Trend { DOUBLE_DOWN, SINGLE_DOWN, FORTY_FIVE_DOWN, FLAT, FORTY_FIVE_UP, SINGLE_UP, DOUBLE_UP, UNKNOWN }
 @Serializable enum class Freshness { CURRENT, DELAYED, STALE, NO_DATA }
@@ -10,9 +10,23 @@ import kotlinx.serialization.Serializable
 @Serializable enum class PredictionKind { IOB, COB, ACOB, UAM, ZERO_TEMP }
 
 @Serializable data class GlucoseState(val valueMgDl: Double, val displayUnit: GlucoseUnit, val trend: Trend = Trend.UNKNOWN, val measuredAtEpochMs: Long, val deltaMgDl: Double? = null, val averageDeltaMgDl: Double? = null)
-@Serializable data class GlucoseSample(val valueMgDl: Double, val measuredAtEpochMs: Long)
+@Serializable data class GlucoseSample(
+    val valueMgDl: Double,
+    val measuredAtEpochMs: Long,
+    val source: DataSourceId = DataSourceId.ANDROID_APS,
+)
 @Serializable data class GlucosePrediction(val kind: PredictionKind, val samples: List<GlucoseSample>)
-@Serializable data class TherapyHistorySample(val measuredAtEpochMs: Long, val totalIob: Double? = null, val cobGrams: Double? = null, val basalUnitsPerHour: Double? = null)
+@Serializable data class TherapyHistorySample(
+    val measuredAtEpochMs: Long,
+    val totalIob: Double? = null,
+    val cobGrams: Double? = null,
+    /** Effective basal value retained for protocol compatibility. */
+    val basalUnitsPerHour: Double? = null,
+    val baseBasalUnitsPerHour: Double? = null,
+    val tempBasalUnitsPerHour: Double? = null,
+    /** Display-only estimate derived from the recent IOB decay when AAPS exposes no activity. */
+    val insulinActivityUnitsPerMinute: Double? = null,
+)
 @Serializable data class InsulinState(val totalIob: Double? = null, val bolusIob: Double? = null, val basalIob: Double? = null)
 @Serializable data class CarbState(val cobGrams: Double? = null, val futureCarbsGrams: Double? = null)
 @Serializable data class BasalState(val currentUnitsPerHour: Double? = null, val tempAbsoluteUnitsPerHour: Double? = null, val tempPercent: Int? = null, val tempStartedAtEpochMs: Long? = null, val tempDurationMinutes: Long? = null, val tempEndsAtEpochMs: Long? = null, val displayText: String? = null)
@@ -41,7 +55,7 @@ import kotlinx.serialization.Serializable
     val device: DeviceState? = null,
     val profile: ProfileState? = null,
     val capabilities: Set<DataCapability> = emptySet()
-) { companion object { const val CURRENT_SCHEMA = 3 } }
+) { companion object { const val CURRENT_SCHEMA = 4 } }
 
 object FreshnessPolicy {
     const val CURRENT_MAX_MS = 6 * 60_000L

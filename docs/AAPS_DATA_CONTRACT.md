@@ -38,7 +38,7 @@ Der Broadcast enthält keine App-Version. Die Mobile-App deklariert per
 `<queries>` die fünf aktuellen AAPS-/Pumpcontrol-/Client-Pakete und ermittelt
 daraus VersionName/VersionCode. `sourceContract` enthält getrennt
 `AAPS_EXTENDED_STATUS_V1` oder `AAPS_LEGACY_STATUS`. Schema 1 wird beim Empfang
-auf Schema 3 migriert. Listenfelder aus neueren Schemata besitzen leere
+auf Schema 4 migriert. Listenfelder aus neueren Schemata besitzen leere
 Standardwerte und fehlen bei älteren Zuständen ohne Fehler.
 
 ## Anzeigeverlauf und Prognosen
@@ -46,13 +46,14 @@ Standardwerte und fehlen bei älteren Zuständen ohne Fehler.
 Der unveränderte öffentliche AAPS-Broadcast liefert keinen fertigen historischen
 Graphen. Sugarlicious bleibt deshalb vollständig mit Stock-AAPS kompatibel und
 sammelt nacheinander real empfangene Anzeigewerte lokal: maximal 24 Stunden und
-300 Zeitpunkte, dedupliziert nach Messzeit. IOB, COB und Basal werden nur dann
+300 Zeitpunkte, dedupliziert innerhalb eines 90-Sekunden-Fensters. Dabei hat
+ein AAPS-Punkt Vorrang vor einem zeitgleichen xDrip+-Punkt. IOB, COB und Basal werden nur dann
 als Verlaufspunkt gespeichert, wenn der Broadcast den jeweiligen Wert enthält.
 
-Sugarlicious erweitert oder patcht AndroidAPS ausdrücklich nicht. Ein separater
-Backfill-Kanal darf ausschließlich bereits vorhandene historische Messwerte aus
-einer externen read-only Quelle ergänzen; erfundene oder interpolierte CGM-Werte
-sind nicht zulässig.
+Sugarlicious erweitert oder patcht AndroidAPS ausdrücklich nicht und besitzt
+keinen Nightscout-Backfill. xDrip+ ist ausschließlich eine alternative lokale
+Glukosequelle; es ergänzt keine AAPS-Therapiefelder. Erfunden oder interpoliert
+wird kein CGM-Wert.
 
 Prognosen werden nicht lokal berechnet. Der Adapter liest optional das
 `predBGs`-Objekt aus dem vorhandenen Suggested-, ersatzweise Enacted-JSON,

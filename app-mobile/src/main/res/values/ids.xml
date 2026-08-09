@@ -1,12 +1,4 @@
 <resources>
-    <item name="dropdown_panel" type="id" />
-    <item name="dropdown_overview" type="id" />
-    <item name="dropdown_history" type="id" />
-    <item name="dropdown_data" type="id" />
-    <item name="dropdown_settings" type="id" />
-    <item name="dropdown_sync" type="id" />
-    <item name="dropdown_diagnostics" type="id" />
-    <item name="dropdown_app_info" type="id" />
     <item name="dashboard_glucose" type="id"/>
     <item name="dashboard_source_status" type="id"/>
     <item name="dashboard_sync_status" type="id"/>

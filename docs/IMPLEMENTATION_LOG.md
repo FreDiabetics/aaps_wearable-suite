@@ -1,5 +1,35 @@
 # Implementation Log
 
+## 2026-08-09, 10:36 +02:00, interaktive Graphen, xDrip+, vereinfachte UI und vier Analog-WFFs
+
+- Geändert: Mobile-Dashboard und Graph-Canvas, Verlaufsakkumulator, Farbrollen
+  und HSV-Farbwähler, Watchface-Karussell, Benachrichtigungsservice,
+  AAPS-/xDrip-Empfänger, Modell/Protokoll/Watch-Speicher, Wear-Graphen,
+  Complication-Provider/-Manifest/-Previews, vier Sugarlicious-WFF-Module,
+  Build-/Screenshotskripte, Tests und Dokumentation.
+- Zweck: die vorgegebenen Interaktionen und die Nightscout-Toolkit-artige
+  Graphlogik umsetzen, technische Nutzeroberflächen entfernen, lokale xDrip-
+  Glukose optional zulassen und vier größere analoge Sugarlicious-Designs
+  bereitstellen.
+- Umsetzung: Touch-Viewport mit Einfinger-Pan und Zweifinger-Zoom; dynamische
+  Log-Skalierung; ausschließlich Zielgrenzen rechts; AAPS-Basal/TBR als
+  invertierte cyanfarbene Spur; quellenpriorisierte 90-Sekunden-Deduplizierung;
+  Prediction-Clipping rechts der Jetzt-Linie; getrennte Farbrollen über
+  Protokoll 5; freundliches, flaches Watch-Menü; lokaler xDrip-Intentadapter;
+  Standard-Foreground-Notification mit Wert/Trend/Alter/Bitmapgraph; 27
+  vollständig registrierte Provider; vier deklarative Original-WFFs mit
+  kräftigen eigenständigen Baton-Zeigern.
+- Tests: vollständiger Releaseweg mit 2.599 Gradle-Tasks erfolgreich; 64 Tests
+  aus 19 Suites ohne Fehler, Fehlschlag oder Skip; 29/29 WFF-XMLs offiziell
+  valide; 29/29 WFF-APKs ohne DEX; 27/27 Provider mit statischer Vorschau im
+  gemergten Manifest. Mobile- und Wear-Lint liefen ohne Fehler.
+- Einschränkungen: Die Insulinaktivität ist eine ausdrücklich gekennzeichnete
+  Display-Schätzung aus IOB-Abfall, nicht AAPS-Therapielogik. One-UI-Live-
+  Darstellung und reale aktive/AOD-Sichtprüfung der vier 0.6.0-WFFs stehen aus.
+- Nächster Schritt: APKs auf Telefon und Galaxy Watch installieren, reale
+  Gesten/Live-Notification/Complication-Picker/AOD sichten und anschließend
+  nur belegte visuelle Abweichungen nachschärfen.
+
 ## 2026-08-07, 00:17 +02:00, neutrale Oberfläche und zweistufige Hintergrund-Benachrichtigung
 
 - Geändert: Mobile-/Wear-Palette, Karten-, Chip-, Navigations- und Dropdown-

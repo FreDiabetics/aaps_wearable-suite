@@ -6,7 +6,6 @@ import app.aapswear.protocol.WatchConfig
 import app.aapswear.protocol.WatchGlucoseUnit
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
-import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.Robolectric
@@ -38,13 +37,18 @@ class WearActivityTest {
                 R.id.wear_glucose_chart,
             ),
         )
-        assertTrue(
-            activity
-                .findViewById<TextView>(
-                    R.id.wear_config_info,
-                )
-                .text
-                .contains("3h"),
+        assertNotNull(
+            activity.findViewById<TextView>(
+                R.id.wear_connection,
+            ),
+        )
+        assertEquals(
+            0,
+            activity.resources.getIdentifier(
+                "wear_config_info",
+                "id",
+                activity.packageName,
+            ),
         )
     }
 

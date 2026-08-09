@@ -1,5 +1,6 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
- <uses-permission android:name="android.permission.INTERNET"/>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" xmlns:tools="http://schemas.android.com/tools">
+ <permission android:name="com.eveningoutpost.dexdrip.permissions.RECEIVE_BG_ESTIMATE" android:protectionLevel="normal"/>
+ <uses-permission android:name="com.eveningoutpost.dexdrip.permissions.RECEIVE_BG_ESTIMATE"/>
  <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
  <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE"/>
  <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
@@ -11,10 +12,14 @@
   <package android:name="info.nightscout.aapsclient"/>
   <package android:name="info.nightscout.aapsclient2"/>
   <package android:name="info.nightscout.aapsclient3"/>
+  <package android:name="com.eveningoutpost.dexdrip"/>
  </queries>
- <application android:theme="@style/AppTheme" android:label="@string/app_name" android:icon="@mipmap/ic_launcher" android:roundIcon="@mipmap/ic_launcher_round" android:allowBackup="false" android:usesCleartextTraffic="false">
+ <application android:theme="@style/AppTheme" android:label="@string/app_name" android:icon="@mipmap/ic_launcher" android:roundIcon="@mipmap/ic_launcher_round" android:allowBackup="false" android:fullBackupContent="false" android:dataExtractionRules="@xml/data_extraction_rules" android:supportsRtl="false" android:usesCleartextTraffic="false">
   <activity android:name=".MainActivity" android:exported="true"><intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter></activity>
-  <receiver android:name=".AapsStatusReceiver" android:exported="true"><intent-filter><action android:name="info.nightscout.androidaps.status"/></intent-filter></receiver>
+  <receiver android:name=".AapsStatusReceiver" android:exported="true" tools:ignore="ExportedReceiver"><intent-filter><action android:name="info.nightscout.androidaps.status"/></intent-filter></receiver>
+  <receiver android:name=".XdripStatusReceiver" android:exported="true" tools:ignore="ExportedReceiver">
+   <intent-filter><action android:name="com.eveningoutpost.dexdrip.BgEstimate"/></intent-filter>
+  </receiver>
   <receiver android:name=".PersistentBridgeBootReceiver" android:exported="true"><intent-filter><action android:name="android.intent.action.BOOT_COMPLETED"/><action android:name="android.intent.action.MY_PACKAGE_REPLACED"/></intent-filter></receiver>
   <service android:name=".PersistentBridgeService" android:exported="false" android:foregroundServiceType="specialUse">
    <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE" android:value="User-visible persistent local AndroidAPS status receiver and Wear OS read-only data bridge"/>

@@ -59,8 +59,8 @@ class MainActivityTest {
         activity.findViewById<View>(R.id.nav_settings).performClick()
         shadowOf(android.os.Looper.getMainLooper()).idle()
         val settingsText = textOf(activity.findViewById(R.id.dashboard_content))
-        assertTrue(settingsText.contains("AAPS_EXTENDED_STATUS_V1"))
-        assertTrue(settingsText.contains("4.0.0-dev-b"))
+        assertTrue(settingsText.contains("Datenquelle"))
+        assertTrue(settingsText.contains("AndroidAPS"))
         controller.pause().stop().destroy()
     }
 
@@ -96,8 +96,8 @@ class MainActivityTest {
         shadowOf(android.os.Looper.getMainLooper()).idle()
         val settingsText = textOf(activity.findViewById(R.id.dashboard_content))
         assertTrue(settingsText.contains("Sugarlicious"))
-        assertTrue(settingsText.contains("typ1.diafreddy@gmail.com"))
-        assertTrue(settingsText.contains("FreDiabetics/aaps_wearable-suite"))
+        assertFalse(settingsText.contains("typ1.diafreddy@gmail.com"))
+        assertFalse(settingsText.contains("FreDiabetics/aaps_wearable-suite"))
 
         activity.findViewById<View>(R.id.dashboard_github).performClick()
         assertEquals(
@@ -111,29 +111,15 @@ class MainActivityTest {
         controller.pause().stop().destroy()
     }
 
-    @Test fun `header menus use pill dropdowns and keep their actions inline`() {
+    @Test fun `header menus are removed and bottom navigation remains available`() {
         val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
         val activity = controller.get()
-
-        activity.findViewById<View>(R.id.menu_button).performClick()
-        val sectionPopup = activity.activeDropdown
-        assertNotNull(sectionPopup)
-        val sectionPanel = sectionPopup!!.contentView as ViewGroup
-        assertEquals(R.id.dropdown_panel, sectionPanel.id)
-        assertEquals(3, sectionPanel.childCount)
-        assertNotNull(sectionPanel.findViewById<View>(R.id.dropdown_overview).background)
-        assertEquals(activity.getColor(R.color.app_accent), sectionPanel.findViewById<TextView>(R.id.dropdown_overview).currentTextColor)
-        sectionPanel.findViewById<View>(R.id.dropdown_settings).performClick()
+        assertEquals(0, activity.resources.getIdentifier("menu_button", "id", activity.packageName))
+        assertEquals(0, activity.resources.getIdentifier("more_button", "id", activity.packageName))
+        assertNotNull(activity.findViewById<View>(R.id.bottom_navigation))
+        activity.findViewById<View>(R.id.nav_settings).performClick()
         shadowOf(android.os.Looper.getMainLooper()).idle()
-        assertNull(activity.activeDropdown)
         assertTrue(textOf(activity.findViewById(R.id.dashboard_content)).contains("Einstellungen"))
-
-        activity.findViewById<View>(R.id.more_button).performClick()
-        val morePanel = activity.activeDropdown!!.contentView as ViewGroup
-        assertEquals(3, morePanel.childCount)
-        assertNotNull(morePanel.findViewById<View>(R.id.dropdown_app_info).background)
-        activity.activeDropdown?.dismiss()
-
         controller.pause().stop().destroy()
     }
 

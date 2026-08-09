@@ -1,7 +1,4 @@
 <resources>
-    <!-- Brand -->
-    <color name="brand_green">#5FC479</color>
-
     <!-- Semantic app palette. Keep synchronized with SugarliciousColors.kt. -->
     <color name="app_background">#181818</color>
     <color name="app_surface">#242424</color>
@@ -15,16 +12,4 @@
 
     <!-- Interactive accents -->
     <color name="app_accent">#6DE892</color>
-    <color name="app_accent_on">#181818</color>
-    <color name="app_cyan">#19D7E8</color>
-
-    <!-- Therapy/data accents -->
-    <color name="app_green">#54DF30</color>
-    <color name="app_blue">#64BFFF</color>
-    <color name="app_orange">#FF9D18</color>
-    <color name="app_yellow">#F4DE00</color>
-    <color name="app_purple">#D69AFF</color>
-    <color name="app_red">#FF5C69</color>
-
-    <color name="launcher_background">#181818</color>
 </resources>

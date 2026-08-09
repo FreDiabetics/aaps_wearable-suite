@@ -6,10 +6,11 @@
   beenden; ein erzwungener App-Stopp durch den Nutzer verhindert den Neustart.
   Die Funktion ist daher kein absolutes „unkillable“-Versprechen.
 - Der Live-Status verwendet die offizielle Android-16-Promoted-Ongoing-
-  Schnittstelle. Ob One UI 8.5 ihn tatsächlich als Live-Benachrichtigung
-  hervorhebt, hängt von Systemfreigabe und OEM-Kriterien ab. Die Logik ist per
-  API-36-Test abgedeckt, aber noch nicht visuell auf realer One-UI-8.5-Hardware
-  abgenommen.
+  Schnittstelle und einen Standardstil mit Glukosewert und Minigraph. Ob One UI
+  ihn tatsächlich als Live-Benachrichtigung hervorhebt und wo der Minigraph
+  angeordnet wird, entscheidet System/OEM. Die Logik ist per API-36-Test
+  abgedeckt, aber in diesem Arbeitspaket nicht visuell auf realer
+  One-UI-8.5-Hardware abgenommen.
 - Der Foreground-Service-Typ `specialUse` benötigt bei einer späteren
   Google-Play-Veröffentlichung eine passende Deklaration und Überprüfung in der
   Play Console. Das lokale DIY-/ADB-Paket ist davon nicht blockiert.
@@ -39,11 +40,20 @@
   gebaut oder verteilt.
 - Das DIY-Vorschaupaket ist entwicklersigniert, nicht für Store-Veröffentlichung
   produktionssigniert und deshalb noch kein freigegebenes Version-1-Release.
-- Stock-AAPS liefert im öffentlichen Companion-Broadcast keinen historischen
-  Graphen. Sugarlicious patcht AndroidAPS nicht. Bis ein separater read-only
-  Backfill-Kanal konfiguriert ist, baut sich der lokale Verlauf deshalb aus neu
-  empfangenen Statusmeldungen auf. Fehlende CGM-Werte werden niemals erfunden
-  oder interpoliert.
+- Stock-AAPS und xDrip+ liefern in den verwendeten öffentlichen Broadcasts
+  keinen vollständigen historischen Graphen. Sugarlicious verwendet bewusst
+  keinen Nightscout-Backfill und baut den lokalen Verlauf aus neu empfangenen
+  Statusmeldungen auf. Fehlende CGM-Werte werden niemals erfunden oder
+  interpoliert.
+- xDrip+ muss seine lokale Broadcast-Ausgabe ausdrücklich aktiviert haben. Der
+  Vertrag liefert Glukose, Trend und Messzeit, aber keine verlässlichen AAPS-
+  Therapieinformationen. In `Automatisch` bleibt ein aktueller AAPS-Zustand
+  deshalb vorrangig; die explizite xDrip+-Auswahl unterdrückt AAPS-Glukose.
+- Der öffentliche AAPS-Vertrag liefert keine verlässliche, vollständige
+  Insulinaktivitätskurve. Die cyanfarbene Kurve im Zielband ist ausschließlich
+  eine Display-Schätzung aus dem positiven IOB-Abfall benachbarter Messpunkte;
+  bei unzureichender Datenbasis wird sie nicht gezeichnet. Sie darf nicht für
+  Therapieentscheidungen verwendet werden.
 - AAPS-`predBGs` werden nur dargestellt, wenn sie im Suggested-/Enacted-Payload
   vorhanden und gültig sind. Die App berechnet bewusst keine Ersatzprognosen.
 - Die Bildvorlage zeigt einen 24-Stunden-Insulin-Gesamtwert und einen Uhrenakku.
@@ -58,6 +68,10 @@
 - Die beiden Sugarlicious-0.5.0-Watchfaces wurden aktiv und in Doze/AOD auf
   Wear OS 6 (480×480 rund) geprüft. Der erneute visuelle Realgerätetest dieser
   neuen Designs auf One UI Watch 8 ist noch offen und wird nicht behauptet.
+- Die drei neuen 0.6.0-Varianten Orbit, Rings und Graph sowie das überarbeitete
+  Analog-Watchface bauen, validieren und sind codefrei. Ein neuer aktiver/AOD-
+  Screenshotlauf auf der realen Galaxy Watch Ultra wurde in diesem
+  Arbeitspaket noch nicht ausgeführt und wird nicht behauptet.
 - Die Analogzeiger sind bewusst eigenständig gezeichnet. Eine exakte Kopie von
   Apple-Watch-Ressourcen oder Apple-Trade-Dress ist weder enthalten noch als
   Zielparität deklariert.

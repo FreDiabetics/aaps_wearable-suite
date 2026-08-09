@@ -2,4 +2,6 @@
     <string name="app_name">Sugarlicious</string>
     <string name="brand_logo">FreDiabetics-Logo</string>
     <string name="read_only">Nur Anzeige · read-only</string>
+    <string name="syncing_values">Werte werden aktualisiert …</string>
+    <string name="data_source_unavailable">Datenquelle nicht bereit</string>
 </resources>

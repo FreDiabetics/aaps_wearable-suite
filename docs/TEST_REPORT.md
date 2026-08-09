@@ -1,5 +1,41 @@
 # Test Report
 
+## Sugarlicious 0.6.0, 2026-08-09
+
+- AndroidAPS `dev` erneut live bei
+  `7fc8205e9a73259cec2982fc199f3d2055f84347` bestätigt; kein Delta zum
+  vorherigen Audit. xDrip+ `master` bei
+  `c2a0ba1a8f69d5f93610a83695656bd0fd15a142` auditiert.
+- Vollständiger `tools/build-release.ps1`-Lauf erfolgreich: 2.599 Gradle-Tasks,
+  beide Apps, alle Tools, 28 auslieferbare WFF-Pakete und das Testface.
+- Gesamte Testmatrix erfolgreich: Core-Modell, AAPS- und xDrip-Adapter,
+  Wear-Protokoll, Wear-Storage, Complications, Mobile, Wear sowie Parser,
+  Generator und Screenshot-Comparator. 19 Suites, 64 Tests, 0 Fehler,
+  0 Fehlschläge, 0 übersprungen.
+- Alle 29 WFF-XML-Dateien bestanden den fest gepinnten offiziellen Validator
+  als WFF v1. Die vier in diesem Arbeitspaket gebauten Sugarlicious-Release-
+  APKs enthalten kein `classes*.dex`.
+- Gemergtes Wear-Debug-Manifest geprüft: 27 Complication-Provider, 27 statische
+  Vorschauen; Provider 02 deklariert `SHORT_TEXT,RANGED_VALUE`.
+- Gemergter Runtime-Quellstand geprüft: keine `INTERNET`-Berechtigung, kein
+  Nightscout-Backfill/-Client und keine Hamburger-/Overflow-View mehr.
+- `lintDebug` für Mobile und Wear: 0 Fehler. Verbleibend sind drei Mobile-
+  Hinweise (bewusstes API-36-Ziel bei installiertem API 37 sowie der
+  Adaptive-Icon-Ordner) und ein gleichartiger Wear-Icon-Hinweis. Das von Lint
+  vorgeschlagene Verschieben aus `mipmap-anydpi-v26` wurde praktisch geprüft
+  und von AAPT mit fehlender Launcher-Ressource abgelehnt; die gültige Struktur
+  bleibt deshalb erhalten.
+- Mobile-Debug-APK: 18.110.812 Byte,
+  SHA-256 `8EA0F52B35D10752C6922674ABDB2825FFA389496F19D668E5E482542903F43D`.
+- Wear-Debug-APK: 14.440.432 Byte,
+  SHA-256 `E37C2C672836D53F6AD24392A44F5E5A8074CF6CCD98769017659E34BC1C6D6B`.
+- DIY-Paket: `dist/sugarlicious-0.6.0-diy-preview.zip`; die maßgebliche
+  Prüfsumme wird daneben in `.zip.sha256` erzeugt.
+
+Nicht als bestanden behauptet werden ein neuer visueller Telefon-Screenshot,
+die One-UI-Live-Hervorhebung und ein aktiver/AOD-Lauf der vier 0.6.0-WFFs auf
+realer Hardware. Diese Punkte benötigen die angeschlossenen Geräte.
+
 ## Sugarlicious 0.5.1, 2026-08-07
 
 - AndroidAPS-`dev` bei `7fc8205e9a73259cec2982fc199f3d2055f84347`

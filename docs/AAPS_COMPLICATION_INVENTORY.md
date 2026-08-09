@@ -16,4 +16,7 @@ Die unabhängige Wear-App manifestiert alle 27 geforderten Provider und deckt
 `SHORT_TEXT`, `LONG_TEXT`, `RANGED_VALUE`, `SMALL_IMAGE` und `LARGE_IMAGE` ab.
 Bildprovider rendern Glukose oder den auf der Uhr gehaltenen Verlauf. Primäre
 Typen, Ranged Values, stale-Sperren und Preview-Daten sind automatisiert
-getestet. Wear-OS-6-Goldens zeigen die Provider in den 23 WFF-Paketen.
+getestet. Alle 27 Provider besitzen statische Picker-Vorschauen; Provider 02
+unterstützt zusätzlich zu `SHORT_TEXT` auch `RANGED_VALUE`. Wear-OS-6-Goldens
+zeigen den bis Version 0.5.1 veröffentlichten Stand; die neuen 0.6.0-WFF-
+Varianten benötigen noch einen neuen visuellen Hardwarelauf.

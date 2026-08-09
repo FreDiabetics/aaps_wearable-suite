@@ -2,7 +2,6 @@ package app.aapswear.mobile
 
 import android.graphics.drawable.GradientDrawable
 import android.Manifest
-import android.app.AlertDialog
 import android.app.NotificationManager
 import android.content.ActivityNotFoundException
 import android.content.ClipData
@@ -16,23 +15,17 @@ import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
-import android.text.InputType
 import android.text.SpannableString
 import android.text.Spanned
 import android.text.style.ForegroundColorSpan
-import android.view.Gravity
 import android.view.View
-import android.view.ViewGroup
-import android.widget.EditText
 import android.widget.ImageView
 import android.widget.LinearLayout
-import android.widget.PopupWindow
 import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.core.content.edit
-import androidx.core.graphics.drawable.toDrawable
 import androidx.core.net.toUri
 import app.aapswear.mobile.ui.theme.SugarliciousColorRole
 import app.aapswear.mobile.ui.theme.SugarliciousColorStore
@@ -59,8 +52,6 @@ class MainActivity : ComponentActivity() {
     private var state: app.aapswear.model.TherapyDisplayState? = null
     private var screen = DashboardScreen.OVERVIEW
     private var clockJob: Job? = null
-    internal var activeDropdown: PopupWindow? = null
-        private set
 
     private val diagnosticsListener = SharedPreferences.OnSharedPreferenceChangeListener { _, _ -> runOnUiThread(::refresh) }
     private val uiListener =
@@ -89,10 +80,9 @@ class MainActivity : ComponentActivity() {
         styleTitle()
         factory = DashboardViewFactory(this, DashboardCallbacks(
             navigate = ::navigate,
-            cycleUnit = ::cycleUnit,
-            cycleGraphHours = ::cycleGraphHours,
-            setGraphHours = { uiPreferences.edit { putInt("graphHours", it) } },
             setUnit = { uiPreferences.edit { putString("unit", it.name) } },
+            setDataSource = { uiPreferences.edit { putString("dataSource", it.name) } },
+            setThemeMode = { uiPreferences.edit { putString("themeMode", it.name) } },
             setShowDetails = { uiPreferences.edit { putBoolean("showDetails", it) } },
             setShowPredictions = { uiPreferences.edit { putBoolean("showPredictions", it) } },
             setShowMetabolicGraph = { uiPreferences.edit { putBoolean("showMetabolicGraph", it) } },
@@ -102,34 +92,21 @@ class MainActivity : ComponentActivity() {
                 uiPreferences.edit {
                     putInt(
                         "watchFaceIndex",
-                        it.coerceIn(0, 2),
+                        it.coerceIn(0, 3),
                     )
                 }
             },
             syncNow = ::syncNow,
-            configureNightscout = { showNightscoutSetup(firstRun = false) },
-            syncNightscout = { syncNightscout() },
-            copyDiagnostics = ::copyDiagnostics,
             openContactEmail = ::openContactEmail,
             openGithub = ::openGithub,
         ))
         bindNavigation()
-        findViewById<View>(R.id.menu_button).setOnClickListener(::showSectionMenu)
-        findViewById<View>(R.id.more_button).setOnClickListener(::showMoreMenu)
         PersistentBridgeService.start(this)
         requestNotificationPermissionIfNeeded()
         scope.launch {
             TherapyStateStore(this@MainActivity).state.collectLatest {
                 state = it
                 refresh()
-            }
-        }
-        scope.launch {
-            NightscoutBackfillCoordinator.syncIfNeeded(applicationContext)
-        }
-        window.decorView.post {
-            if (NightscoutConfigStore.shouldOfferSetup(this)) {
-                showNightscoutSetup(firstRun = true)
             }
         }
         refresh()
@@ -144,7 +121,6 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onStop() {
-        activeDropdown?.dismiss()
         clockJob?.cancel(); clockJob = null
         diagnostics.unregisterOnSharedPreferenceChangeListener(diagnosticsListener)
         uiPreferences.unregisterOnSharedPreferenceChangeListener(uiListener)
@@ -179,6 +155,7 @@ class MainActivity : ComponentActivity() {
     }
 
 
+    @Suppress("DEPRECATION")
     private fun applyRuntimeColors() {
         val backgroundColor =
             SugarliciousColors.argb(
@@ -199,33 +176,27 @@ class MainActivity : ComponentActivity() {
 
         findViewById<View>(R.id.root)
             .setBackgroundColor(backgroundColor)
+        findViewById<View>(R.id.scroll_fade).background = GradientDrawable(
+            GradientDrawable.Orientation.TOP_BOTTOM,
+            intArrayOf(Color.TRANSPARENT, backgroundColor),
+        )
+        window.statusBarColor = backgroundColor
+        window.navigationBarColor = backgroundColor
+        val light = DashboardUiPreferences.read(uiPreferences).themeMode == DashboardThemeMode.LIGHT
+        if (Build.VERSION.SDK_INT >= 30) {
+            val mask = android.view.WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS or
+                android.view.WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS
+            window.insetsController?.setSystemBarsAppearance(if (light) mask else 0, mask)
+        } else {
+            @Suppress("DEPRECATION")
+            val flags = (if (light) View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR else 0) or
+                (if (light) View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR else 0)
+            @Suppress("DEPRECATION")
+            window.decorView.systemUiVisibility = flags
+        }
 
         findViewById<TextView>(R.id.app_title)
             .setTextColor(text)
-
-        val iconButtonBackground =
-            SugarliciousColors.argb(
-                SugarliciousColorRole.SURFACE_HIGH,
-            )
-
-        findViewById<ImageView>(R.id.menu_button).apply {
-            setColorFilter(text)
-            background =
-                GradientDrawable().apply {
-                    shape =
-                        GradientDrawable.OVAL
-                    setColor(iconButtonBackground)
-                }
-        }
-        findViewById<ImageView>(R.id.more_button).apply {
-            setColorFilter(text)
-            background =
-                GradientDrawable().apply {
-                    shape =
-                        GradientDrawable.OVAL
-                    setColor(iconButtonBackground)
-                }
-        }
 
         findViewById<View>(R.id.bottom_navigation).background =
             GradientDrawable().apply {
@@ -291,81 +262,6 @@ styleTitle()
         findViewById<TextView>(R.id.app_title).text = value
     }
 
-    private fun showSectionMenu(anchor: View) {
-        showPillDropdown(anchor, alignEnd = false, listOf(
-            PillMenuItem(R.id.dropdown_overview, "Übersicht", screen == DashboardScreen.OVERVIEW) { navigate(DashboardScreen.OVERVIEW) },
-            PillMenuItem(View.generateViewId(), "Watch", screen == DashboardScreen.WATCH) { navigate(DashboardScreen.WATCH) },
-            PillMenuItem(R.id.dropdown_settings, "Einstellungen", screen == DashboardScreen.SETTINGS) { navigate(DashboardScreen.SETTINGS) },
-        ))
-    }
-
-    private fun showMoreMenu(anchor: View) {
-        showPillDropdown(anchor, alignEnd = true, listOf(
-            PillMenuItem(R.id.dropdown_sync, "Jetzt an Watch senden", action = ::syncNow),
-            PillMenuItem(R.id.dropdown_diagnostics, "Diagnose kopieren", action = ::copyDiagnostics),
-            PillMenuItem(R.id.dropdown_app_info, "Einstellungen & App-Info") { navigate(DashboardScreen.SETTINGS) },
-        ))
-    }
-
-    private fun showPillDropdown(anchor: View, alignEnd: Boolean, items: List<PillMenuItem>) {
-        activeDropdown?.dismiss()
-        val panel = LinearLayout(this).apply {
-            id = R.id.dropdown_panel
-            orientation = LinearLayout.VERTICAL
-            setPadding(8.dp, 8.dp, 8.dp, 8.dp)
-            background = GradientDrawable().apply { cornerRadius = 22.dp.toFloat(); setColor(SugarliciousColors.argb(SugarliciousColorRole.SURFACE)); setStroke(1.dp, SugarliciousColors.argb(SugarliciousColorRole.BORDER)) }
-        }
-        lateinit var popup: PopupWindow
-        items.forEachIndexed { index, item ->
-            panel.addView(TextView(this).apply {
-                id = item.id
-                text = item.label
-                textSize = 14f
-                setTextColor(SugarliciousColors.argb(if (item.selected) SugarliciousColorRole.PRIMARY else SugarliciousColorRole.TEXT_PRIMARY))
-                gravity = Gravity.CENTER_VERTICAL
-                minHeight = 46.dp
-                setPadding(18.dp, 0, 18.dp, 0)
-                background = GradientDrawable().apply { cornerRadius = 18.dp.toFloat(); setColor(if (item.selected) SugarliciousColors.argb(SugarliciousColorRole.SURFACE_SELECTED) else SugarliciousColors.argb(SugarliciousColorRole.SURFACE_HIGH)); if (item.selected) setStroke(1.dp, SugarliciousColors.argb(SugarliciousColorRole.PRIMARY)) }
-                isClickable = true
-                isFocusable = true
-                setOnClickListener {
-                    popup.dismiss()
-                    item.action()
-                }
-            }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
-                if (index > 0) topMargin = 6.dp
-            })
-        }
-        val menuWidth = 232.dp
-        popup = PopupWindow(panel, menuWidth, ViewGroup.LayoutParams.WRAP_CONTENT, true).apply {
-            setBackgroundDrawable(Color.TRANSPARENT.toDrawable())
-            isOutsideTouchable = true
-            elevation = 16.dp.toFloat()
-            inputMethodMode = PopupWindow.INPUT_METHOD_NOT_NEEDED
-            setOnDismissListener { if (activeDropdown === this) activeDropdown = null }
-        }
-        activeDropdown = popup
-        val xOffset = if (alignEnd) anchor.width - menuWidth else 0
-        popup.showAsDropDown(anchor, xOffset, 4.dp)
-    }
-
-    private fun cycleUnit() {
-        val current = DashboardUiPreferences.read(uiPreferences).unit
-        val next = when (current) { DisplayUnitPreference.AAPS -> DisplayUnitPreference.MG_DL; DisplayUnitPreference.MG_DL -> DisplayUnitPreference.MMOL_L; DisplayUnitPreference.MMOL_L -> DisplayUnitPreference.AAPS }
-        uiPreferences.edit { putString("unit", next.name) }
-    }
-
-    private fun cycleGraphHours() {
-        val current = DashboardUiPreferences.read(uiPreferences).graphHours
-        val next = when (current) {
-            3 -> 6
-            6 -> 12
-            12 -> 24
-            else -> 3
-        }
-        uiPreferences.edit { putInt("graphHours", next) }
-    }
-
     private fun syncNow() {
         val latest = state
         if (latest == null) {
@@ -384,72 +280,6 @@ styleTitle()
                     Toast.makeText(this@MainActivity, "Keine Watch erreichbar", Toast.LENGTH_SHORT).show()
                 }
         }
-    }
-
-    private fun syncNightscout() {
-        scope.launch {
-            val result = NightscoutBackfillCoordinator.syncIfNeeded(applicationContext, force = true)
-            when (result.status) {
-                NightscoutBackfillResult.Status.OK ->
-                    Toast.makeText(this@MainActivity, "${result.pointCount} Nightscout-Werte synchronisiert", Toast.LENGTH_SHORT).show()
-                NightscoutBackfillResult.Status.NOT_CONFIGURED ->
-                    showNightscoutSetup(firstRun = false)
-                NightscoutBackfillResult.Status.ERROR ->
-                    Toast.makeText(this@MainActivity, "Nightscout-Backfill fehlgeschlagen: ${result.message ?: "unbekannt"}", Toast.LENGTH_LONG).show()
-                else -> Unit
-            }
-        }
-    }
-
-    private fun showNightscoutSetup(firstRun: Boolean) {
-        val existing = NightscoutConfigStore.load(this)
-        val container = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(24.dp, 6.dp, 24.dp, 0)
-        }
-        val urlInput = EditText(this).apply {
-            hint = "https://dein-nightscout.example"
-            setText(existing?.baseUrl.orEmpty())
-            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_URI
-            isSingleLine = true
-        }
-        val tokenInput = EditText(this).apply {
-            hint = "Read-only Access Token (optional)"
-            setText(existing?.accessToken.orEmpty())
-            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD
-            isSingleLine = true
-        }
-        container.addView(urlInput)
-        container.addView(tokenInput)
-
-        val dialog = AlertDialog.Builder(this)
-            .setTitle(if (firstRun) "24h-Verlauf aus Nightscout" else "Nightscout")
-            .setMessage("Sugarlicious nutzt Nightscout nur lesend für den initialen 24h-Backfill und zum Reparieren von Graph-Lücken. AndroidAPS bleibt die Live-Datenquelle.")
-            .setView(container)
-            .setNegativeButton(if (firstRun) "Später" else "Abbrechen") { _, _ ->
-                if (firstRun) NightscoutConfigStore.markSetupPromptShown(this)
-            }
-            .setPositiveButton("Speichern", null)
-            .create()
-
-        dialog.setOnShowListener {
-            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
-                runCatching {
-                    NightscoutConfigStore.save(
-                        this,
-                        urlInput.text.toString(),
-                        tokenInput.text.toString(),
-                    )
-                }.onSuccess {
-                    dialog.dismiss()
-                    Toast.makeText(this, "Nightscout gespeichert", Toast.LENGTH_SHORT).show()
-                    syncNightscout()
-                }.onFailure {
-                    Toast.makeText(this, it.message ?: "Ungültige Nightscout-Konfiguration", Toast.LENGTH_LONG).show()
-                }
-            }
-        }
-        dialog.show()
     }
 
     private fun setLiveNotification(enabled: Boolean) {
@@ -472,24 +302,6 @@ styleTitle()
         }
     }
 
-    private fun copyDiagnostics() {
-        val d = DiagnosticsSnapshot.read(diagnostics)
-        val report = buildString {
-            appendLine("Sugarlicious 0.5.1")
-            appendLine("Quelle: ${d.sourcePackage ?: "—"}")
-            appendLine("AAPS: ${d.sourceVersion ?: "—"}")
-            appendLine("Vertrag: ${d.sourceContract ?: "—"}")
-            appendLine("Schema: ${state?.schemaVersion ?: "—"}")
-            appendLine("Fähigkeiten: ${state?.capabilities?.size ?: 0}")
-            appendLine("Uhren erreichbar: ${d.reachableWatches}")
-            appendLine("Sync: ${d.syncStatus ?: "—"}")
-            appendLine("Nightscout Backfill: ${d.historyBackfillStatus ?: "—"}")
-            appendLine("Nightscout Punkte: ${d.historyBackfillPointCount}")
-        }
-        (getSystemService(CLIPBOARD_SERVICE) as ClipboardManager).setPrimaryClip(ClipData.newPlainText("Sugarlicious Diagnose", report))
-        Toast.makeText(this, "Diagnose ohne Therapiewerte kopiert", Toast.LENGTH_SHORT).show()
-    }
-
     private fun openGithub() {
         openExternal(Intent(Intent.ACTION_VIEW, getString(R.string.github_url).toUri()))
     }
@@ -507,13 +319,6 @@ styleTitle()
             Toast.makeText(this, "Keine passende App installiert", Toast.LENGTH_SHORT).show()
         }
     }
-
-    private data class PillMenuItem(
-        val id: Int,
-        val label: String,
-        val selected: Boolean = false,
-        val action: () -> Unit,
-    )
 
     private val Int.dp get() = (this * resources.displayMetrics.density).toInt()
 

@@ -30,7 +30,7 @@ class TrendArrowResolverTest {
     }
 
     @Test
-    fun `Nightscout direction is preferred over calculated fallback`() {
+    fun `explicit direction is preferred over calculated fallback`() {
         val history = listOf(
             GlucoseSample(100.0, 0L),
             GlucoseSample(100.0, 5 * 60_000L),

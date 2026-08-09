@@ -1,20 +1,24 @@
 package app.aapswear.wear
 
+import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.DashPathEffect
 import android.graphics.Paint
 import android.util.AttributeSet
+import android.util.TypedValue
 import android.view.View
 import app.aapswear.model.GlucosePrediction
 import app.aapswear.model.GlucoseSample
 import app.aapswear.model.PredictionKind
 import app.aapswear.model.TherapyDisplayState
+import app.aapswear.protocol.WatchGraphColors
 import kotlin.math.ceil
 import kotlin.math.max
 import kotlin.math.min
 
+@SuppressLint("DrawAllocation")
 class WearGlucoseChart @JvmOverloads constructor(
     context: Context,
     attrs: AttributeSet? = null,
@@ -35,19 +39,24 @@ class WearGlucoseChart @JvmOverloads constructor(
     private val emptyTextPaint =
         Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = context.getColor(R.color.wear_text_secondary)
-            textSize =
-                10f * resources.displayMetrics.scaledDensity
+            textSize = TypedValue.applyDimension(
+                TypedValue.COMPLEX_UNIT_SP,
+                10f,
+                resources.displayMetrics,
+            )
             textAlign = Paint.Align.CENTER
         }
 
     private var state: TherapyDisplayState? = null
     private var durationHours: Int = 3
     private var showPredictions: Boolean = true
+    private var colors: WatchGraphColors = WatchGraphColors()
 
     fun bind(
         newState: TherapyDisplayState?,
         graphHours: Int,
         showPredictions: Boolean,
+        colors: WatchGraphColors,
     ) {
         state = newState
         durationHours =
@@ -55,6 +64,7 @@ class WearGlucoseChart @JvmOverloads constructor(
                 it in listOf(3, 6, 12, 24)
             } ?: 3
         this.showPredictions = showPredictions
+        this.colors = colors
         invalidate()
     }
 
@@ -62,6 +72,7 @@ class WearGlucoseChart @JvmOverloads constructor(
         super.onDraw(canvas)
 
         val now = System.currentTimeMillis()
+        canvas.drawColor(colors.graphBackground)
         val start =
             now - durationHours * 60L * 60_000L
 
@@ -174,11 +185,13 @@ class WearGlucoseChart @JvmOverloads constructor(
                     .toFloat() *
                 (bottom - top)
 
-        val targetTop = yFor(TARGET_HIGH)
-        val targetBottom = yFor(TARGET_LOW)
+        val targetLow = state?.target?.lowMgDl ?: TARGET_LOW
+        val targetHigh = state?.target?.highMgDl ?: TARGET_HIGH
+        val targetTop = yFor(targetHigh)
+        val targetBottom = yFor(targetLow)
 
-        fillPaint.color = Color.rgb(10, 57, 28)
-        fillPaint.alpha = 180
+        fillPaint.color = colors.rangeInRange
+        fillPaint.alpha = 55
         canvas.drawRoundRect(
             left,
             targetTop,
@@ -212,7 +225,7 @@ class WearGlucoseChart @JvmOverloads constructor(
         val dividerX = xFor(now)
 
         if (visiblePredictions.isNotEmpty()) {
-            linePaint.color = Color.rgb(130, 130, 130)
+            linePaint.color = colors.divider
             linePaint.strokeWidth = 1f.dp
             linePaint.pathEffect =
                 DashPathEffect(
@@ -245,10 +258,14 @@ class WearGlucoseChart @JvmOverloads constructor(
                 }
 
             fillPaint.color =
-                glucoseColor(point.valueMgDl)
+                glucoseColor(point.valueMgDl, targetLow, targetHigh)
+            val y = yFor(point.valueMgDl)
+            fillPaint.color = colors.outline
+            canvas.drawCircle(x, y, 3.1f.dp, fillPaint)
+            fillPaint.color = glucoseColor(point.valueMgDl, targetLow, targetHigh)
             canvas.drawCircle(
                 x,
-                yFor(point.valueMgDl),
+                y,
                 2.4f.dp,
                 fillPaint,
             )
@@ -267,7 +284,7 @@ class WearGlucoseChart @JvmOverloads constructor(
                 }
             val y = yFor(point.valueMgDl)
 
-            fillPaint.color = Color.BLACK
+            fillPaint.color = colors.outline
             canvas.drawCircle(
                 x,
                 y,
@@ -275,7 +292,7 @@ class WearGlucoseChart @JvmOverloads constructor(
                 fillPaint,
             )
             fillPaint.color =
-                glucoseColor(point.valueMgDl)
+                glucoseColor(point.valueMgDl, targetLow, targetHigh)
             canvas.drawCircle(
                 x,
                 y,
@@ -341,16 +358,13 @@ class WearGlucoseChart @JvmOverloads constructor(
         }
     }
 
-    private fun glucoseColor(valueMgDl: Double): Int =
+    private fun glucoseColor(valueMgDl: Double, low: Double, high: Double): Int =
         when {
-            valueMgDl < TARGET_LOW ->
-                Color.rgb(255, 92, 105)
+            valueMgDl < low -> colors.cgmLow
 
-            valueMgDl > TARGET_HIGH ->
-                Color.rgb(255, 208, 64)
+            valueMgDl > high -> colors.cgmHigh
 
-            else ->
-                Color.WHITE
+            else -> colors.cgmInRange
         }
 
     private val Float.dp: Float

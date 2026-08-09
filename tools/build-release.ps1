@@ -1,5 +1,5 @@
 param(
-    [string]$Version = "0.5.1-diy-preview",
+    [string]$Version = "0.6.0-diy-preview",
     [switch]$SkipBuild
 )
 
@@ -11,7 +11,8 @@ $watchFaces = @(
     "aaps-big-chart", "aaps-large", "aaps-no-chart", "aaps-cockpit", "aaps-v2-tt-dark",
     "aaps-community", "aimico", "analog-g-watch", "blue-ring", "digital-big-graph",
     "digital-g-watch", "gears", "gota", "lucky-loop-koeln", "p-zero", "robby",
-    "simple-digital", "steam-punk", "sugarlicious-digital", "sugarlicious-analog"
+    "simple-digital", "steam-punk", "sugarlicious-digital", "sugarlicious-analog",
+    "sugarlicious-orbit", "sugarlicious-rings", "sugarlicious-graph"
 )
 
 if (-not $SkipBuild) {

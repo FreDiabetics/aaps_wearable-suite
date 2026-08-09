@@ -4,11 +4,12 @@
 - Request-Pfad: `/aaps-display/v1/request`
 - Capability: `aaps_display`
 - Kodierung: UTF-8 JSON
-- aktuelles Envelope-Protokoll: 3
-- aktuelles `TherapyDisplayState`-Schema: 3
+- aktuelles Envelope-Protokoll: 5
+- aktuelles `TherapyDisplayState`-Schema: 4
+- aktuelle Watch-Konfiguration: 2
 
 Der Pfad bleibt für kompatible Updates stabil; die Version steht im Envelope.
-Unbekannte JSON-Felder werden ignoriert. Protokollversionen größer als 3 werden
+Unbekannte JSON-Felder werden ignoriert. Protokollversionen größer als 5 werden
 abgewiesen. Beim Lesen von Protokoll/Schema 1 wird eine damalige
 `AAPS_*`-Vertragskennung aus `sourceVersion` nach `sourceContract` migriert;
 eine echte AAPS-App-Version bleibt separat.
@@ -24,6 +25,13 @@ Die Verlaufslisten sind optional und besitzen leere Standardwerte. Dadurch
 bleiben Zustände aus Schema 1/2 lesbar. Die Mobile-App hält höchstens 24 Stunden
 und 300 Messzeitpunkte; es entsteht keine separate Therapiedatenbank. Der
 Empfänger erzeugt weder Prognosen noch fehlende Zwischenwerte.
+
+Schema 4 ergänzt die Quellenkennung `XDRIP_PLUS`, die Herkunft einzelner
+Glukosepunkte, getrennte Basis-/TBR-Raten und eine optionale, rein visuelle
+Insulinaktivitäts-Schätzung. Protokoll 5 transportiert diese Felder sowie die
+Watch-Konfiguration 2. Letztere enthält getrennte Graphrollen für Hintergrund,
+Zielbereiche, CGM-Punkte, Trennlinie und Punktkontur. Alte Konfigurationen
+erhalten sichere Standardfarben.
 
 `DataClient` hält genau den aktuellen vollständigen Zustand. `MessageClient`
 wird nur für eine explizite Wiederanfrage verwendet. `CapabilityClient` und

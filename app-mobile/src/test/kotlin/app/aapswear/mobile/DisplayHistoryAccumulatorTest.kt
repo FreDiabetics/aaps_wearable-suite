@@ -1,6 +1,7 @@
 package app.aapswear.mobile
 
 import app.aapswear.model.CarbState
+import app.aapswear.model.DataSourceId
 import app.aapswear.model.GlucoseSample
 import app.aapswear.model.GlucoseState
 import app.aapswear.model.GlucoseUnit
@@ -32,7 +33,7 @@ class DisplayHistoryAccumulatorTest {
     }
 
     @Test
-    fun `incoming backfill samples close an existing graph gap`() {
+    fun `incoming history samples close an existing graph gap`() {
         val minute = 60_000L
         val now = 1000 * minute
         val previous = TherapyDisplayState(
@@ -62,5 +63,22 @@ class DisplayHistoryAccumulatorTest {
             merged.glucoseHistory.map { (it.measuredAtEpochMs - now) / minute },
         )
         assertFalse(DisplayHistoryAccumulator.hasGap(merged.glucoseHistory))
+    }
+
+    @Test
+    fun `AndroidAPS wins over a nearby xDrip reading`() {
+        val now = 2_000_000L
+        val state = TherapyDisplayState(
+            source = DataSourceId.ANDROID_APS,
+            receivedAtEpochMs = now,
+            glucose = GlucoseState(123.0, GlucoseUnit.MG_DL, measuredAtEpochMs = now),
+            glucoseHistory = listOf(
+                GlucoseSample(121.0, now - 30_000L, DataSourceId.XDRIP_PLUS),
+            ),
+        )
+        val merged = DisplayHistoryAccumulator.merge(null, state, now)
+        assertEquals(1, merged.glucoseHistory.size)
+        assertEquals(DataSourceId.ANDROID_APS, merged.glucoseHistory.single().source)
+        assertEquals(123.0, merged.glucoseHistory.single().valueMgDl, 0.0)
     }
 }

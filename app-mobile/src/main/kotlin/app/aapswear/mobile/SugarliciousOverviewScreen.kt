@@ -5,7 +5,6 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -28,7 +27,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.res.painterResource
@@ -67,10 +65,12 @@ internal fun SugarliciousOverviewScreen(
     val gap = if (preferences.compact) 6.dp else 9.dp
 
     val glucoseText = if (displayable && glucose != null) formatGlucose(glucose.valueMgDl, unit) else "—"
+    val targetLow = state?.target?.lowMgDl ?: 80.0
+    val targetHigh = state?.target?.highMgDl ?: 160.0
     val glucoseColor = when {
         !displayable || glucose == null -> SugarliciousColors.TextPrimary
-        glucose.valueMgDl < 80.0 -> SugarliciousColors.GlucoseLow
-        glucose.valueMgDl > 160.0 -> SugarliciousColors.GlucoseHigh
+        glucose.valueMgDl < targetLow -> SugarliciousColors.GlucoseLow
+        glucose.valueMgDl > targetHigh -> SugarliciousColors.GlucoseHigh
         else -> SugarliciousColors.GlucoseInRange
     }
     val delta = if (displayable) formatDelta(glucose?.deltaMgDl, unit) else "—"
@@ -92,7 +92,6 @@ internal fun SugarliciousOverviewScreen(
                     DashboardScreen.WATCH,
                 )
             },
-            onSync = callbacks.syncNow,
         )
 
         GlucoseHeroCard(
@@ -105,7 +104,6 @@ internal fun SugarliciousOverviewScreen(
             unitLabel = unitLabel(unit),
             tirStats = tirStats,
             heightDp = maxOf(metrics.summaryTileHeight + 48, 136),
-            onClick = callbacks.cycleUnit,
         )
 
         if (preferences.showDetails) {
@@ -116,7 +114,6 @@ internal fun SugarliciousOverviewScreen(
             state = state,
             preferences = preferences,
             chartHeightDp = maxOf(metrics.glucoseChartHeight - 10, 108),
-            onHoursClick = callbacks.cycleGraphHours,
         )
 
         if (preferences.showMetabolicGraph) {
@@ -143,7 +140,6 @@ private fun GlucoseHeroCard(
     unitLabel: String,
     tirStats: TirStats,
     heightDp: Int,
-    onClick: () -> Unit,
 ) {
     val shape = RoundedCornerShape(28.dp)
 
@@ -151,22 +147,13 @@ private fun GlucoseHeroCard(
         modifier = Modifier
             .fillMaxWidth()
             .height(heightDp.dp)
-            .background(
-                brush = Brush.linearGradient(
-                    listOf(
-                        SugarliciousColors.SurfaceHigh,
-                        SugarliciousColors.Surface,
-                    ),
-                ),
-                shape = shape,
-            )
+            .background(SugarliciousColors.Surface, shape)
             .border(
                 1.dp,
                 SugarliciousColors.Border.copy(alpha = 0.85f),
                 shape,
             )
             .clip(shape)
-            .clickable(onClick = onClick)
             .padding(
                 horizontal = 18.dp,
                 vertical = 10.dp,
@@ -225,7 +212,7 @@ private fun GlucoseHeroCard(
 
             TirProgressColumn(
                 stats = tirStats,
-                modifier = Modifier.width(194.dp),
+                modifier = Modifier.width(194.dp).fillMaxHeight(),
             )
         }
     }
@@ -241,6 +228,8 @@ private fun calculateTirStats(
     now: Long,
 ): TirStats {
     val start = now - 24L * 60L * 60_000L
+    val targetLow = state?.target?.lowMgDl ?: 80.0
+    val targetHigh = state?.target?.highMgDl ?: 160.0
     val samples = buildList {
         addAll(state?.glucoseHistory.orEmpty())
         state?.glucose?.let {
@@ -264,9 +253,9 @@ private fun calculateTirStats(
     }
 
     val total = samples.size.toDouble()
-    val below = samples.count { it.valueMgDl < 80.0 }
-    val inRange = samples.count { it.valueMgDl in 80.0..160.0 }
-    val above = samples.count { it.valueMgDl > 160.0 }
+    val below = samples.count { it.valueMgDl < targetLow }
+    val inRange = samples.count { it.valueMgDl in targetLow..targetHigh }
+    val above = samples.count { it.valueMgDl > targetHigh }
 
     return TirStats(
         inRange = (inRange / total * 100.0).roundToInt(),
@@ -282,24 +271,24 @@ private fun TirProgressColumn(
 ) {
     Column(
         modifier = modifier,
-        verticalArrangement = Arrangement.spacedBy(10.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp, Alignment.CenterVertically),
     ) {
         TirProgress(
             modifier = Modifier.fillMaxWidth(),
             percent = stats.above,
-            accent = SugarliciousColors.GlucoseHigh,
+            accent = SugarliciousColors.color(app.aapswear.mobile.ui.theme.SugarliciousColorRole.RANGE_HIGH),
         )
 
         TirProgress(
             modifier = Modifier.fillMaxWidth(),
             percent = stats.inRange,
-            accent = SugarliciousColors.GlucoseInRange,
+            accent = SugarliciousColors.color(app.aapswear.mobile.ui.theme.SugarliciousColorRole.RANGE_IN_RANGE),
         )
 
         TirProgress(
             modifier = Modifier.fillMaxWidth(),
             percent = stats.below,
-            accent = SugarliciousColors.GlucoseLow,
+            accent = SugarliciousColors.color(app.aapswear.mobile.ui.theme.SugarliciousColorRole.RANGE_LOW),
         )
     }
 }
@@ -541,30 +530,10 @@ private fun GlucoseGraphSurface(
     state: TherapyDisplayState?,
     preferences: DashboardUiPreferences,
     chartHeightDp: Int,
-    onHoursClick: () -> Unit,
 ) {
     OverviewSurface {
-        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Spacer(Modifier.weight(1f))
-            Surface(
-                modifier = Modifier.clickable(onClick = onHoursClick),
-                shape = RoundedCornerShape(999.dp),
-                color = SugarliciousColors.Surface,
-            ) {
-                Text(
-                    "${preferences.graphHours} h",
-                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                    color = SugarliciousColors.TextSecondary,
-                    fontSize = 9.sp,
-                    fontWeight = FontWeight.Medium,
-                )
-            }
-        }
-
-        Spacer(Modifier.height(5.dp))
-
         AndroidView(
-            modifier = Modifier.fillMaxWidth().height(chartHeightDp.dp).clip(RoundedCornerShape(16.dp)),
+            modifier = Modifier.fillMaxWidth().height(chartHeightDp.dp),
             factory = { GlucoseDashboardChart(it) },
             update = { it.bind(state, preferences.unitFor(state), preferences.showPredictions, preferences.graphHours) },
         )
@@ -585,14 +554,12 @@ private fun MetabolicGraphSurface(
                 fontSize = 12.sp,
                 fontWeight = FontWeight.SemiBold,
             )
-            Spacer(Modifier.weight(1f))
-            Text("${preferences.graphHours} h", color = SugarliciousColors.TextSecondary, fontSize = 9.sp)
         }
 
         Spacer(Modifier.height(2.dp))
 
         AndroidView(
-            modifier = Modifier.fillMaxWidth().height(chartHeightDp.dp).clip(RoundedCornerShape(16.dp)),
+            modifier = Modifier.fillMaxWidth().height(chartHeightDp.dp),
             factory = { MetabolicDashboardChart(it) },
             update = { it.bind(state, preferences.graphHours) },
         )
