@@ -104,22 +104,26 @@ class PersistentBridgeService : Service(), SharedPreferences.OnSharedPreferenceC
         )
         val display = notificationDisplay(latestState)
         val graph = NotificationGraphRenderer.render(this, latestState, uiPreferences)
+        val graphStyle =
+            Notification.BigPictureStyle()
+                .bigPicture(graph)
+                .setSummaryText(display.subtitle)
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            graphStyle.showBigPictureWhenCollapsed(true)
+        }
+
         val builder = Notification.Builder(this, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_notification_outlined)
             .setColor(getColor(R.color.app_accent))
             .setContentTitle(display.title)
             .setContentText(display.subtitle)
-            .setLargeIcon(graph)
             .setCategory(Notification.CATEGORY_SERVICE)
             .setContentIntent(openApp)
             .setOngoing(true)
             .setOnlyAlertOnce(true)
             .setShowWhen(false)
-            .setStyle(
-                Notification.BigPictureStyle()
-                    .bigPicture(graph)
-                    .setSummaryText(display.subtitle),
-            )
+            .setStyle(graphStyle)
 
         if (liveCapable) {
             val disableLive = PendingIntent.getService(
@@ -194,8 +198,8 @@ class PersistentBridgeService : Service(), SharedPreferences.OnSharedPreferenceC
 }
 
 internal object NotificationGraphRenderer {
-    const val WIDTH = 420
-    const val HEIGHT = 360
+    const val WIDTH = 1100
+    const val HEIGHT = 210
 
     fun render(context: Context, state: TherapyDisplayState?, preferences: SharedPreferences): Bitmap {
         val width = WIDTH
@@ -203,38 +207,182 @@ internal object NotificationGraphRenderer {
         val bitmap = createBitmap(width, height)
         val canvas = Canvas(bitmap)
         val palette = SugarliciousColorStore.load(preferences)
-        val bounds = RectF(1f, 1f, width - 1f, height - 1f)
-        val radius = 38f
-        val clip = Path().apply { addRoundRect(bounds, radius, radius, Path.Direction.CW) }
+        val bounds = RectF(0f, 0f, width.toFloat(), height.toFloat())
+        val radius = 24f
+        val clip = Path().apply {
+            addRoundRect(
+                bounds,
+                radius,
+                radius,
+                Path.Direction.CW,
+            )
+        }
         canvas.clipPath(clip)
+
         val paint = Paint(Paint.ANTI_ALIAS_FLAG)
         paint.color = palette.argb(SugarliciousColorRole.GRAPH_BACKGROUND)
-        canvas.drawRoundRect(bounds, radius, radius, paint)
-        val points = state?.glucoseHistory.orEmpty().takeLast(36)
+        canvas.drawRoundRect(
+            bounds,
+            radius,
+            radius,
+            paint,
+        )
+
+        val points =
+            state?.glucoseHistory
+                .orEmpty()
+                .takeLast(36)
+
         if (points.size >= 2) {
-            val targetLow = state?.target?.lowMgDl ?: 80.0
-            val targetHigh = state?.target?.highMgDl ?: 160.0
-            val minValue = min(targetLow * 0.75, points.minOf { it.valueMgDl } * 0.9)
-            val maxValue = max(targetHigh * 1.2, points.maxOf { it.valueMgDl } * 1.1)
-            fun y(value: Double) = (height - 14f - ((value - minValue) / (maxValue - minValue).coerceAtLeast(1.0) * (height - 28f))).toFloat()
-            paint.color = withAlpha(palette.argb(SugarliciousColorRole.RANGE_IN_RANGE), 42)
-            canvas.drawRect(8f, y(targetHigh), width - 8f, y(targetLow), paint)
-            val first = points.first().measuredAtEpochMs
-            val last = points.last().measuredAtEpochMs.coerceAtLeast(first + 1L)
-            points.forEach { point ->
-                val x = 10f + (point.measuredAtEpochMs - first).toFloat() / (last - first) * (width - 20f)
-                paint.color = when {
-                    point.valueMgDl < targetLow -> palette.argb(SugarliciousColorRole.CGM_DOT_LOW)
-                    point.valueMgDl > targetHigh -> palette.argb(SugarliciousColorRole.CGM_DOT_HIGH)
-                    else -> android.graphics.Color.WHITE
+            val targetLow =
+                state?.target?.lowMgDl
+                    ?: 80.0
+            val targetHigh =
+                state?.target?.highMgDl
+                    ?: 160.0
+
+            val minValue =
+                min(
+                    targetLow * 0.72,
+                    points.minOf {
+                        it.valueMgDl
+                    } * 0.88,
+                )
+
+            val maxValue =
+                max(
+                    targetHigh * 1.18,
+                    points.maxOf {
+                        it.valueMgDl
+                    } * 1.10,
+                )
+
+            fun y(
+                value: Double,
+            ): Float =
+                (
+                    height -
+                        8f -
+                        (
+                            (
+                                value -
+                                    minValue
+                                ) /
+                                (
+                                    maxValue -
+                                        minValue
+                                    ).coerceAtLeast(
+                                    1.0,
+                                ) *
+                                (
+                                    height -
+                                        16f
+                                    )
+                            )
+                    ).toFloat()
+
+            paint.color =
+                withAlpha(
+                    palette.argb(
+                        SugarliciousColorRole.RANGE_IN_RANGE,
+                    ),
+                    54,
+                )
+
+            canvas.drawRect(
+                0f,
+                y(targetHigh),
+                width.toFloat(),
+                y(targetLow),
+                paint,
+            )
+
+            val first =
+                points.first()
+                    .measuredAtEpochMs
+            val last =
+                points.last()
+                    .measuredAtEpochMs
+                    .coerceAtLeast(
+                        first + 1L,
+                    )
+
+            points.forEachIndexed {
+                    index,
+                    point,
+                ->
+                val x =
+                    7f +
+                        (
+                            point.measuredAtEpochMs -
+                                first
+                            ).toFloat() /
+                        (
+                            last -
+                                first
+                            ) *
+                        (
+                            width -
+                                14f
+                            )
+
+                val dotColor =
+                    when {
+                        point.valueMgDl <
+                            targetLow ->
+                            palette.argb(
+                                SugarliciousColorRole.CGM_DOT_LOW,
+                            )
+
+                        point.valueMgDl >
+                            targetHigh ->
+                            palette.argb(
+                                SugarliciousColorRole.CGM_DOT_HIGH,
+                            )
+
+                        else ->
+                            palette.argb(
+                                SugarliciousColorRole.CGM_DOT_IN_RANGE,
+                            )
+                    }
+
+                val current =
+                    index ==
+                        points.lastIndex
+
+                if (current) {
+                    paint.color =
+                        palette.argb(
+                            SugarliciousColorRole.GRAPH_CURRENT_OUTLINE,
+                        )
+
+                    canvas.drawCircle(
+                        x,
+                        y(
+                            point.valueMgDl,
+                        ),
+                        14f,
+                        paint,
+                    )
                 }
-                canvas.drawCircle(x, y(point.valueMgDl), 6.5f, paint)
+
+                paint.color =
+                    dotColor
+
+                canvas.drawCircle(
+                    x,
+                    y(
+                        point.valueMgDl,
+                    ),
+                    if (current) {
+                        9.5f
+                    } else {
+                        8.5f
+                    },
+                    paint,
+                )
             }
         }
-        paint.style = Paint.Style.STROKE
-        paint.strokeWidth = 3f
-        paint.color = palette.argb(SugarliciousColorRole.BORDER)
-        canvas.drawRoundRect(bounds, radius, radius, paint)
         return bitmap
     }
 

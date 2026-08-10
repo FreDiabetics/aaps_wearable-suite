@@ -7,7 +7,7 @@ android {
         applicationId="app.aapswear.watchface.sugarlicious.analog"
         minSdk=33
         targetSdk=35
-        versionCode=8
+        versionCode=10
         versionName="0.6.2"
     }
     buildTypes {

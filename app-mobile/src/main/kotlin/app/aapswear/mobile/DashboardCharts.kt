@@ -36,60 +36,236 @@ import kotlin.math.sqrt
 
 private const val HOUR_MS = 60L * 60_000L
 private const val BASAL_HEIGHT_FRACTION = 0.28f
-private const val ACTIVITY_HEIGHT_FRACTION = 0.8f
+private const val ACTIVITY_HEIGHT_FRACTION = 0.92f
 private const val GRAPH_PLOT_LEFT_DP = 6f
 private const val GRAPH_LABEL_GUTTER_DP = 31f
 private const val GRAPH_CORNER_RADIUS_DP = 18f
 private const val GLUCOSE_LOG_MIN = 40.0
 private const val GLUCOSE_LOG_MAX = 400.0
 private const val TOOLKIT_SECONDARY_MINIMUM = -2.0
-private const val TOOLKIT_ACTIVITY_SCALE_FACTOR = 2.2
+private const val TOOLKIT_ACTIVITY_SCALE_FACTOR = 1.15
 
-internal class ChartViewport(initialHours: Int) {
-    var hours = initialHours.toFloat().coerceIn(1f, 24f)
+internal class ChartViewport(
+    initialHours: Int,
+) {
+    private val listeners =
+        LinkedHashSet<() -> Unit>()
+
+    var hours =
+        initialHours
+            .toFloat()
+            .coerceIn(
+                1f,
+                24f,
+            )
+        private set
+
     var panMs = 0L
+        private set
 
-    fun zoom(scaleFactor: Float) {
-        hours = (hours / scaleFactor.coerceAtLeast(0.05f)).coerceIn(1f, 24f)
+    var futureWindowMs = 0L
+        private set
+
+    fun setHours(
+        value: Float,
+        resetPan: Boolean = false,
+    ) {
+        val next =
+            value.coerceIn(
+                1f,
+                24f,
+            )
+
+        val changed =
+            next != hours ||
+                (
+                    resetPan &&
+                        panMs != 0L
+                )
+
+        hours = next
+
+        if (resetPan) {
+            panMs = 0L
+        }
+
         clampPan()
+
+        if (changed) {
+            notifyChanged()
+        }
     }
 
-    fun pan(deltaPixels: Float, width: Float) {
-        if (width <= 0f) return
-        panMs -= (deltaPixels / width * hours * HOUR_MS).toLong()
+    fun setFutureWindow(
+        valueMs: Long,
+    ) {
+        val next =
+            valueMs.coerceIn(
+                0L,
+                2L * HOUR_MS,
+            )
+
+        if (next == futureWindowMs) {
+            return
+        }
+
+        futureWindowMs = next
+        notifyChanged()
+    }
+
+    fun endEpochMs(
+        now: Long,
+    ): Long =
+        now +
+            futureWindowMs +
+            panMs
+
+    fun zoom(
+        scaleFactor: Float,
+    ) {
+        val oldHours =
+            hours
+
+        hours =
+            (
+                hours /
+                    scaleFactor.coerceAtLeast(
+                        0.05f,
+                    )
+                ).coerceIn(
+                1f,
+                24f,
+            )
+
         clampPan()
+
+        if (hours != oldHours) {
+            notifyChanged()
+        }
+    }
+
+    fun pan(
+        deltaPixels: Float,
+        width: Float,
+    ) {
+        if (width <= 0f) {
+            return
+        }
+
+        val oldPan =
+            panMs
+
+        panMs -=
+            (
+                deltaPixels /
+                    width *
+                    hours *
+                    HOUR_MS
+                ).toLong()
+
+        clampPan()
+
+        if (panMs != oldPan) {
+            notifyChanged()
+        }
+    }
+
+    internal fun addListener(
+        listener: () -> Unit,
+    ) {
+        listeners += listener
+    }
+
+    internal fun removeListener(
+        listener: () -> Unit,
+    ) {
+        listeners -= listener
+    }
+
+    private fun notifyChanged() {
+        listeners
+            .toList()
+            .forEach {
+                it()
+            }
     }
 
     private fun clampPan() {
-        panMs = panMs.coerceIn(-24L * HOUR_MS, 2L * HOUR_MS)
+        panMs =
+            panMs.coerceIn(
+                -24L * HOUR_MS,
+                2L * HOUR_MS,
+            )
     }
 }
 
-internal abstract class InteractiveChartView @JvmOverloads constructor(
+internal abstract class InteractiveChartView(
     context: Context,
     attrs: AttributeSet? = null,
-    initialHours: Int,
-) : View(context, attrs) {
-    protected val viewport = ChartViewport(initialHours)
+    protected val viewport: ChartViewport,
+) : View(
+    context,
+    attrs,
+) {
     private var lastX = 0f
     private var downX = 0f
     private var downY = 0f
     private var moving = false
-    private val scaleDetector = ScaleGestureDetector(
-        context,
-        object : ScaleGestureDetector.SimpleOnScaleGestureListener() {
-            override fun onScale(detector: ScaleGestureDetector): Boolean {
-                viewport.zoom(detector.scaleFactor)
-                parent?.requestDisallowInterceptTouchEvent(true)
-                invalidate()
-                return true
-            }
-        },
-    )
 
-    @SuppressLint("ClickableViewAccessibility")
-    override fun onTouchEvent(event: MotionEvent): Boolean {
-        scaleDetector.onTouchEvent(event)
+    private val viewportListener:
+        () -> Unit =
+        {
+            invalidate()
+        }
+
+    private val scaleDetector =
+        ScaleGestureDetector(
+            context,
+            object :
+                ScaleGestureDetector
+                    .SimpleOnScaleGestureListener() {
+                override fun onScale(
+                    detector:
+                        ScaleGestureDetector,
+                ): Boolean {
+                    viewport.zoom(
+                        detector.scaleFactor,
+                    )
+
+                    parent
+                        ?.requestDisallowInterceptTouchEvent(
+                            true,
+                        )
+
+                    return true
+                }
+            },
+        )
+
+    override fun onAttachedToWindow() {
+        super.onAttachedToWindow()
+        viewport.addListener(
+            viewportListener,
+        )
+    }
+
+    override fun onDetachedFromWindow() {
+        viewport.removeListener(
+            viewportListener,
+        )
+        super.onDetachedFromWindow()
+    }
+
+    @SuppressLint(
+        "ClickableViewAccessibility",
+    )
+    override fun onTouchEvent(
+        event: MotionEvent,
+    ): Boolean {
+        scaleDetector.onTouchEvent(
+            event,
+        )
+
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
                 lastX = event.x
@@ -98,41 +274,94 @@ internal abstract class InteractiveChartView @JvmOverloads constructor(
                 moving = false
                 return true
             }
+
             MotionEvent.ACTION_POINTER_DOWN -> {
-                parent?.requestDisallowInterceptTouchEvent(true)
+                parent
+                    ?.requestDisallowInterceptTouchEvent(
+                        true,
+                    )
                 return true
             }
+
             MotionEvent.ACTION_MOVE -> {
-                if (!scaleDetector.isInProgress && event.pointerCount == 1) {
-                    val delta = event.x - lastX
-                    val horizontalGesture = abs(event.x - downX) > abs(event.y - downY) + 4f
-                    if (horizontalGesture && abs(delta) > 0.4f) {
-                        parent?.requestDisallowInterceptTouchEvent(true)
-                        viewport.pan(delta, width.toFloat())
+                if (
+                    !scaleDetector
+                        .isInProgress &&
+                    event.pointerCount == 1
+                ) {
+                    val delta =
+                        event.x -
+                            lastX
+
+                    val horizontalGesture =
+                        abs(
+                            event.x -
+                                downX,
+                        ) >
+                            abs(
+                                event.y -
+                                    downY,
+                            ) +
+                            4f
+
+                    if (
+                        horizontalGesture &&
+                        abs(delta) > 0.4f
+                    ) {
+                        parent
+                            ?.requestDisallowInterceptTouchEvent(
+                                true,
+                            )
+
+                        viewport.pan(
+                            delta,
+                            width.toFloat(),
+                        )
+
                         moving = true
-                        invalidate()
                     }
-                    lastX = event.x
+
+                    lastX =
+                        event.x
                 }
+
                 return true
             }
-            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
-                parent?.requestDisallowInterceptTouchEvent(false)
-                if (!moving) performClick()
+
+            MotionEvent.ACTION_UP,
+            MotionEvent.ACTION_CANCEL,
+            -> {
+                parent
+                    ?.requestDisallowInterceptTouchEvent(
+                        false,
+                    )
+
+                if (!moving) {
+                    performClick()
+                }
+
                 return true
             }
         }
+
         return true
     }
 
-    override fun performClick(): Boolean = super.performClick()
+    override fun performClick():
+        Boolean =
+        super.performClick()
 }
 
 @SuppressLint("DrawAllocation")
 internal class GlucoseDashboardChart @JvmOverloads constructor(
     context: Context,
     attrs: AttributeSet? = null,
-) : InteractiveChartView(context, attrs, 6) {
+    sharedViewport: ChartViewport = ChartViewport(6),
+) : InteractiveChartView(
+    context,
+    attrs,
+    sharedViewport,
+) {
     private val density = resources.displayMetrics.density
     private val linePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
@@ -149,19 +378,15 @@ internal class GlucoseDashboardChart @JvmOverloads constructor(
         this.state = state
         this.unit = unit
         this.showPredictions = showPredictions
-        if (!isAttachedToWindow) viewport.hours = durationHours.toFloat().coerceIn(1f, 24f)
+        if (!isAttachedToWindow) viewport.setHours(durationHours.toFloat())
         invalidate()
     }
 
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
         val scaleContainer = RectF(0.5f.dp, 0.5f.dp, width - 0.5f.dp, height - 0.5f.dp)
-        val plot = RectF(
-            scaleContainer.left + GRAPH_PLOT_LEFT_DP.dp,
-            scaleContainer.top + 7f.dp,
-            scaleContainer.right - GRAPH_LABEL_GUTTER_DP.dp,
-            scaleContainer.bottom - 23f.dp,
-        )
+        val plot = RectF(scaleContainer)
+
         if (plot.width() <= 24f || plot.height() <= 24f) return
         val radius = GRAPH_CORNER_RADIUS_DP.dp
         val clip = Path().apply { addRoundRect(scaleContainer, radius, radius, Path.Direction.CW) }
@@ -172,9 +397,8 @@ internal class GlucoseDashboardChart @JvmOverloads constructor(
             val targetLow = state?.target?.lowMgDl ?: 80.0
             val targetHigh = state?.target?.highMgDl ?: 160.0
             val predictions = if (showPredictions) state?.glucosePredictions.orEmpty() else emptyList()
-            val horizon = predictions.flatMap { it.samples }.maxOfOrNull { it.measuredAtEpochMs }
-                ?.minus(now)?.coerceAtLeast(0L) ?: 0L
-            val end = (now + min(horizon, 2L * HOUR_MS) + viewport.panMs)
+            val end = viewport.endEpochMs(now)
+
             val start = end - (viewport.hours * HOUR_MS).toLong()
 
             val history = buildList {
@@ -222,16 +446,24 @@ internal class GlucoseDashboardChart @JvmOverloads constructor(
             visiblePredictions.forEach { drawPrediction(canvas, it, plot, start, end, dividerX) }
 
             drawTargetLabel(
-                canvas,
-                glucoseLabel(targetHigh),
-                scaleContainer.right - 7f.dp,
-                targetTop + 3f.dp,
+                canvas = canvas,
+                value = glucoseLabel(targetHigh),
+                x = plot.right - 8f.dp,
+                y =
+                    (targetTop - 4f.dp)
+                        .coerceAtLeast(
+                            plot.top + 12f.dp,
+                        ),
             )
             drawTargetLabel(
-                canvas,
-                glucoseLabel(targetLow),
-                scaleContainer.right - 7f.dp,
-                targetBottom + 3f.dp,
+                canvas = canvas,
+                value = glucoseLabel(targetLow),
+                x = plot.right - 8f.dp,
+                y =
+                    (targetBottom + 12f.dp)
+                        .coerceAtMost(
+                            plot.bottom - 6f.dp,
+                        ),
             )
             if (history.size < 2) {
                 drawText(canvas, "Noch kein Verlauf", plot.centerX(), plot.centerY(), 10f, SugarliciousColors.argb(SugarliciousColorRole.GRAPH_MUTED), Paint.Align.CENTER)
@@ -240,23 +472,119 @@ internal class GlucoseDashboardChart @JvmOverloads constructor(
         drawRoundedBorder(canvas, scaleContainer, radius)
     }
 
-    private fun drawGrid(canvas: Canvas, plot: RectF, start: Long, end: Long) {
-        linePaint.color = SugarliciousColors.argb(SugarliciousColorRole.GRAPH_GRID)
-        linePaint.strokeWidth = 0.7f.dp
-        linePaint.pathEffect = DashPathEffect(floatArrayOf(3f.dp, 3f.dp), 0f)
+    private fun drawGrid(
+        canvas: Canvas,
+        plot: RectF,
+        start: Long,
+        end: Long,
+    ) {
+        linePaint.color =
+            SugarliciousColors.argb(
+                SugarliciousColorRole.GRAPH_GRID,
+            )
+        linePaint.strokeWidth =
+            0.7f.dp
+        linePaint.pathEffect =
+            DashPathEffect(
+                floatArrayOf(
+                    3f.dp,
+                    3f.dp,
+                ),
+                0f,
+            )
+
         for (index in 1..3) {
-            val y = plot.top + plot.height() * index / 4f
-            canvas.drawLine(plot.left, y, plot.right, y, linePaint)
+            val y =
+                plot.top +
+                    plot.height() *
+                    index /
+                    4f
+
+            canvas.drawLine(
+                plot.left,
+                y,
+                plot.right,
+                y,
+                linePaint,
+            )
         }
-        for (index in 1..2) {
-            val x = plot.left + plot.width() * index / 3f
-            canvas.drawLine(x, plot.top, x, plot.bottom, linePaint)
+
+        val interval =
+            timeGridIntervalMs(
+                viewport.hours,
+            )
+
+        var tick =
+            firstAlignedTick(
+                start,
+                interval,
+            )
+
+        while (tick <= end) {
+            val x =
+                mapX(
+                    tick,
+                    start,
+                    end,
+                    plot,
+                )
+
+            if (
+                x >= plot.left &&
+                x <= plot.right
+            ) {
+                canvas.drawLine(
+                    x,
+                    plot.top,
+                    x,
+                    plot.bottom,
+                    linePaint,
+                )
+            }
+
+            tick += interval
         }
-        linePaint.pathEffect = null
-        repeat(4) { index ->
-            val x = plot.left + plot.width() * index / 3f
-            val align = when (index) { 0 -> Paint.Align.LEFT; 3 -> Paint.Align.RIGHT; else -> Paint.Align.CENTER }
-            drawText(canvas, timeFormat.format(Date(start + (end - start) * index / 3)), x, plot.bottom + 15f.dp, 8.5f, SugarliciousColors.argb(SugarliciousColorRole.GRAPH_LABEL), align)
+
+        linePaint.pathEffect =
+            null
+
+        tick =
+            firstAlignedTick(
+                start,
+                interval,
+            )
+
+        while (tick <= end) {
+            val x =
+                mapX(
+                    tick,
+                    start,
+                    end,
+                    plot,
+                )
+
+            if (
+                x >=
+                    plot.left +
+                    22f.dp &&
+                x <=
+                    plot.right -
+                    22f.dp
+            ) {
+                drawText(
+                    canvas,
+                    timeFormat.format(
+                        Date(tick),
+                    ),
+                    x,
+                    plot.bottom - 7f.dp,
+                    8.5f,
+                    Color.WHITE,
+                    Paint.Align.CENTER,
+                )
+            }
+
+            tick += interval
         }
     }
 
@@ -300,24 +628,133 @@ internal class GlucoseDashboardChart @JvmOverloads constructor(
         now: Long,
         points: List<TherapyHistorySample>,
     ) {
-        val actual = points.mapNotNull { point ->
-            point.insulinActivityUnitsPerMinute?.takeIf { it.isFinite() && it >= 0.0 }
-                ?.let { point.measuredAtEpochMs to it }
-        }.filter { it.first in start..min(end, now) }.sortedBy { it.first }
-        if (actual.size < 2) return
-        val future = buildActivityProjection(actual.last(), max(now, actual.last().first), end)
-        val maxActivity = max(0.0001, (actual.map { it.second } + future.map { it.second }).maxOrNull() ?: 0.0001)
-        fun activityY(value: Double): Float = band.bottom -
-            (value / maxActivity).coerceIn(0.0, 1.0).toFloat() * band.height() * ACTIVITY_HEIGHT_FRACTION
-        val yellow = Color.rgb(242, 201, 76)
-        linePaint.color = yellow
-        linePaint.strokeWidth = 1.1f.dp
-        linePaint.pathEffect = null
-        canvas.drawPath(valuePath(actual, start, end, band, ::activityY), linePaint)
-        if (future.size >= 2) {
-            linePaint.pathEffect = DashPathEffect(floatArrayOf(4f.dp, 4f.dp), 0f)
-            canvas.drawPath(valuePath(future, start, end, band, ::activityY), linePaint)
-            linePaint.pathEffect = null
+        val actual =
+            points
+                .mapNotNull { point ->
+                    point
+                        .insulinActivityUnitsPerMinute
+                        ?.takeIf {
+                            it.isFinite() &&
+                                it >= 0.0
+                        }
+                        ?.let {
+                            point.measuredAtEpochMs to
+                                it
+                        }
+                }
+                .filter {
+                    it.first in
+                        start..min(
+                            end,
+                            now,
+                        )
+                }
+                .sortedBy {
+                    it.first
+                }
+
+        if (actual.size < 2) {
+            return
+        }
+
+        val future =
+            buildActivityProjection(
+                actual.last(),
+                max(
+                    now,
+                    actual.last().first,
+                ),
+                end,
+            )
+
+        val maxActivity =
+            max(
+                0.0001,
+                (
+                    actual.map {
+                        it.second
+                    } +
+                        future.map {
+                            it.second
+                        }
+                    ).maxOrNull()
+                    ?: 0.0001,
+            )
+
+        fun activityY(
+            value: Double,
+        ): Float =
+            band.bottom -
+                (
+                    value /
+                        maxActivity
+                    ).coerceIn(
+                    0.0,
+                    1.0,
+                ).toFloat() *
+                band.height() *
+                ACTIVITY_HEIGHT_FRACTION
+
+        val yellow =
+            Color.rgb(
+                242,
+                201,
+                76,
+            )
+
+        val smoothedActual =
+            smoothSeries(
+                actual,
+            )
+
+        val smoothedFuture =
+            smoothSeries(
+                future,
+            )
+
+        linePaint.color =
+            yellow
+        linePaint.strokeWidth =
+            1.35f.dp
+        linePaint.pathEffect =
+            null
+
+        canvas.drawPath(
+            smoothValuePath(
+                smoothedActual,
+                start,
+                end,
+                band,
+                ::activityY,
+            ),
+            linePaint,
+        )
+
+        if (
+            smoothedFuture.size >= 2
+        ) {
+            linePaint.pathEffect =
+                DashPathEffect(
+                    floatArrayOf(
+                        4f.dp,
+                        4f.dp,
+                    ),
+                    0f,
+                )
+
+            canvas.drawPath(
+                smoothValuePath(
+                    smoothedFuture,
+                    start,
+                    end,
+                    band,
+                    ::activityY,
+                ),
+                linePaint,
+            )
+
+            linePaint.pathEffect =
+                null
         }
     }
 
@@ -365,7 +802,7 @@ internal class GlucoseDashboardChart @JvmOverloads constructor(
     } else valueMgDl.toInt().toString()
 
     private fun drawTargetLabel(canvas: Canvas, value: String, x: Float, y: Float) =
-        drawText(canvas, value, x, y, 9f, SugarliciousColors.argb(SugarliciousColorRole.GRAPH_LABEL), Paint.Align.RIGHT)
+        drawText(canvas, value, x, y, 9f, Color.WHITE, Paint.Align.RIGHT)
 
     private val Float.dp get() = this * density
 }
@@ -374,7 +811,12 @@ internal class GlucoseDashboardChart @JvmOverloads constructor(
 internal class MetabolicDashboardChart @JvmOverloads constructor(
     context: Context,
     attrs: AttributeSet? = null,
-) : InteractiveChartView(context, attrs, 6) {
+    sharedViewport: ChartViewport = ChartViewport(6),
+) : InteractiveChartView(
+    context,
+    attrs,
+    sharedViewport,
+) {
     private val density = resources.displayMetrics.density
     private val linePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
@@ -387,7 +829,7 @@ internal class MetabolicDashboardChart @JvmOverloads constructor(
 
     fun bind(state: TherapyDisplayState?, durationHours: Int) {
         this.state = state
-        if (!isAttachedToWindow) viewport.hours = durationHours.toFloat().coerceIn(1f, 24f)
+        if (!isAttachedToWindow) viewport.setHours(durationHours.toFloat())
         invalidate()
     }
 
@@ -400,15 +842,34 @@ internal class MetabolicDashboardChart @JvmOverloads constructor(
         canvas.withClip(clip) {
             fillPaint.color = SugarliciousColors.argb(SugarliciousColorRole.GRAPH_BACKGROUND)
             canvas.drawRoundRect(outer, radius, radius, fillPaint)
-            val end = System.currentTimeMillis() + viewport.panMs
-            val start = end - (viewport.hours * HOUR_MS).toLong()
-            val allPoints = state?.therapyHistory.orEmpty()
-            val points = allPoints.filter { it.measuredAtEpochMs in start..end }
-            val left = GRAPH_PLOT_LEFT_DP.dp
-            val right = width - GRAPH_LABEL_GUTTER_DP.dp
-            val top = 9f.dp
-            val bottom = height - 23f.dp
-            val gap = 9f.dp
+            val end =
+                viewport.endEpochMs(
+                    System.currentTimeMillis(),
+                )
+            val start =
+                end -
+                    (
+                        viewport.hours *
+                            HOUR_MS
+                        ).toLong()
+            val allPoints =
+                state?.therapyHistory
+                    .orEmpty()
+            val points =
+                allPoints.filter {
+                    it.measuredAtEpochMs in
+                        start..end
+                }
+            val left =
+                outer.left
+            val right =
+                outer.right
+            val top =
+                outer.top
+            val bottom =
+                outer.bottom
+            val gap =
+                3f.dp
             val half = (bottom - top - gap) / 2f
             val iobPlot = RectF(left, top, right, top + half)
             val cobPlot = RectF(left, top + half + gap, right, bottom)
@@ -427,13 +888,14 @@ internal class MetabolicDashboardChart @JvmOverloads constructor(
                 points,
                 start,
                 end,
-                zeroY = mapY(0.0, iobRange.minimum, iobRange.maximum, iobPlot),
+                zeroY =
+                    mapSignedLogY(
+                        0.0,
+                        iobRange.minimum,
+                        iobRange.maximum,
+                        iobPlot,
+                    ),
             )
-            repeat(4) { index ->
-                val x = left + (right - left) * index / 3f
-                val align = when (index) { 0 -> Paint.Align.LEFT; 3 -> Paint.Align.RIGHT; else -> Paint.Align.CENTER }
-                drawText(canvas, timeFormat.format(Date(start + (end - start) * index / 3)), x, bottom + 15f.dp, 8.5f, SugarliciousColors.argb(SugarliciousColorRole.GRAPH_LABEL), align)
-            }
             if (points.none { it.totalIob != null || it.cobGrams != null }) {
                 drawText(canvas, "Noch kein IOB/COB-Verlauf", (left + right) / 2f, (top + bottom) / 2f, 10f, SugarliciousColors.argb(SugarliciousColorRole.GRAPH_MUTED), Paint.Align.CENTER)
             }
@@ -444,24 +906,154 @@ internal class MetabolicDashboardChart @JvmOverloads constructor(
         canvas.drawRoundRect(outer, radius, radius, linePaint)
     }
 
-    private fun drawSharedGrid(canvas: Canvas, iob: RectF, cob: RectF, start: Long, end: Long) {
-        linePaint.color = SugarliciousColors.argb(SugarliciousColorRole.GRAPH_GRID)
-        linePaint.strokeWidth = 0.7f.dp
-        linePaint.pathEffect = DashPathEffect(floatArrayOf(3f.dp, 3f.dp), 0f)
-        listOf(iob, cob).forEach { lane ->
+    private fun drawSharedGrid(
+        canvas: Canvas,
+        iob: RectF,
+        cob: RectF,
+        start: Long,
+        end: Long,
+    ) {
+        linePaint.color =
+            SugarliciousColors.argb(
+                SugarliciousColorRole.GRAPH_GRID,
+            )
+        linePaint.strokeWidth =
+            0.7f.dp
+        linePaint.pathEffect =
+            DashPathEffect(
+                floatArrayOf(
+                    3f.dp,
+                    3f.dp,
+                ),
+                0f,
+            )
+
+        listOf(
+            iob,
+            cob,
+        ).forEach { lane ->
             for (index in 1..2) {
-                val y = lane.top + lane.height() * index / 3f
-                canvas.drawLine(lane.left, y, lane.right, y, linePaint)
+                val y =
+                    lane.top +
+                        lane.height() *
+                        index /
+                        3f
+
+                canvas.drawLine(
+                    lane.left,
+                    y,
+                    lane.right,
+                    y,
+                    linePaint,
+                )
             }
         }
-        for (index in 1..2) {
-            val x = iob.left + iob.width() * index / 3f
-            canvas.drawLine(x, iob.top, x, cob.bottom, linePaint)
+
+        val interval =
+            timeGridIntervalMs(
+                viewport.hours,
+            )
+
+        var tick =
+            firstAlignedTick(
+                start,
+                interval,
+            )
+
+        while (tick <= end) {
+            val x =
+                mapX(
+                    tick,
+                    start,
+                    end,
+                    iob,
+                )
+
+            if (
+                x >= iob.left &&
+                x <= iob.right
+            ) {
+                canvas.drawLine(
+                    x,
+                    iob.top,
+                    x,
+                    cob.bottom,
+                    linePaint,
+                )
+            }
+
+            tick += interval
         }
-        linePaint.pathEffect = null
-        linePaint.color = withAlpha(SugarliciousColors.argb(SugarliciousColorRole.BORDER), 130)
-        linePaint.strokeWidth = 0.7f.dp
-        canvas.drawLine(iob.left, iob.bottom + (cob.top - iob.bottom) / 2f, iob.right, iob.bottom + (cob.top - iob.bottom) / 2f, linePaint)
+
+        linePaint.pathEffect =
+            null
+
+        linePaint.color =
+            withAlpha(
+                SugarliciousColors.argb(
+                    SugarliciousColorRole.BORDER,
+                ),
+                130,
+            )
+        linePaint.strokeWidth =
+            0.7f.dp
+
+        canvas.drawLine(
+            iob.left,
+            iob.bottom +
+                (
+                    cob.top -
+                        iob.bottom
+                    ) /
+                2f,
+            iob.right,
+            iob.bottom +
+                (
+                    cob.top -
+                        iob.bottom
+                    ) /
+                2f,
+            linePaint,
+        )
+
+        tick =
+            firstAlignedTick(
+                start,
+                interval,
+            )
+
+        while (tick <= end) {
+            val x =
+                mapX(
+                    tick,
+                    start,
+                    end,
+                    cob,
+                )
+
+            if (
+                x >=
+                    cob.left +
+                    22f.dp &&
+                x <=
+                    cob.right -
+                    22f.dp
+            ) {
+                drawText(
+                    canvas,
+                    timeFormat.format(
+                        Date(tick),
+                    ),
+                    x,
+                    cob.bottom - 7f.dp,
+                    8.5f,
+                    Color.WHITE,
+                    Paint.Align.CENTER,
+                )
+            }
+
+            tick += interval
+        }
     }
 
     private fun drawLane(
@@ -478,7 +1070,7 @@ internal class MetabolicDashboardChart @JvmOverloads constructor(
                 ?.let { point.measuredAtEpochMs to it }
         }.sortedBy { it.first }
         if (actual.isEmpty()) return
-        fun y(value: Double) = mapY(value, range.minimum, range.maximum, plot)
+        fun y(value: Double) = mapSignedLogY(value, range.minimum, range.maximum, plot)
         val zeroY = y(0.0)
         val color = SugarliciousColors.argb(if (iob) SugarliciousColorRole.GRAPH_IOB else SugarliciousColorRole.GRAPH_COB)
         val area = Path().apply {
@@ -503,10 +1095,71 @@ internal class MetabolicDashboardChart @JvmOverloads constructor(
         linePaint.strokeWidth = 0.8f.dp
         linePaint.pathEffect = null
         canvas.drawLine(plot.left, zeroY, plot.right, zeroY, linePaint)
-        linePaint.color = color
-        linePaint.strokeWidth = 2.2f.dp
-        linePaint.pathEffect = null
-        canvas.drawPath(valuePath(actual, start, end, plot, ::y), linePaint)
+        linePaint.color =
+            color
+        linePaint.strokeWidth =
+            2.35f.dp
+        linePaint.pathEffect =
+            null
+
+        canvas.drawPath(
+            valuePath(
+                actual,
+                start,
+                end,
+                plot,
+                ::y,
+            ),
+            linePaint,
+        )
+
+        val labelX =
+            plot.right -
+                7f.dp
+
+        drawText(
+            canvas,
+            formatMetabolicScale(
+                range.maximum,
+            ),
+            labelX,
+            plot.top + 12f.dp,
+            8f,
+            Color.WHITE,
+            Paint.Align.RIGHT,
+        )
+
+        drawText(
+            canvas,
+            "0",
+            labelX,
+            (
+                zeroY -
+                    3f.dp
+                ).coerceIn(
+                plot.top + 12f.dp,
+                plot.bottom - 7f.dp,
+            ),
+            8f,
+            Color.WHITE,
+            Paint.Align.RIGHT,
+        )
+
+        if (
+            range.minimum < -0.01
+        ) {
+            drawText(
+                canvas,
+                formatMetabolicScale(
+                    range.minimum,
+                ),
+                labelX,
+                plot.bottom - 7f.dp,
+                8f,
+                Color.WHITE,
+                Paint.Align.RIGHT,
+            )
+        }
     }
 
     private fun drawInsulinActivity(
@@ -518,23 +1171,88 @@ internal class MetabolicDashboardChart @JvmOverloads constructor(
         end: Long,
         sharedZeroRatio: Double,
     ) {
-        val actual = visiblePoints.mapNotNull { point ->
-            point.insulinActivityUnitsPerMinute?.takeIf { it.isFinite() && it >= 0.0 }
-                ?.let { point.measuredAtEpochMs to it }
-        }.sortedBy { it.first }
-        if (actual.size < 2) return
-        val maximum = allPoints.mapNotNull { it.insulinActivityUnitsPerMinute }
-            .filter { it.isFinite() && it >= 0.0 }
-            .maxOrNull()
-            ?.times(TOOLKIT_ACTIVITY_SCALE_FACTOR)
-            ?.coerceAtLeast(0.000001)
-            ?: return
-        val minimum = toolkitMinimumForZeroRatio(maximum, sharedZeroRatio)
-        fun y(value: Double) = mapY(value, minimum, maximum, plot)
-        linePaint.color = Color.rgb(242, 201, 76)
-        linePaint.strokeWidth = 1.25f.dp
-        linePaint.pathEffect = null
-        canvas.drawPath(valuePath(actual, start, end, plot, ::y), linePaint)
+        val actual =
+            visiblePoints
+                .mapNotNull { point ->
+                    point
+                        .insulinActivityUnitsPerMinute
+                        ?.takeIf {
+                            it.isFinite() &&
+                                it >= 0.0
+                        }
+                        ?.let {
+                            point.measuredAtEpochMs to
+                                it
+                        }
+                }
+                .sortedBy {
+                    it.first
+                }
+
+        if (actual.size < 2) {
+            return
+        }
+
+        val maximum =
+            allPoints
+                .mapNotNull {
+                    it.insulinActivityUnitsPerMinute
+                }
+                .filter {
+                    it.isFinite() &&
+                        it >= 0.0
+                }
+                .maxOrNull()
+                ?.times(
+                    TOOLKIT_ACTIVITY_SCALE_FACTOR,
+                )
+                ?.coerceAtLeast(
+                    0.000001,
+                )
+                ?: return
+
+        val minimum =
+            toolkitMinimumForZeroRatio(
+                maximum,
+                sharedZeroRatio,
+            )
+
+        fun y(
+            value: Double,
+        ) =
+            mapSignedLogY(
+                value,
+                minimum,
+                maximum,
+                plot,
+            )
+
+        val smoothed =
+            smoothSeries(
+                actual,
+            )
+
+        linePaint.color =
+            Color.rgb(
+                242,
+                201,
+                76,
+            )
+        linePaint.strokeWidth =
+            1.6f.dp
+        linePaint.pathEffect =
+            null
+
+        canvas.drawPath(
+            smoothValuePath(
+                smoothed,
+                start,
+                end,
+                plot,
+                ::y,
+            ),
+            linePaint,
+        )
     }
 
     private fun drawSmbMarkers(
@@ -570,11 +1288,55 @@ internal fun toolkitMetabolicRange(
     values: List<Double>,
     sharedZeroRatio: Double? = null,
 ): ToolkitMetabolicRange {
-    val referenceMaximum = values.filter { it.isFinite() && it >= 0.0 }.maxOrNull() ?: 0.0
-    val maximum = max(0.01, referenceMaximum * 2.0 - TOOLKIT_SECONDARY_MINIMUM)
-    val minimum = sharedZeroRatio?.let { toolkitMinimumForZeroRatio(maximum, it) }
-        ?: TOOLKIT_SECONDARY_MINIMUM
-    return ToolkitMetabolicRange(minimum, maximum)
+    val finite =
+        values.filter {
+            it.isFinite()
+        }
+
+    val referenceMaximum =
+        finite
+            .filter {
+                it >= 0.0
+            }
+            .maxOrNull()
+            ?: 0.0
+
+    val referenceMinimum =
+        min(
+            0.0,
+            finite.minOrNull()
+                ?: 0.0,
+        )
+
+    val maximum =
+        max(
+            0.01,
+            referenceMaximum *
+                1.08,
+        )
+
+    val minimum =
+        sharedZeroRatio
+            ?.let {
+                toolkitMinimumForZeroRatio(
+                    maximum,
+                    it,
+                )
+            }
+            ?: if (
+                referenceMinimum < 0.0
+            ) {
+                referenceMinimum *
+                    1.08
+            } else {
+                -maximum *
+                    0.08
+            }
+
+    return ToolkitMetabolicRange(
+        minimum,
+        maximum,
+    )
 }
 
 internal fun toolkitMinimumForZeroRatio(maximum: Double, zeroRatio: Double): Double {
@@ -655,6 +1417,304 @@ private fun valuePath(
     }
 }
 
+private fun timeGridIntervalMs(
+    hours: Float,
+): Long =
+    when {
+        hours <= 2f ->
+            30L * 60_000L
+
+        hours <= 4f ->
+            60L * 60_000L
+
+        hours <= 8f ->
+            2L * HOUR_MS
+
+        hours <= 16f ->
+            4L * HOUR_MS
+
+        else ->
+            6L * HOUR_MS
+    }
+
+private fun firstAlignedTick(
+    start: Long,
+    interval: Long,
+): Long {
+    val remainder =
+        (
+            (
+                start %
+                    interval
+                ) +
+                interval
+            ) %
+            interval
+
+    return if (
+        remainder == 0L
+    ) {
+        start
+    } else {
+        start +
+            interval -
+            remainder
+    }
+}
+
+private fun signedLogTransform(
+    value: Double,
+    linearScale: Double,
+): Double =
+    when {
+        value > 0.0 ->
+            ln(
+                1.0 +
+                    value /
+                    linearScale,
+            )
+
+        value < 0.0 ->
+            -ln(
+                1.0 +
+                    abs(value) /
+                    linearScale,
+            )
+
+        else ->
+            0.0
+    }
+
+private fun mapSignedLogY(
+    value: Double,
+    minValue: Double,
+    maxValue: Double,
+    plot: RectF,
+): Float {
+    val magnitude =
+        max(
+            abs(minValue),
+            abs(maxValue),
+        ).coerceAtLeast(
+            0.000001,
+        )
+
+    val linearScale =
+        (
+            magnitude *
+                0.075
+            ).coerceAtLeast(
+            0.000001,
+        )
+
+    val transformedMin =
+        signedLogTransform(
+            minValue,
+            linearScale,
+        )
+
+    val transformedMax =
+        signedLogTransform(
+            maxValue,
+            linearScale,
+        )
+
+    val transformedValue =
+        signedLogTransform(
+            value,
+            linearScale,
+        )
+
+    val ratio =
+        (
+            (
+                transformedValue -
+                    transformedMin
+                ) /
+                (
+                    transformedMax -
+                        transformedMin
+                    ).coerceAtLeast(
+                    0.000001,
+                )
+            ).coerceIn(
+            0.0,
+            1.0,
+        )
+
+    return plot.bottom -
+        ratio.toFloat() *
+        plot.height()
+}
+
+private fun smoothSeries(
+    values: List<Pair<Long, Double>>,
+    radius: Int = 2,
+): List<Pair<Long, Double>> {
+    if (
+        values.size < 3 ||
+        radius <= 0
+    ) {
+        return values
+    }
+
+    return values.mapIndexed {
+            index,
+            point,
+        ->
+        val from =
+            max(
+                0,
+                index - radius,
+            )
+
+        val to =
+            min(
+                values.lastIndex,
+                index + radius,
+            )
+
+        var weightedSum =
+            0.0
+
+        var weightSum =
+            0.0
+
+        for (sampleIndex in from..to) {
+            val distance =
+                abs(
+                    sampleIndex -
+                        index,
+                )
+
+            val weight =
+                (
+                    radius +
+                        1 -
+                        distance
+                    ).toDouble()
+
+            weightedSum +=
+                values[sampleIndex].second *
+                    weight
+
+            weightSum +=
+                weight
+        }
+
+        point.first to
+            (
+                weightedSum /
+                    weightSum
+                )
+    }
+}
+
+private fun smoothValuePath(
+    values: List<Pair<Long, Double>>,
+    start: Long,
+    end: Long,
+    plot: RectF,
+    mapValue: (Double) -> Float,
+): Path =
+    Path().apply {
+        if (values.isEmpty()) {
+            return@apply
+        }
+
+        val mapped =
+            values.map {
+                    (
+                        time,
+                        value,
+                    ),
+                ->
+                mapX(
+                    time,
+                    start,
+                    end,
+                    plot,
+                ) to
+                    mapValue(value)
+            }
+
+        moveTo(
+            mapped.first().first,
+            mapped.first().second,
+        )
+
+        if (mapped.size == 2) {
+            lineTo(
+                mapped.last().first,
+                mapped.last().second,
+            )
+            return@apply
+        }
+
+        for (
+            index in
+                1 until
+                    mapped.lastIndex
+        ) {
+            val current =
+                mapped[index]
+
+            val next =
+                mapped[index + 1]
+
+            val midX =
+                (
+                    current.first +
+                        next.first
+                    ) /
+                    2f
+
+            val midY =
+                (
+                    current.second +
+                        next.second
+                    ) /
+                    2f
+
+            quadTo(
+                current.first,
+                current.second,
+                midX,
+                midY,
+            )
+        }
+
+        lineTo(
+            mapped.last().first,
+            mapped.last().second,
+        )
+    }
+
+private fun formatMetabolicScale(
+    value: Double,
+): String =
+    when {
+        abs(value) >= 10.0 ->
+            String.format(
+                Locale.getDefault(),
+                "%.0f",
+                value,
+            )
+
+        abs(value) >= 1.0 ->
+            String.format(
+                Locale.getDefault(),
+                "%.1f",
+                value,
+            )
+
+        else ->
+            String.format(
+                Locale.getDefault(),
+                "%.2f",
+                value,
+            )
+    }
 private fun buildActivityProjection(last: Pair<Long, Double>, projectionStart: Long, end: Long): List<Pair<Long, Double>> {
     if (end <= projectionStart || last.second <= 0.0) return emptyList()
     val duration = 3L * HOUR_MS

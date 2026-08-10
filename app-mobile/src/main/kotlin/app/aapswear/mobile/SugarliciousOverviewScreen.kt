@@ -24,6 +24,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -63,6 +65,48 @@ internal fun SugarliciousOverviewScreen(
     }
     val metrics = DashboardLayoutMetrics.forScreenHeight(screenHeightDp)
     val gap = if (preferences.compact) 6.dp else 9.dp
+
+    val sharedChartViewport =
+        remember {
+            ChartViewport(
+                preferences.graphHours,
+            )
+        }
+
+    val futureWindowMs =
+        if (preferences.showPredictions) {
+            state?.glucosePredictions
+                .orEmpty()
+                .flatMap { it.samples }
+                .maxOfOrNull {
+                    it.measuredAtEpochMs
+                }
+                ?.minus(now)
+                ?.coerceIn(
+                    0L,
+                    2L * 60L * 60_000L,
+                )
+                ?: 0L
+        } else {
+            0L
+        }
+
+    LaunchedEffect(
+        preferences.graphHours,
+    ) {
+        sharedChartViewport.setHours(
+            preferences.graphHours.toFloat(),
+            resetPan = true,
+        )
+    }
+
+    LaunchedEffect(
+        futureWindowMs,
+    ) {
+        sharedChartViewport.setFutureWindow(
+            futureWindowMs,
+        )
+    }
 
     val glucoseText = if (displayable && glucose != null) formatGlucose(glucose.valueMgDl, unit) else "—"
     val targetLow = state?.target?.lowMgDl ?: 80.0
@@ -113,6 +157,7 @@ internal fun SugarliciousOverviewScreen(
         GlucoseGraphSurface(
             state = state,
             preferences = preferences,
+            viewport = sharedChartViewport,
             chartHeightDp = maxOf(metrics.glucoseChartHeight + 34, 148),
         )
 
@@ -120,6 +165,7 @@ internal fun SugarliciousOverviewScreen(
             MetabolicGraphSurface(
                 state = state,
                 preferences = preferences,
+                viewport = sharedChartViewport,
                 chartHeightDp = maxOf(
                     metrics.metabolicChartHeight - 18,
                     96,
@@ -529,12 +575,25 @@ private fun QuickStatCard(
 private fun GlucoseGraphSurface(
     state: TherapyDisplayState?,
     preferences: DashboardUiPreferences,
+    viewport: ChartViewport,
     chartHeightDp: Int,
 ) {
     AndroidView(
         modifier = Modifier.fillMaxWidth().height(chartHeightDp.dp),
-        factory = { GlucoseDashboardChart(it) },
-        update = { it.bind(state, preferences.unitFor(state), preferences.showPredictions, preferences.graphHours) },
+        factory = {
+            GlucoseDashboardChart(
+                context = it,
+                sharedViewport = viewport,
+            )
+        },
+        update = {
+            it.bind(
+                state,
+                preferences.unitFor(state),
+                preferences.showPredictions,
+                preferences.graphHours,
+            )
+        },
     )
 }
 
@@ -542,12 +601,23 @@ private fun GlucoseGraphSurface(
 private fun MetabolicGraphSurface(
     state: TherapyDisplayState?,
     preferences: DashboardUiPreferences,
+    viewport: ChartViewport,
     chartHeightDp: Int,
 ) {
     AndroidView(
         modifier = Modifier.fillMaxWidth().height(chartHeightDp.dp),
-        factory = { MetabolicDashboardChart(it) },
-        update = { it.bind(state, preferences.graphHours) },
+        factory = {
+            MetabolicDashboardChart(
+                context = it,
+                sharedViewport = viewport,
+            )
+        },
+        update = {
+            it.bind(
+                state,
+                preferences.graphHours,
+            )
+        },
     )
 }
 

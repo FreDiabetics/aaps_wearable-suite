@@ -352,60 +352,404 @@ internal fun FaceDial(
     now: Long,
     modifier: Modifier = Modifier,
 ) {
-    val glucose = state?.glucose?.valueMgDl?.roundToInt()?.toString() ?: "—"
-    val trend = when (state?.glucose?.trend) {
-        Trend.DOUBLE_UP -> "⇈"
-        Trend.SINGLE_UP -> "↑"
-        Trend.FORTY_FIVE_UP -> "↗"
-        Trend.FLAT -> "→"
-        Trend.FORTY_FIVE_DOWN -> "↘"
-        Trend.SINGLE_DOWN -> "↓"
-        Trend.DOUBLE_DOWN -> "⇊"
-        else -> "·"
-    }
-    val accent = when (index) {
-        1 -> Color(0xFFFF8B60)
-        2 -> SugarliciousColors.Primary
-        3 -> SugarliciousColors.Secondary
-        else -> Color.White
-    }
+    val glucose =
+        state?.glucose
+            ?.valueMgDl
+            ?.roundToInt()
+            ?.toString()
+            ?: "—"
+
+    val trend =
+        when (
+            state?.glucose
+                ?.trend
+        ) {
+            Trend.DOUBLE_UP ->
+                "⇈"
+
+            Trend.SINGLE_UP ->
+                "↑"
+
+            Trend.FORTY_FIVE_UP ->
+                "↗"
+
+            Trend.FLAT ->
+                "→"
+
+            Trend.FORTY_FIVE_DOWN ->
+                "↘"
+
+            Trend.SINGLE_DOWN ->
+                "↓"
+
+            Trend.DOUBLE_DOWN ->
+                "⇊"
+
+            else ->
+                "·"
+        }
+
+    val accent =
+        when (index) {
+            1 ->
+                Color(
+                    0xFF19D7E8,
+                )
+
+            2 ->
+                Color(
+                    0xFFFF8B60,
+                )
+
+            3 ->
+                SugarliciousColors.Primary
+
+            else ->
+                Color.White
+        }
+
+    val calendar =
+        java.util.Calendar
+            .getInstance()
+            .apply {
+                timeInMillis =
+                    now
+            }
+
+    val hour =
+        calendar.get(
+            java.util.Calendar.HOUR,
+        )
+
+    val minute =
+        calendar.get(
+            java.util.Calendar.MINUTE,
+        )
+
+    val second =
+        calendar.get(
+            java.util.Calendar.SECOND,
+        )
+
     Box(
-        modifier.clip(CircleShape).background(Color.Black),
-        contentAlignment = Alignment.Center,
+        modifier
+            .clip(
+                CircleShape,
+            )
+            .background(
+                Color.Black,
+            ),
+        contentAlignment =
+            Alignment.Center,
     ) {
-        Canvas(Modifier.fillMaxSize()) {
-            val radius = size.minDimension / 2f
-            repeat(12) { tick ->
-                val angle = Math.toRadians((tick * 30.0) - 90.0)
-                val major = tick % 3 == 0
-                val inner = radius - if (major) 11.dp.toPx() else 8.dp.toPx()
-                val outer = radius - 4.dp.toPx()
-                drawLine(
-                    color = Color.White.copy(alpha = if (major) 0.92f else 0.38f),
-                    start = Offset(
-                        center.x + cos(angle).toFloat() * inner,
-                        center.y + sin(angle).toFloat() * inner,
-                    ),
-                    end = Offset(
-                        center.x + cos(angle).toFloat() * outer,
-                        center.y + sin(angle).toFloat() * outer,
-                    ),
-                    strokeWidth = (if (major) 2.dp else 1.dp).toPx(),
-                    cap = StrokeCap.Round,
+        Canvas(
+            Modifier.fillMaxSize(),
+        ) {
+            val radius =
+                size.minDimension /
+                    2f
+
+            if (
+                index == 1 ||
+                index == 2
+            ) {
+                drawCircle(
+                    color =
+                        accent.copy(
+                            alpha =
+                                if (
+                                    index == 1
+                                ) {
+                                    0.18f
+                                } else {
+                                    0.11f
+                                },
+                        ),
+                    radius =
+                        radius -
+                            8.dp.toPx(),
+                    center =
+                        center,
+                    style =
+                        androidx.compose.ui.graphics.drawscope.Stroke(
+                            width =
+                                if (
+                                    index == 2
+                                ) {
+                                    7.dp.toPx()
+                                } else {
+                                    4.dp.toPx()
+                                },
+                        ),
                 )
             }
-        }
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(DateFormat.getTimeInstance(DateFormat.SHORT).format(Date(now)), color = Color.White.copy(alpha = 0.68f), fontSize = 7.sp)
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(glucose, color = accent, fontSize = 25.sp, fontWeight = FontWeight.Bold)
-                Spacer(Modifier.width(2.dp))
-                Text(trend, color = SugarliciousColors.Primary, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+
+            repeat(
+                60,
+            ) { tick ->
+                val angle =
+                    Math.toRadians(
+                        tick *
+                            6.0 -
+                            90.0,
+                    )
+
+                val major =
+                    tick % 5 ==
+                        0
+
+                val inner =
+                    radius -
+                        if (major) {
+                            13.dp.toPx()
+                        } else {
+                            7.dp.toPx()
+                        }
+
+                val outer =
+                    radius -
+                        3.dp.toPx()
+
+                drawLine(
+                    color =
+                        if (major) {
+                            Color.White.copy(
+                                alpha =
+                                    0.86f,
+                            )
+                        } else {
+                            Color.White.copy(
+                                alpha =
+                                    0.22f,
+                            )
+                        },
+                    start =
+                        Offset(
+                            x =
+                                center.x +
+                                    cos(
+                                        angle,
+                                    ).toFloat() *
+                                    inner,
+                            y =
+                                center.y +
+                                    sin(
+                                        angle,
+                                    ).toFloat() *
+                                    inner,
+                        ),
+                    end =
+                        Offset(
+                            x =
+                                center.x +
+                                    cos(
+                                        angle,
+                                    ).toFloat() *
+                                    outer,
+                            y =
+                                center.y +
+                                    sin(
+                                        angle,
+                                    ).toFloat() *
+                                    outer,
+                        ),
+                    strokeWidth =
+                        if (major) {
+                            1.7.dp.toPx()
+                        } else {
+                            0.7.dp.toPx()
+                        },
+                    cap =
+                        StrokeCap.Round,
+                )
             }
+
+            fun handEnd(
+                angleDegrees: Double,
+                length: Float,
+            ): Offset {
+                val angle =
+                    Math.toRadians(
+                        angleDegrees -
+                            90.0,
+                    )
+
+                return Offset(
+                    x =
+                        center.x +
+                            cos(
+                                angle,
+                            ).toFloat() *
+                            length,
+                    y =
+                        center.y +
+                            sin(
+                                angle,
+                            ).toFloat() *
+                            length,
+                )
+            }
+
+            val hourAngle =
+                (
+                    hour %
+                        12
+                    ) *
+                    30.0 +
+                    minute /
+                    60.0 *
+                    30.0
+
+            val minuteAngle =
+                minute *
+                    6.0 +
+                    second /
+                    60.0 *
+                    6.0
+
+            val secondAngle =
+                second *
+                    6.0
+
+            drawLine(
+                color =
+                    Color.White,
+                start =
+                    center,
+                end =
+                    handEnd(
+                        hourAngle,
+                        radius *
+                            0.48f,
+                    ),
+                strokeWidth =
+                    5.dp.toPx(),
+                cap =
+                    StrokeCap.Round,
+            )
+
+            drawLine(
+                color =
+                    Color.White,
+                start =
+                    center,
+                end =
+                    handEnd(
+                        minuteAngle,
+                        radius *
+                            0.70f,
+                    ),
+                strokeWidth =
+                    3.dp.toPx(),
+                cap =
+                    StrokeCap.Round,
+            )
+
+            drawLine(
+                color =
+                    accent,
+                start =
+                    handEnd(
+                        secondAngle +
+                            180.0,
+                        radius *
+                            0.16f,
+                    ),
+                end =
+                    handEnd(
+                        secondAngle,
+                        radius *
+                            0.78f,
+                    ),
+                strokeWidth =
+                    1.2.dp.toPx(),
+                cap =
+                    StrokeCap.Round,
+            )
+
+            drawCircle(
+                color =
+                    accent,
+                radius =
+                    4.dp.toPx(),
+                center =
+                    center,
+            )
+
+            drawCircle(
+                color =
+                    Color.Black,
+                radius =
+                    1.8.dp.toPx(),
+                center =
+                    center,
+            )
+        }
+
+        Column(
+            modifier =
+                Modifier
+                    .align(
+                        Alignment.BottomCenter,
+                    )
+                    .padding(
+                        bottom =
+                            20.dp,
+                    ),
+            horizontalAlignment =
+                Alignment.CenterHorizontally,
+        ) {
+            Row(
+                verticalAlignment =
+                    Alignment.CenterVertically,
+            ) {
+                Text(
+                    glucose,
+                    color =
+                        accent,
+                    fontSize =
+                        15.sp,
+                    fontWeight =
+                        FontWeight.Bold,
+                )
+
+                Spacer(
+                    Modifier.width(
+                        2.dp,
+                    ),
+                )
+
+                Text(
+                    trend,
+                    color =
+                        SugarliciousColors.Primary,
+                    fontSize =
+                        9.sp,
+                    fontWeight =
+                        FontWeight.Bold,
+                )
+            }
+
             Text(
-                "IOB ${state?.insulin?.totalIob?.let { String.format(Locale.getDefault(), "%.1f", it) } ?: "—"}",
-                color = Color.White.copy(alpha = 0.58f),
-                fontSize = 5.5.sp,
+                "IOB ${
+                    state?.insulin
+                        ?.totalIob
+                        ?.let {
+                            String.format(
+                                Locale.getDefault(),
+                                "%.1f",
+                                it,
+                            )
+                        }
+                        ?: "—"
+                }",
+                color =
+                    Color.White.copy(
+                        alpha =
+                            0.58f,
+                    ),
+                fontSize =
+                    5.5.sp,
             )
         }
     }
