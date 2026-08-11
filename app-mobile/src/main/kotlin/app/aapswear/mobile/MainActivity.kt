@@ -4,8 +4,6 @@ import android.graphics.drawable.GradientDrawable
 import android.Manifest
 import android.app.NotificationManager
 import android.content.ActivityNotFoundException
-import android.content.ClipData
-import android.content.ClipboardManager
 import android.content.Intent
 import android.content.SharedPreferences
 import android.content.pm.PackageManager
@@ -18,6 +16,7 @@ import android.provider.Settings
 import android.text.SpannableString
 import android.text.Spanned
 import android.text.style.ForegroundColorSpan
+import android.view.MotionEvent
 import android.view.View
 import android.widget.ImageView
 import android.widget.LinearLayout
@@ -52,6 +51,9 @@ class MainActivity : ComponentActivity() {
     private var state: app.aapswear.model.TherapyDisplayState? = null
     private var screen = DashboardScreen.OVERVIEW
     private var clockJob: Job? = null
+    private var settingsSwipeStartX = 0f
+    private var settingsSwipeStartY = 0f
+    private var settingsSwipeTracking = false
 
     private val diagnosticsListener = SharedPreferences.OnSharedPreferenceChangeListener { _, _ -> runOnUiThread(::refresh) }
     private val uiListener =
@@ -90,6 +92,15 @@ class MainActivity : ComponentActivity() {
             setThemeMode = { uiPreferences.edit { putString("themeMode", it.name) } },
             setShowDetails = { uiPreferences.edit { putBoolean("showDetails", it) } },
             setShowPredictions = { uiPreferences.edit { putBoolean("showPredictions", it) } },
+            setShowCgmGraph = { uiPreferences.edit { putBoolean("showCgmGraph", it) } },
+            setCgmStream = { key, enabled ->
+                uiPreferences.edit {
+                    putBoolean(
+                        key,
+                        enabled,
+                    )
+                }
+            },
             setShowMetabolicGraph = { uiPreferences.edit { putBoolean("showMetabolicGraph", it) } },
             setCompact = { uiPreferences.edit { putBoolean("compact", it) } },
             setLiveNotification = ::setLiveNotification,
@@ -115,6 +126,47 @@ class MainActivity : ComponentActivity() {
             }
         }
         refresh(forceSettingsRender = true)
+    }
+
+    override fun dispatchTouchEvent(event: MotionEvent): Boolean {
+        var swipeTarget: DashboardScreen? = null
+
+        if (screen == DashboardScreen.SETTINGS) {
+            when (event.actionMasked) {
+                MotionEvent.ACTION_DOWN -> {
+                    val safeStartArea = resources.displayMetrics.widthPixels * 0.70f
+                    settingsSwipeTracking = event.pointerCount == 1 && event.rawX <= safeStartArea
+                    settingsSwipeStartX = event.rawX
+                    settingsSwipeStartY = event.rawY
+                }
+
+                MotionEvent.ACTION_POINTER_DOWN -> {
+                    settingsSwipeTracking = false
+                }
+
+                MotionEvent.ACTION_UP -> {
+                    if (settingsSwipeTracking) {
+                        swipeTarget = menuSwipeTarget(
+                            screen = screen,
+                            deltaX = event.rawX - settingsSwipeStartX,
+                            deltaY = event.rawY - settingsSwipeStartY,
+                            minimumDistancePx = 72.dp.toFloat(),
+                        )
+                    }
+                    settingsSwipeTracking = false
+                }
+
+                MotionEvent.ACTION_CANCEL -> {
+                    settingsSwipeTracking = false
+                }
+            }
+        } else {
+            settingsSwipeTracking = false
+        }
+
+        val handled = super.dispatchTouchEvent(event)
+        swipeTarget?.let(::navigate)
+        return handled
     }
 
     override fun onStart() {

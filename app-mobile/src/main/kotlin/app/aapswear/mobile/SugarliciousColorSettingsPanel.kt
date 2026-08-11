@@ -51,7 +51,10 @@ import app.aapswear.mobile.ui.theme.SugarliciousColors
 import kotlin.math.roundToInt
 
 @Composable
-internal fun SugarliciousColorSettingsPanel() {
+internal fun SugarliciousColorSettingsPanel(
+    showCgmGraph: Boolean = true,
+    showMetabolicGraph: Boolean = false,
+) {
     val context = LocalContext.current
     val preferences =
         remember {
@@ -126,7 +129,15 @@ internal fun SugarliciousColorSettingsPanel() {
         }
 
         SugarliciousColorGroup.entries.forEach { group ->
-            val roles = SugarliciousColorRole.entries.filter { it.group == group && it.configurable }
+            val roles =
+                SugarliciousColorRole.entries.filter {
+                    it.group == group &&
+                        colorRoleVisible(
+                            role = it,
+                            showCgmGraph = showCgmGraph,
+                            showMetabolicGraph = showMetabolicGraph,
+                        )
+                }
             if (roles.isEmpty()) return@forEach
             Text(
                 text = group.label.uppercase(),
@@ -177,6 +188,34 @@ internal fun SugarliciousColorSettingsPanel() {
             },
         )
     }
+}
+
+private val cgmGraphColorRoles =
+    setOf(
+        SugarliciousColorRole.RANGE_LOW,
+        SugarliciousColorRole.RANGE_IN_RANGE,
+        SugarliciousColorRole.RANGE_HIGH,
+        SugarliciousColorRole.CGM_DOT_LOW,
+        SugarliciousColorRole.CGM_DOT_IN_RANGE,
+        SugarliciousColorRole.CGM_DOT_HIGH,
+        SugarliciousColorRole.GRAPH_DIVIDER,
+    )
+
+internal fun colorRoleVisible(
+    role: SugarliciousColorRole,
+    showCgmGraph: Boolean,
+    showMetabolicGraph: Boolean,
+): Boolean {
+    if (!role.configurable) return false
+    if (!showCgmGraph && role in cgmGraphColorRoles) return false
+    if (
+        role == SugarliciousColorRole.GRAPH_BACKGROUND &&
+        !showCgmGraph &&
+        !showMetabolicGraph
+    ) {
+        return false
+    }
+    return true
 }
 
 @Composable

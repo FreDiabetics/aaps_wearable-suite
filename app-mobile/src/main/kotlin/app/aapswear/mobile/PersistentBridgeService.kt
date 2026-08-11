@@ -282,11 +282,8 @@ internal object NotificationGraphRenderer {
                     ).toFloat()
 
             paint.color =
-                withAlpha(
-                    palette.argb(
-                        SugarliciousColorRole.RANGE_IN_RANGE,
-                    ),
-                    54,
+                palette.argb(
+                    SugarliciousColorRole.RANGE_IN_RANGE,
                 )
 
             canvas.drawRect(
@@ -386,6 +383,4 @@ internal object NotificationGraphRenderer {
         return bitmap
     }
 
-    private fun withAlpha(color: Int, alpha: Int) =
-        android.graphics.Color.argb(alpha, android.graphics.Color.red(color), android.graphics.Color.green(color), android.graphics.Color.blue(color))
 }

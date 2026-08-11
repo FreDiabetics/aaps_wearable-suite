@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -21,7 +20,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -73,15 +71,41 @@ internal fun SugarliciousOverviewScreen(
             )
         }
 
-    val futureWindowMs =
-        if (preferences.showPredictions) {
+    val predictionFutureWindowMs =
+        if (
+            preferences.showCgmGraph &&
+            preferences.anyCgmPredictionEnabled
+        ) {
             state?.glucosePredictions
                 .orEmpty()
-                .flatMap { it.samples }
+                .filter { series ->
+                    when (
+                        series.kind
+                    ) {
+                        app.aapswear.model.PredictionKind.IOB ->
+                            preferences.showCgmPredictionIob
+
+                        app.aapswear.model.PredictionKind.COB,
+                        app.aapswear.model.PredictionKind.ACOB,
+                        ->
+                            preferences.showCgmPredictionCob
+
+                        app.aapswear.model.PredictionKind.UAM ->
+                            preferences.showCgmPredictionUam
+
+                        app.aapswear.model.PredictionKind.ZERO_TEMP ->
+                            preferences.showCgmPredictionZeroTemp
+                    }
+                }
+                .flatMap {
+                    it.samples
+                }
                 .maxOfOrNull {
                     it.measuredAtEpochMs
                 }
-                ?.minus(now)
+                ?.minus(
+                    now,
+                )
                 ?.coerceIn(
                     0L,
                     2L * 60L * 60_000L,
@@ -90,6 +114,21 @@ internal fun SugarliciousOverviewScreen(
         } else {
             0L
         }
+
+    val metabolicFutureWindowMs =
+        if (
+            preferences.showMetabolicGraph
+        ) {
+            90L * 60_000L
+        } else {
+            0L
+        }
+
+    val futureWindowMs =
+        maxOf(
+            predictionFutureWindowMs,
+            metabolicFutureWindowMs,
+        )
 
     LaunchedEffect(
         preferences.graphHours,
@@ -122,14 +161,20 @@ internal fun SugarliciousOverviewScreen(
     val tirStats = calculateTirStats(state, now)
 
     Column(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 2.dp, vertical = 2.dp),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .menuSwipeNavigation(
+                    screen = DashboardScreen.OVERVIEW,
+                    onNavigate = callbacks.navigate,
+                )
+                .padding(horizontal = 2.dp, vertical = 2.dp),
         verticalArrangement = Arrangement.spacedBy(gap),
     ) {
         OverviewWatchFaceTile(
             state = state,
             diagnostics = diagnostics,
             selectedFaceIndex = preferences.watchFaceIndex,
-            now = now,
             onSelectedFace = callbacks.setWatchFaceIndex,
             onEdit = {
                 callbacks.navigate(
@@ -147,19 +192,21 @@ internal fun SugarliciousOverviewScreen(
             deltaMgDl = glucose?.deltaMgDl,age = age,
             unitLabel = unitLabel(unit),
             tirStats = tirStats,
-            heightDp = maxOf(metrics.summaryTileHeight + 48, 136),
+            heightDp = maxOf(metrics.summaryTileHeight + 18, 108),
         )
 
         if (preferences.showDetails) {
             QuickStatsRow(state = state.takeIf { displayable }, heightDp = metrics.statTileHeight)
         }
 
-        GlucoseGraphSurface(
-            state = state,
-            preferences = preferences,
-            viewport = sharedChartViewport,
-            chartHeightDp = maxOf(metrics.glucoseChartHeight + 34, 148),
-        )
+        if (preferences.showCgmGraph) {
+            GlucoseGraphSurface(
+                state = state,
+                preferences = preferences,
+                viewport = sharedChartViewport,
+                chartHeightDp = maxOf(metrics.glucoseChartHeight + 34, 148),
+            )
+        }
 
         if (preferences.showMetabolicGraph) {
             MetabolicGraphSurface(
@@ -202,7 +249,7 @@ private fun GlucoseHeroCard(
             .clip(shape)
             .padding(
                 horizontal = 18.dp,
-                vertical = 10.dp,
+                vertical = 2.dp,
             ),
         contentAlignment = Alignment.Center,
     ) {
@@ -317,7 +364,7 @@ private fun TirProgressColumn(
 ) {
     Column(
         modifier = modifier,
-        verticalArrangement = Arrangement.spacedBy(10.dp, Alignment.CenterVertically),
+        verticalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterVertically),
     ) {
         TirProgress(
             modifier = Modifier.fillMaxWidth(),
@@ -417,6 +464,25 @@ private fun correctedTrendForDisplay(
 
 @Composable
 private fun TrendIndicator(trend: Trend) {
+    val arrowSize =
+        when (trend) {
+            Trend.FLAT,
+            Trend.SINGLE_UP,
+            Trend.SINGLE_DOWN,
+            -> 24.dp
+
+            Trend.FORTY_FIVE_UP,
+            Trend.FORTY_FIVE_DOWN,
+            -> 26.dp
+
+            Trend.DOUBLE_UP,
+            Trend.DOUBLE_DOWN,
+            -> 25.dp
+
+            Trend.UNKNOWN ->
+                25.dp
+        }
+
     val rotation =
         when (trend) {
             Trend.DOUBLE_UP,
@@ -443,25 +509,6 @@ private fun TrendIndicator(trend: Trend) {
     val doubleArrow =
         trend == Trend.DOUBLE_UP ||
             trend == Trend.DOUBLE_DOWN
-
-    val arrowSize =
-        when (trend) {
-            Trend.FLAT,
-            Trend.SINGLE_UP,
-            Trend.SINGLE_DOWN,
-            -> 24.dp
-
-            Trend.FORTY_FIVE_UP,
-            Trend.FORTY_FIVE_DOWN,
-            -> 26.dp
-
-            Trend.DOUBLE_UP,
-            Trend.DOUBLE_DOWN,
-            -> 25.dp
-
-            Trend.UNKNOWN ->
-                25.dp
-        }
 
     Box(
         modifier =
@@ -588,10 +635,29 @@ private fun GlucoseGraphSurface(
         },
         update = {
             it.bind(
-                state,
-                preferences.unitFor(state),
-                preferences.showPredictions,
-                preferences.graphHours,
+                state = state,
+                unit =
+                    preferences.unitFor(
+                        state,
+                    ),
+                showPredictions =
+                    preferences.anyCgmPredictionEnabled,
+                durationHours =
+                    preferences.graphHours,
+                showTargetRange =
+                    preferences.showCgmTargetRange,
+                showBasal =
+                    preferences.showCgmBasal,
+                showActivity =
+                    preferences.showCgmActivity,
+                showPredictionIob =
+                    preferences.showCgmPredictionIob,
+                showPredictionCob =
+                    preferences.showCgmPredictionCob,
+                showPredictionUam =
+                    preferences.showCgmPredictionUam,
+                showPredictionZeroTemp =
+                    preferences.showCgmPredictionZeroTemp,
             )
         },
     )
@@ -618,19 +684,6 @@ private fun MetabolicGraphSurface(
                 preferences.graphHours,
             )
         },
-    )
-}
-
-@Composable
-private fun OverviewSurface(content: @Composable ColumnScope.() -> Unit) {
-    val shape = RoundedCornerShape(24.dp)
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(SugarliciousColors.Surface, shape)
-            .border(1.dp, SugarliciousColors.Border.copy(alpha = 0.72f), shape)
-            .padding(horizontal = 12.dp, vertical = 10.dp),
-        content = content,
     )
 }
 

@@ -4,7 +4,6 @@ import android.content.Context
 import android.content.SharedPreferences
 import android.content.res.ColorStateList
 import android.graphics.Typeface
-import android.graphics.drawable.Drawable
 import android.graphics.drawable.GradientDrawable
 import android.text.TextUtils
 import android.view.Gravity
@@ -17,12 +16,8 @@ import android.widget.TextView
 import app.aapswear.mobile.ui.theme.SugarliciousColorRole
 import app.aapswear.mobile.ui.theme.SugarliciousColors
 import app.aapswear.mobile.ui.theme.SugarliciousTheme
-import app.aapswear.model.Freshness
-import app.aapswear.model.FreshnessPolicy
 import app.aapswear.model.GlucoseUnit
 import app.aapswear.model.TherapyDisplayState
-import java.text.DateFormat
-import java.util.Date
 
 enum class DashboardScreen { OVERVIEW, WATCH, SETTINGS }
 enum class DisplayUnitPreference { AAPS, MG_DL, MMOL_L }
@@ -32,6 +27,14 @@ data class DashboardUiPreferences(
     val unit: DisplayUnitPreference = DisplayUnitPreference.AAPS,
     val showDetails: Boolean = true,
     val showPredictions: Boolean = true,
+    val showCgmGraph: Boolean = true,
+    val showCgmTargetRange: Boolean = true,
+    val showCgmBasal: Boolean = true,
+    val showCgmActivity: Boolean = true,
+    val showCgmPredictionIob: Boolean = true,
+    val showCgmPredictionCob: Boolean = true,
+    val showCgmPredictionUam: Boolean = true,
+    val showCgmPredictionZeroTemp: Boolean = true,
     val showMetabolicGraph: Boolean = false,
     val compact: Boolean = true,
     val graphHours: Int = 3,
@@ -40,6 +43,13 @@ data class DashboardUiPreferences(
     val dataSource: DataSourcePreference = DataSourcePreference.AUTOMATIC,
     val themeMode: DashboardThemeMode = DashboardThemeMode.DARK,
 ) {
+    val anyCgmPredictionEnabled: Boolean
+        get() =
+            showCgmPredictionIob ||
+                showCgmPredictionCob ||
+                showCgmPredictionUam ||
+                showCgmPredictionZeroTemp
+
     fun unitFor(state: TherapyDisplayState?): GlucoseUnit = when (unit) {
         DisplayUnitPreference.AAPS ->
             state?.glucose?.displayUnit ?: GlucoseUnit.MG_DL
@@ -66,6 +76,58 @@ data class DashboardUiPreferences(
                     preferences.getBoolean(
                         "showPredictions",
                         true,
+                    ),
+                showCgmGraph =
+                    preferences.getBoolean(
+                        "showCgmGraph",
+                        true,
+                    ),
+                showCgmTargetRange =
+                    preferences.getBoolean(
+                        "cgm.targetRange",
+                        true,
+                    ),
+                showCgmBasal =
+                    preferences.getBoolean(
+                        "cgm.basal",
+                        true,
+                    ),
+                showCgmActivity =
+                    preferences.getBoolean(
+                        "cgm.activity",
+                        true,
+                    ),
+                showCgmPredictionIob =
+                    preferences.getBoolean(
+                        "cgm.prediction.iob",
+                        preferences.getBoolean(
+                            "showPredictions",
+                            true,
+                        ),
+                    ),
+                showCgmPredictionCob =
+                    preferences.getBoolean(
+                        "cgm.prediction.cob",
+                        preferences.getBoolean(
+                            "showPredictions",
+                            true,
+                        ),
+                    ),
+                showCgmPredictionUam =
+                    preferences.getBoolean(
+                        "cgm.prediction.uam",
+                        preferences.getBoolean(
+                            "showPredictions",
+                            true,
+                        ),
+                    ),
+                showCgmPredictionZeroTemp =
+                    preferences.getBoolean(
+                        "cgm.prediction.zeroTemp",
+                        preferences.getBoolean(
+                            "showPredictions",
+                            true,
+                        ),
                     ),
                 showMetabolicGraph =
                     preferences.getBoolean(
@@ -177,6 +239,8 @@ data class DashboardCallbacks(
     val setThemeMode: (DashboardThemeMode) -> Unit,
     val setShowDetails: (Boolean) -> Unit,
     val setShowPredictions: (Boolean) -> Unit,
+    val setShowCgmGraph: (Boolean) -> Unit,
+    val setCgmStream: (String, Boolean) -> Unit = { _, _ -> },
     val setShowMetabolicGraph: (Boolean) -> Unit,
     val setCompact: (Boolean) -> Unit,
     val setLiveNotification: (Boolean) -> Unit,
@@ -225,12 +289,6 @@ class DashboardViewFactory(
                 SugarliciousColorRole.PRIMARY,
             )
 
-    private val green: Int
-        get() =
-            SugarliciousColors.argb(
-                SugarliciousColorRole.GREEN,
-            )
-
     fun render(
         parent: LinearLayout,
         screen: DashboardScreen,
@@ -261,8 +319,6 @@ class DashboardViewFactory(
             DashboardScreen.SETTINGS ->
                 renderSettings(
                     parent,
-                    state,
-                    diagnostics,
                     preferences,
                 )
         }
@@ -347,8 +403,8 @@ class DashboardViewFactory(
                             SugarliciousWatchScreen(
                                 state = rendered.state,
                                 preferences = rendered.preferences,
-                                now = rendered.now,
                                 onSelectedFace = callbacks.setWatchFaceIndex,
+                                onNavigate = callbacks.navigate,
                             )
                         }
                     }
@@ -365,8 +421,6 @@ class DashboardViewFactory(
 
     private fun renderSettings(
         parent: LinearLayout,
-        state: TherapyDisplayState?,
-        diagnostics: DiagnosticsSnapshot,
         preferences: DashboardUiPreferences,
     ) {
         parent.removeAllViews()
@@ -456,13 +510,119 @@ class DashboardViewFactory(
 
         display.addView(
             switchRow(
-                "AAPS-Prognosen anzeigen",
-                "Vorhandene Vorhersagewerte anzeigen",
-                preferences.showPredictions,
-                R.id.dashboard_predictions_switch,
-                callbacks.setShowPredictions,
+                "CGM-Graph anzeigen",
+                "Glukoseverlauf auf der Übersicht ein- oder ausblenden",
+                preferences.showCgmGraph,
+                View.generateViewId(),
+                callbacks.setShowCgmGraph,
             ),
         )
+
+        if (preferences.showCgmGraph) {
+            display.addView(
+                sectionLabel(
+                    "CGM-Graph – Datenströme",
+                ),
+            )
+
+            display.addView(
+                switchRow(
+                    "Zielbereich",
+                    "Zielband und Zielwert-Skalen",
+                    preferences.showCgmTargetRange,
+                    View.generateViewId(),
+                ) {
+                    callbacks.setCgmStream(
+                        "cgm.targetRange",
+                        it,
+                    )
+                },
+            )
+
+            display.addView(
+                switchRow(
+                    "Basal",
+                    "Basalverlauf im CGM-Graph",
+                    preferences.showCgmBasal,
+                    View.generateViewId(),
+                ) {
+                    callbacks.setCgmStream(
+                        "cgm.basal",
+                        it,
+                    )
+                },
+            )
+
+            display.addView(
+                switchRow(
+                    "Insulinaktivität",
+                    "Gelbe Aktivitätskurve",
+                    preferences.showCgmActivity,
+                    View.generateViewId(),
+                ) {
+                    callbacks.setCgmStream(
+                        "cgm.activity",
+                        it,
+                    )
+                },
+            )
+
+            display.addView(
+                switchRow(
+                    "IOB-Prognose",
+                    "IOB-basierte Glukoseprognose",
+                    preferences.showCgmPredictionIob,
+                    View.generateViewId(),
+                ) {
+                    callbacks.setCgmStream(
+                        "cgm.prediction.iob",
+                        it,
+                    )
+                },
+            )
+
+            display.addView(
+                switchRow(
+                    "COB-Prognose",
+                    "COB-/aCOB-basierte Glukoseprognose",
+                    preferences.showCgmPredictionCob,
+                    View.generateViewId(),
+                ) {
+                    callbacks.setCgmStream(
+                        "cgm.prediction.cob",
+                        it,
+                    )
+                },
+            )
+
+            display.addView(
+                switchRow(
+                    "UAM-Prognose",
+                    "UAM-basierte Glukoseprognose",
+                    preferences.showCgmPredictionUam,
+                    View.generateViewId(),
+                ) {
+                    callbacks.setCgmStream(
+                        "cgm.prediction.uam",
+                        it,
+                    )
+                },
+            )
+
+            display.addView(
+                switchRow(
+                    "ZeroTemp-Prognose",
+                    "ZeroTemp-basierte Glukoseprognose",
+                    preferences.showCgmPredictionZeroTemp,
+                    View.generateViewId(),
+                ) {
+                    callbacks.setCgmStream(
+                        "cgm.prediction.zeroTemp",
+                        it,
+                    )
+                },
+            )
+        }
 
         display.addView(
             switchRow(
@@ -510,7 +670,10 @@ class DashboardViewFactory(
                 )
                 setContent {
                     SugarliciousTheme {
-                        SugarliciousColorSettingsPanel()
+                        SugarliciousColorSettingsPanel(
+                            showCgmGraph = preferences.showCgmGraph,
+                            showMetabolicGraph = preferences.showMetabolicGraph,
+                        )
                     }
                 }
             }
@@ -588,96 +751,6 @@ class DashboardViewFactory(
                     row.getChildAt(1).id =
                         R.id.dashboard_github
                 },
-            )
-        }
-
-    private fun infoCard(
-        title: String,
-        rows: List<Pair<String, String>>,
-        action: Pair<String, () -> Unit>? = null,
-    ): View =
-        tile(title).apply {
-            rows.forEach { (name, value) ->
-                addView(
-                    infoRow(
-                        name,
-                        value,
-                    ),
-                )
-            }
-
-            action?.let { (name, callback) ->
-                addView(
-                    chip(
-                        name,
-                        true,
-                        callback,
-                    ),
-                    LinearLayout.LayoutParams(
-                        ViewGroup.LayoutParams.WRAP_CONTENT,
-                        ViewGroup.LayoutParams.WRAP_CONTENT,
-                    ).apply {
-                        gravity =
-                            Gravity.END
-                        topMargin =
-                            10.dp
-                    },
-                )
-            }
-        }
-
-    private fun infoRow(
-        name: String,
-        value: String,
-    ) =
-        LinearLayout(context).apply {
-            orientation =
-                LinearLayout.HORIZONTAL
-            gravity =
-                Gravity.TOP
-            setPadding(
-                0,
-                7.dp,
-                0,
-                7.dp,
-            )
-
-            addView(
-                TextView(context).apply {
-                    text =
-                        name
-                    textSize =
-                        13f
-                    setTextColor(
-                        secondary,
-                    )
-                },
-                LinearLayout.LayoutParams(
-                    0,
-                    ViewGroup.LayoutParams.WRAP_CONTENT,
-                    0.46f,
-                ),
-            )
-
-            addView(
-                TextView(context).apply {
-                    text =
-                        value
-                    textSize =
-                        13f
-                    setTextColor(
-                        this@DashboardViewFactory.text,
-                    )
-                    gravity =
-                        Gravity.END
-                    maxLines =
-                        3
-                },
-                LinearLayout.LayoutParams(
-                    0,
-                    ViewGroup.LayoutParams.WRAP_CONTENT,
-                    0.54f,
-                ),
             )
         }
 
@@ -1026,61 +1099,6 @@ addView(
                 top.dp
             bottomMargin =
                 bottom.dp
-        }
-
-    private fun selectableForeground(): Drawable? =
-        context
-            .obtainStyledAttributes(
-                intArrayOf(
-                    android.R.attr.selectableItemBackground,
-                ),
-            )
-            .let { array ->
-                array
-                    .getDrawable(0)
-                    .also {
-                        array.recycle()
-                    }
-            }
-
-    private fun String?.orDash() =
-        this
-            ?.takeIf {
-                it.isNotBlank()
-            }
-            ?: "—"
-
-    private fun Long?.asDateTime() =
-        if (
-            this == null ||
-            this <= 0L
-        ) {
-            "—"
-        } else {
-            DateFormat
-                .getDateTimeInstance(
-                    DateFormat.SHORT,
-                    DateFormat.SHORT,
-                )
-                .format(
-                    Date(this),
-                )
-        }
-
-    private fun syncText(
-        status: String?,
-    ) =
-        when (status) {
-            "ok" ->
-                "übertragen"
-            "pending" ->
-                "wird übertragen"
-            "unavailable" ->
-                "keine Uhr erreichbar"
-            "invalid_payload" ->
-                "ungültige Nachricht"
-            else ->
-                "noch nicht versucht"
         }
 
     private val Int.dp: Int

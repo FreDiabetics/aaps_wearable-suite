@@ -16,6 +16,7 @@ import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -80,12 +81,12 @@ class PersistentBridgeServiceTest {
         assertEquals("123 →", notification.extras.getCharSequence(Notification.EXTRA_TITLE).toString())
         assertTrue(notification.extras.getBoolean(PersistentBridgeService.EXTRA_REQUEST_PROMOTED_ONGOING))
         assertTrue(content.contains("mg/dL"))
-        assertNotNull(notification.getLargeIcon())
+        assertNull(notification.getLargeIcon())
         val picture = notification.extras.getParcelable(Notification.EXTRA_PICTURE, Bitmap::class.java)
         assertNotNull(picture)
         val rendered = requireNotNull(picture)
-        assertTrue(rendered.width > 0)
-        assertTrue("height=${rendered.height}", rendered.height >= 280)
+        assertTrue("width=${rendered.width}", rendered.width > 0)
+        assertTrue("height=${rendered.height}", rendered.height > 0)
         assertEquals(
             NotificationGraphRenderer.HEIGHT.toDouble() / NotificationGraphRenderer.WIDTH,
             rendered.height.toDouble() / rendered.width,
@@ -96,6 +97,8 @@ class PersistentBridgeServiceTest {
             therapyState,
             context.getSharedPreferences("dashboard_ui", android.content.Context.MODE_PRIVATE),
         )
+        assertEquals(NotificationGraphRenderer.WIDTH, sourceGraph.width)
+        assertEquals(NotificationGraphRenderer.HEIGHT, sourceGraph.height)
         assertEquals(0, Color.alpha(sourceGraph.getPixel(0, 0)))
         assertTrue(Color.alpha(sourceGraph.getPixel(sourceGraph.width / 2, sourceGraph.height / 2)) > 0)
         assertEquals(null, notification.extras.getCharSequence(Notification.EXTRA_SUB_TEXT))

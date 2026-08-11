@@ -37,12 +37,11 @@ import kotlin.math.sqrt
 private const val HOUR_MS = 60L * 60_000L
 private const val BASAL_HEIGHT_FRACTION = 0.28f
 private const val ACTIVITY_HEIGHT_FRACTION = 0.92f
-private const val GRAPH_PLOT_LEFT_DP = 6f
-private const val GRAPH_LABEL_GUTTER_DP = 31f
 private const val GRAPH_CORNER_RADIUS_DP = 18f
-private const val GLUCOSE_LOG_MIN = 40.0
-private const val GLUCOSE_LOG_MAX = 400.0
-private const val TOOLKIT_SECONDARY_MINIMUM = -2.0
+private const val GLUCOSE_ZERO_RATIO = 0.055
+private const val GLUCOSE_LOW_RATIO = 0.215
+private const val GLUCOSE_TARGET_HIGH_RATIO = 0.515
+private const val GLUCOSE_DISPLAY_MAX = 400.0
 private const val TOOLKIT_ACTIVITY_SCALE_FACTOR = 1.15
 
 internal class ChartViewport(
@@ -373,12 +372,56 @@ internal class GlucoseDashboardChart @JvmOverloads constructor(
     private var state: TherapyDisplayState? = null
     private var unit = GlucoseUnit.MG_DL
     private var showPredictions = true
+    private var showTargetRange = true
+    private var showBasal = true
+    private var showActivity = true
+    private var showPredictionIob = true
+    private var showPredictionCob = true
+    private var showPredictionUam = true
+    private var showPredictionZeroTemp = true
 
-    fun bind(state: TherapyDisplayState?, unit: GlucoseUnit, showPredictions: Boolean, durationHours: Int) {
-        this.state = state
-        this.unit = unit
-        this.showPredictions = showPredictions
-        if (!isAttachedToWindow) viewport.setHours(durationHours.toFloat())
+    fun bind(
+        state: TherapyDisplayState?,
+        unit: GlucoseUnit,
+        showPredictions: Boolean,
+        durationHours: Int,
+        showTargetRange: Boolean = true,
+        showBasal: Boolean = true,
+        showActivity: Boolean = true,
+        showPredictionIob: Boolean = true,
+        showPredictionCob: Boolean = true,
+        showPredictionUam: Boolean = true,
+        showPredictionZeroTemp: Boolean = true,
+    ) {
+        this.state =
+            state
+        this.unit =
+            unit
+        this.showPredictions =
+            showPredictions
+        this.showTargetRange =
+            showTargetRange
+        this.showBasal =
+            showBasal
+        this.showActivity =
+            showActivity
+        this.showPredictionIob =
+            showPredictionIob
+        this.showPredictionCob =
+            showPredictionCob
+        this.showPredictionUam =
+            showPredictionUam
+        this.showPredictionZeroTemp =
+            showPredictionZeroTemp
+
+        if (
+            !isAttachedToWindow
+        ) {
+            viewport.setHours(
+                durationHours.toFloat(),
+            )
+        }
+
         invalidate()
     }
 
@@ -396,7 +439,20 @@ internal class GlucoseDashboardChart @JvmOverloads constructor(
             val now = System.currentTimeMillis()
             val targetLow = state?.target?.lowMgDl ?: 80.0
             val targetHigh = state?.target?.highMgDl ?: 160.0
-            val predictions = if (showPredictions) state?.glucosePredictions.orEmpty() else emptyList()
+            val predictions =
+                if (
+                    showPredictions
+                ) {
+                    state?.glucosePredictions
+                        .orEmpty()
+                        .filter {
+                            predictionEnabled(
+                                it.kind,
+                            )
+                        }
+                } else {
+                    emptyList()
+                }
             val end = viewport.endEpochMs(now)
 
             val start = end - (viewport.hours * HOUR_MS).toLong()
@@ -412,11 +468,37 @@ internal class GlucoseDashboardChart @JvmOverloads constructor(
             }.filter { it.samples.isNotEmpty() }
             val targetTop = mapGlucoseY(targetHigh, plot)
             val targetBottom = mapGlucoseY(targetLow, plot)
-            fillPaint.color = withAlpha(SugarliciousColors.argb(SugarliciousColorRole.RANGE_IN_RANGE), 40)
-            canvas.drawRect(plot.left, targetTop, plot.right, targetBottom, fillPaint)
+            if (
+                showTargetRange
+            ) {
+                fillPaint.color =
+                    SugarliciousColors.argb(
+                        SugarliciousColorRole.RANGE_IN_RANGE,
+                    )
+                canvas.drawRect(
+                    plot.left,
+                    targetTop,
+                    plot.right,
+                    targetBottom,
+                    fillPaint,
+                )
+            }
             drawGrid(canvas, plot, start, end)
-            drawBasal(canvas, plot, start, end, state?.therapyHistory.orEmpty())
-            drawInsulinActivity(
+            if (
+                showBasal
+            ) {
+                drawBasal(
+                    canvas,
+                    plot,
+                    start,
+                    end,
+                    state?.therapyHistory
+                        .orEmpty(),
+                )
+            }
+            if (
+                showActivity
+            ) {            drawInsulinActivity(
                 canvas,
                 RectF(plot.left, targetTop, plot.right, targetBottom),
                 start,
@@ -425,6 +507,7 @@ internal class GlucoseDashboardChart @JvmOverloads constructor(
                 state?.therapyHistory.orEmpty(),
             )
 
+            }
             val dividerX = mapX(now, start, end, plot).coerceIn(plot.left, plot.right)
             if (visiblePredictions.isNotEmpty() && now in start..end) {
                 linePaint.color = SugarliciousColors.argb(SugarliciousColorRole.GRAPH_DIVIDER)
@@ -445,7 +528,9 @@ internal class GlucoseDashboardChart @JvmOverloads constructor(
             }
             visiblePredictions.forEach { drawPrediction(canvas, it, plot, start, end, dividerX) }
 
-            drawTargetLabel(
+            if (
+                showTargetRange
+            ) {            drawTargetLabel(
                 canvas = canvas,
                 value = glucoseLabel(targetHigh),
                 x = plot.right - 8f.dp,
@@ -465,6 +550,7 @@ internal class GlucoseDashboardChart @JvmOverloads constructor(
                             plot.bottom - 6f.dp,
                         ),
             )
+            }
             if (history.size < 2) {
                 drawText(canvas, "Noch kein Verlauf", plot.centerX(), plot.centerY(), 10f, SugarliciousColors.argb(SugarliciousColorRole.GRAPH_MUTED), Paint.Align.CENTER)
             }
@@ -478,6 +564,45 @@ internal class GlucoseDashboardChart @JvmOverloads constructor(
         start: Long,
         end: Long,
     ) {
+        val zeroY =
+            mapGlucoseY(
+                0.0,
+                plot,
+            )
+
+        linePaint.color =
+            withAlpha(
+                SugarliciousColors.argb(
+                    SugarliciousColorRole.GRAPH_GRID,
+                ),
+                185,
+            )
+        linePaint.strokeWidth =
+            0.8f.dp
+        linePaint.pathEffect =
+            null
+
+        canvas.drawLine(
+            plot.left,
+            zeroY,
+            plot.right,
+            zeroY,
+            linePaint,
+        )
+
+        drawText(
+            canvas,
+            "0",
+            plot.right -
+                8f.dp,
+            zeroY -
+                4f.dp,
+            8f,
+            SugarliciousColors.argb(
+                SugarliciousColorRole.GRAPH_LABEL,
+            ),
+            Paint.Align.RIGHT,
+        )
         linePaint.color =
             SugarliciousColors.argb(
                 SugarliciousColorRole.GRAPH_GRID,
@@ -758,6 +883,25 @@ internal class GlucoseDashboardChart @JvmOverloads constructor(
         }
     }
 
+    private fun predictionEnabled(
+        kind: PredictionKind,
+    ): Boolean =
+        when (kind) {
+            PredictionKind.IOB ->
+                showPredictionIob
+
+            PredictionKind.COB,
+            PredictionKind.ACOB,
+            ->
+                showPredictionCob
+
+            PredictionKind.UAM ->
+                showPredictionUam
+
+            PredictionKind.ZERO_TEMP ->
+                showPredictionZeroTemp
+        }
+
     private fun drawPrediction(
         canvas: Canvas,
         series: GlucosePrediction,
@@ -882,6 +1026,44 @@ internal class MetabolicDashboardChart @JvmOverloads constructor(
             drawLane(canvas, iobPlot, points, start, end, iob = true, range = iobRange)
             drawInsulinActivity(canvas, iobPlot, allPoints, points, start, end, iobRange.zeroRatio)
             drawLane(canvas, cobPlot, points, start, end, iob = false, range = cobRange)
+            val projectionNow =
+                System.currentTimeMillis()
+
+            drawFutureLane(
+                canvas = canvas,
+                plot = iobPlot,
+                values =
+                    buildIobProjection(
+                        allPoints,
+                        projectionNow,
+                        end,
+                    ),
+                start = start,
+                end = end,
+                range = iobRange,
+                color =
+                    SugarliciousColors.argb(
+                        SugarliciousColorRole.GRAPH_IOB,
+                    ),
+            )
+
+            drawFutureLane(
+                canvas = canvas,
+                plot = cobPlot,
+                values =
+                    buildCobProjection(
+                        allPoints,
+                        projectionNow,
+                        end,
+                    ),
+                start = start,
+                end = end,
+                range = cobRange,
+                color =
+                    SugarliciousColors.argb(
+                        SugarliciousColorRole.GRAPH_COB,
+                    ),
+            )
             drawSmbMarkers(
                 canvas,
                 iobPlot,
@@ -1255,6 +1437,61 @@ internal class MetabolicDashboardChart @JvmOverloads constructor(
         )
     }
 
+    private fun drawFutureLane(
+        canvas: Canvas,
+        plot: RectF,
+        values: List<Pair<Long, Double>>,
+        start: Long,
+        end: Long,
+        range: ToolkitMetabolicRange,
+        color: Int,
+    ) {
+        if (
+            values.size < 2
+        ) {
+            return
+        }
+
+        fun y(
+            value: Double,
+        ) =
+            mapSignedLogY(
+                value,
+                range.minimum,
+                range.maximum,
+                plot,
+            )
+
+        linePaint.color =
+            withAlpha(
+                color,
+                210,
+            )
+        linePaint.strokeWidth =
+            1.8f.dp
+        linePaint.pathEffect =
+            DashPathEffect(
+                floatArrayOf(
+                    5f.dp,
+                    4f.dp,
+                ),
+                0f,
+            )
+
+        canvas.drawPath(
+            smoothValuePath(
+                values,
+                start,
+                end,
+                plot,
+                ::y,
+            ),
+            linePaint,
+        )
+
+        linePaint.pathEffect =
+            null
+    }
     private fun drawSmbMarkers(
         canvas: Canvas,
         plot: RectF,
@@ -1344,18 +1581,270 @@ internal fun toolkitMinimumForZeroRatio(maximum: Double, zeroRatio: Double): Dou
     return -(ratio * maximum.coerceAtLeast(0.000001)) / (1.0 - ratio).coerceAtLeast(0.01)
 }
 
+internal fun buildIobProjection(
+    points: List<TherapyHistorySample>,
+    now: Long,
+    end: Long,
+): List<Pair<Long, Double>> {
+    if (
+        end <= now
+    ) {
+        return emptyList()
+    }
+
+    val actual =
+        points.mapNotNull { point ->
+            point.totalIob
+                ?.takeIf {
+                    it.isFinite()
+                }
+                ?.let {
+                    point.measuredAtEpochMs to
+                        it
+                }
+        }
+
+    val latest =
+        actual
+            .filter {
+                it.first <=
+                    now
+            }
+            .maxByOrNull {
+                it.first
+            } ?: return emptyList()
+
+    val negativeSlope =
+        recentNegativeSlope(
+            actual,
+            now,
+        ) ?: return emptyList()
+
+    return buildList {
+        var time =
+            now
+
+        while (
+            time <= end
+        ) {
+            val minutes =
+                (
+                    time -
+                        now
+                    ) /
+                    60_000.0
+
+            add(
+                time to
+                    max(
+                        0.0,
+                        latest.second +
+                            negativeSlope *
+                            minutes,
+                    ),
+            )
+
+            time +=
+                5 * 60_000L
+        }
+    }
+}
+
+internal fun buildCobProjection(
+    points: List<TherapyHistorySample>,
+    now: Long,
+    end: Long,
+): List<Pair<Long, Double>> {
+    if (
+        end <= now
+    ) {
+        return emptyList()
+    }
+
+    val actual =
+        points.mapNotNull { point ->
+            point.cobGrams
+                ?.takeIf {
+                    it.isFinite() &&
+                        it >= 0.0
+                }
+                ?.let {
+                    point.measuredAtEpochMs to
+                        it
+                }
+        }
+
+    val latest =
+        actual
+            .filter {
+                it.first <=
+                    now
+            }
+            .maxByOrNull {
+                it.first
+            } ?: return emptyList()
+
+    val negativeSlope =
+        recentNegativeSlope(
+            actual,
+            now,
+        ) ?: return emptyList()
+
+    return buildList {
+        var time =
+            now
+
+        while (
+            time <= end
+        ) {
+            val minutes =
+                (
+                    time -
+                        now
+                    ) /
+                    60_000.0
+
+            add(
+                time to
+                    max(
+                        0.0,
+                        latest.second +
+                            negativeSlope *
+                            minutes,
+                    ),
+            )
+
+            time +=
+                5 * 60_000L
+        }
+    }
+}
+
+private fun recentNegativeSlope(
+    values: List<Pair<Long, Double>>,
+    now: Long,
+): Double? {
+    val slopes =
+        values
+            .filter {
+                it.first in
+                    (
+                        now -
+                            60L *
+                            60_000L
+                        )..now
+            }
+            .sortedBy {
+                it.first
+            }
+            .zipWithNext()
+            .mapNotNull {
+                    (
+                        first,
+                        second,
+                    ),
+                ->
+                val minutes =
+                    (
+                        second.first -
+                            first.first
+                        ) /
+                        60_000.0
+
+                if (
+                    minutes !in
+                        2.0..20.0
+                ) {
+                    return@mapNotNull null
+                }
+
+                (
+                    (
+                        second.second -
+                            first.second
+                        ) /
+                        minutes
+                    ).takeIf {
+                    it.isFinite() &&
+                        it < 0.0
+                }
+            }
+
+    if (
+        slopes.isEmpty()
+    ) {
+        return null
+    }
+
+    val sorted =
+        slopes.sorted()
+
+    return sorted[
+        sorted.size /
+            2
+    ]
+}
 internal fun toolkitSmbMarkerSide(units: Double): Float = when {
-    kotlin.math.abs(units) <= 0.1 -> 9f
-    kotlin.math.abs(units) < 0.5 -> 12f
+    abs(units) <= 0.1 -> 9f
+    abs(units) < 0.5 -> 12f
     else -> 15f
 }
 
-internal fun glucoseLogRatio(valueMgDl: Double): Double {
-    val safe = valueMgDl.coerceIn(GLUCOSE_LOG_MIN, GLUCOSE_LOG_MAX)
-    return (
-        ln(safe / GLUCOSE_LOG_MIN) /
-            ln(GLUCOSE_LOG_MAX / GLUCOSE_LOG_MIN)
-        ).coerceIn(0.0, 1.0)
+internal fun glucoseLogRatio(
+    valueMgDl: Double,
+): Double {
+    val value =
+        valueMgDl.coerceIn(
+            0.0,
+            GLUCOSE_DISPLAY_MAX,
+        )
+
+    return when {
+        value <= 80.0 ->
+            GLUCOSE_ZERO_RATIO +
+                value /
+                    80.0 *
+                    (
+                        GLUCOSE_LOW_RATIO -
+                            GLUCOSE_ZERO_RATIO
+                        )
+
+        value <= 160.0 ->
+            GLUCOSE_LOW_RATIO +
+                (
+                    ln(
+                        value /
+                            80.0,
+                    ) /
+                        ln(
+                            2.0,
+                        )
+                    ) *
+                (
+                    GLUCOSE_TARGET_HIGH_RATIO -
+                        GLUCOSE_LOW_RATIO
+                    )
+
+        else ->
+            GLUCOSE_TARGET_HIGH_RATIO +
+                (
+                    ln(
+                        value /
+                            160.0,
+                    ) /
+                        ln(
+                            GLUCOSE_DISPLAY_MAX /
+                                160.0,
+                        )
+                    ) *
+                (
+                    1.0 -
+                        GLUCOSE_TARGET_HIGH_RATIO
+                    )
+    }.coerceIn(
+        GLUCOSE_ZERO_RATIO,
+        1.0,
+    )
 }
 
 private fun mapGlucoseY(valueMgDl: Double, plot: RectF): Float =
@@ -1743,10 +2232,6 @@ private fun roundedUpTriangle(cx: Float, baseY: Float, halfWidth: Float, height:
 
 private fun mapX(time: Long, start: Long, end: Long, plot: RectF): Float =
     plot.left + ((time - start).toDouble() / (end - start).coerceAtLeast(1L) * plot.width()).toFloat()
-
-private fun mapY(value: Double, minValue: Double, maxValue: Double, plot: RectF): Float =
-    plot.bottom - ((value - minValue) / (maxValue - minValue).coerceAtLeast(0.0001))
-        .toFloat().coerceIn(0f, 1f) * plot.height()
 
 private fun withAlpha(color: Int, alpha: Int): Int =
     Color.argb(alpha.coerceIn(0, 255), Color.red(color), Color.green(color), Color.blue(color))

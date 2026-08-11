@@ -63,12 +63,16 @@ internal val sugarliciousWatchFaceCards = listOf(
 internal fun SugarliciousWatchScreen(
     state: TherapyDisplayState?,
     preferences: DashboardUiPreferences,
-    now: Long,
     onSelectedFace: (Int) -> Unit,
+    onNavigate: (DashboardScreen) -> Unit,
 ) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
+            .menuSwipeNavigation(
+                screen = DashboardScreen.WATCH,
+                onNavigate = onNavigate,
+            )
             .padding(horizontal = 2.dp, vertical = 4.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
@@ -77,7 +81,6 @@ internal fun SugarliciousWatchScreen(
                 face = face,
                 index = index,
                 state = state,
-                now = now,
                 selected = preferences.watchFaceIndex == index,
                 onSelected = { onSelectedFace(index) },
             )
@@ -92,7 +95,6 @@ private fun SugarliciousWatchFaceCard(
     face: SugarliciousWatchFaceCard,
     index: Int,
     state: TherapyDisplayState?,
-    now: Long,
     selected: Boolean,
     onSelected: () -> Unit,
 ) {
@@ -116,7 +118,6 @@ private fun SugarliciousWatchFaceCard(
             FaceDial(
                 index = index,
                 state = state,
-                now = now,
                 modifier = Modifier.size(104.dp),
             )
             Spacer(Modifier.width(15.dp))

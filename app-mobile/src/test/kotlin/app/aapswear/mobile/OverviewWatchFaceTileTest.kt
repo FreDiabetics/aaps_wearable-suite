@@ -19,11 +19,15 @@ class OverviewWatchFaceTileTest {
     }
 
     @Test
-    fun `only the immediate carousel neighbours remain visible when settled`() {
+    fun `only the centered carousel face is visible and preview hands stay fixed`() {
         assertEquals(1f, carouselPageVisibility(0f))
-        assertEquals(1f, carouselPageVisibility(1f))
-        assertEquals(0f, carouselPageVisibility(2f))
-        assertEquals(0.5f, carouselPageVisibility(1.125f))
+        assertEquals(1f, carouselPageVisibility(0.5f))
+        assertEquals(0f, carouselPageVisibility(0.5001f))
+        assertEquals(0f, carouselPageVisibility(1f))
+
+        assertEquals(300.0, CAROUSEL_PREVIEW_HOUR_ANGLE, 0.0)
+        assertEquals(60.0, CAROUSEL_PREVIEW_MINUTE_ANGLE, 0.0)
+        assertEquals(180.0, CAROUSEL_PREVIEW_SECOND_ANGLE, 0.0)
     }
 
     @Test

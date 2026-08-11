@@ -1,7 +1,6 @@
 package app.aapswear.mobile
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
@@ -56,8 +55,6 @@ import app.aapswear.model.Trend
 import android.content.Context
 import android.graphics.BitmapFactory
 import android.util.Base64
-import java.text.DateFormat
-import java.util.Date
 import java.util.Locale
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -126,18 +123,18 @@ internal fun carouselTargetPage(currentPage: Int, dragDistance: Float, pageCount
     return (currentPage + direction).coerceIn(0, pageCount - 1)
 }
 
-internal fun carouselPageVisibility(distanceFromCenter: Float): Float = when {
-    distanceFromCenter <= 1f -> 1f
-    distanceFromCenter >= 1.25f -> 0f
-    else -> (1.25f - distanceFromCenter) / 0.25f
-}
+internal fun carouselPageVisibility(distanceFromCenter: Float): Float =
+    if (distanceFromCenter <= 0.50f) 1f else 0f
+
+internal const val CAROUSEL_PREVIEW_HOUR_ANGLE = 300.0
+internal const val CAROUSEL_PREVIEW_MINUTE_ANGLE = 60.0
+internal const val CAROUSEL_PREVIEW_SECOND_ANGLE = 180.0
 
 @Composable
 internal fun OverviewWatchFaceTile(
     state: TherapyDisplayState?,
     diagnostics: DiagnosticsSnapshot,
     selectedFaceIndex: Int,
-    now: Long,
     onSelectedFace: (Int) -> Unit,
     onEdit: () -> Unit,
 ) {
@@ -222,7 +219,7 @@ internal fun OverviewWatchFaceTile(
                             val scale = lerp(1f, 0.73f, distance)
                             scaleX = scale
                             scaleY = scale
-                            alpha = lerp(1f, 0.52f, distance) * carouselPageVisibility(rawDistance)
+                            alpha = carouselPageVisibility(rawDistance)
                         }
                         .clickable(onClick = onEdit),
                     contentAlignment = Alignment.Center,
@@ -230,7 +227,6 @@ internal fun OverviewWatchFaceTile(
                     FaceDial(
                         index = index,
                         state = state,
-                        now = now,
                         modifier = Modifier.size(carouselFaceSize),
                     )
                 }
@@ -349,7 +345,6 @@ private fun GalaxyWatchUltraFrame() {
 internal fun FaceDial(
     index: Int,
     state: TherapyDisplayState?,
-    now: Long,
     modifier: Modifier = Modifier,
 ) {
     val glucose =
@@ -407,29 +402,6 @@ internal fun FaceDial(
             else ->
                 Color.White
         }
-
-    val calendar =
-        java.util.Calendar
-            .getInstance()
-            .apply {
-                timeInMillis =
-                    now
-            }
-
-    val hour =
-        calendar.get(
-            java.util.Calendar.HOUR,
-        )
-
-    val minute =
-        calendar.get(
-            java.util.Calendar.MINUTE,
-        )
-
-    val second =
-        calendar.get(
-            java.util.Calendar.SECOND,
-        )
 
     Box(
         modifier
@@ -590,26 +562,14 @@ internal fun FaceDial(
                 )
             }
 
+            // Fixed preview geometry: hour at 10, minute at 2, second at 6.
+            // The preview hands never advance.
             val hourAngle =
-                (
-                    hour %
-                        12
-                    ) *
-                    30.0 +
-                    minute /
-                    60.0 *
-                    30.0
-
+                CAROUSEL_PREVIEW_HOUR_ANGLE
             val minuteAngle =
-                minute *
-                    6.0 +
-                    second /
-                    60.0 *
-                    6.0
-
+                CAROUSEL_PREVIEW_MINUTE_ANGLE
             val secondAngle =
-                second *
-                    6.0
+                CAROUSEL_PREVIEW_SECOND_ANGLE
 
             drawLine(
                 color =
