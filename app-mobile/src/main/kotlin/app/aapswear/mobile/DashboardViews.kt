@@ -26,16 +26,18 @@ enum class DashboardThemeMode { DARK, LIGHT }
 data class DashboardUiPreferences(
     val unit: DisplayUnitPreference = DisplayUnitPreference.AAPS,
     val showDetails: Boolean = true,
-    val showPredictions: Boolean = true,
     val showCgmGraph: Boolean = true,
-    val showCgmTargetRange: Boolean = true,
-    val showCgmBasal: Boolean = true,
-    val showCgmActivity: Boolean = true,
-    val showCgmPredictionIob: Boolean = true,
-    val showCgmPredictionCob: Boolean = true,
-    val showCgmPredictionUam: Boolean = true,
-    val showCgmPredictionZeroTemp: Boolean = true,
+    val showCgmTargetRange: Boolean = false,
+    val showCgmBasal: Boolean = false,
+    val showCgmActivity: Boolean = false,
+    val showCgmPredictionIob: Boolean = false,
+    val showCgmPredictionCob: Boolean = false,
+    val showCgmPredictionUam: Boolean = false,
+    val showCgmPredictionZeroTemp: Boolean = false,
     val showMetabolicGraph: Boolean = false,
+    val cgmDotRadiusDp: Float = 2.4f,
+    val cgmDotOutlineEnabled: Boolean = true,
+    val cgmDotOutlineWidthDp: Float = 0.95f,
     val compact: Boolean = true,
     val graphHours: Int = 3,
     val liveNotification: Boolean = false,
@@ -72,11 +74,6 @@ data class DashboardUiPreferences(
                         "showDetails",
                         true,
                     ),
-                showPredictions =
-                    preferences.getBoolean(
-                        "showPredictions",
-                        true,
-                    ),
                 showCgmGraph =
                     preferences.getBoolean(
                         "showCgmGraph",
@@ -85,55 +82,56 @@ data class DashboardUiPreferences(
                 showCgmTargetRange =
                     preferences.getBoolean(
                         "cgm.targetRange",
-                        true,
+                        false,
                     ),
                 showCgmBasal =
                     preferences.getBoolean(
                         "cgm.basal",
-                        true,
+                        false,
                     ),
                 showCgmActivity =
                     preferences.getBoolean(
                         "cgm.activity",
-                        true,
+                        false,
                     ),
                 showCgmPredictionIob =
                     preferences.getBoolean(
                         "cgm.prediction.iob",
-                        preferences.getBoolean(
-                            "showPredictions",
-                            true,
-                        ),
+                        false,
                     ),
                 showCgmPredictionCob =
                     preferences.getBoolean(
                         "cgm.prediction.cob",
-                        preferences.getBoolean(
-                            "showPredictions",
-                            true,
-                        ),
+                        false,
                     ),
                 showCgmPredictionUam =
                     preferences.getBoolean(
                         "cgm.prediction.uam",
-                        preferences.getBoolean(
-                            "showPredictions",
-                            true,
-                        ),
+                        false,
                     ),
                 showCgmPredictionZeroTemp =
                     preferences.getBoolean(
                         "cgm.prediction.zeroTemp",
-                        preferences.getBoolean(
-                            "showPredictions",
-                            true,
-                        ),
+                        false,
                     ),
                 showMetabolicGraph =
                     preferences.getBoolean(
                         "showMetabolicGraph",
                         false,
                     ),
+                cgmDotRadiusDp =
+                    preferences
+                        .getFloat("cgm.dotRadiusDp", 2.4f)
+                        .coerceIn(1.5f, 6.0f),
+                cgmDotOutlineEnabled =
+                    preferences.getBoolean(
+                        "cgm.dotOutlineEnabled",
+                        true,
+                    ),
+                cgmDotOutlineWidthDp =
+                    preferences
+                        .getFloat("cgm.dotOutlineWidthDp", 0.95f)
+                        .coerceIn(0.25f, 3.0f),
                 compact =
                     preferences.getBoolean(
                         "compact",
@@ -238,7 +236,6 @@ data class DashboardCallbacks(
     val setDataSource: (DataSourcePreference) -> Unit,
     val setThemeMode: (DashboardThemeMode) -> Unit,
     val setShowDetails: (Boolean) -> Unit,
-    val setShowPredictions: (Boolean) -> Unit,
     val setShowCgmGraph: (Boolean) -> Unit,
     val setCgmStream: (String, Boolean) -> Unit = { _, _ -> },
     val setShowMetabolicGraph: (Boolean) -> Unit,
@@ -247,7 +244,6 @@ data class DashboardCallbacks(
     val setWatchFaceIndex: (Int) -> Unit,
     val syncNow: () -> Unit,
     val openContactEmail: () -> Unit,
-    val openGithub: () -> Unit,
 )
 
 class DashboardViewFactory(
@@ -442,7 +438,7 @@ class DashboardViewFactory(
                     Triple("Automatisch", preferences.dataSource == DataSourcePreference.AUTOMATIC) {
                         callbacks.setDataSource(DataSourcePreference.AUTOMATIC)
                     },
-                    Triple("AndroidAPS", preferences.dataSource == DataSourcePreference.ANDROID_APS) {
+                    Triple("Loop-App (lokal)", preferences.dataSource == DataSourcePreference.ANDROID_APS) {
                         callbacks.setDataSource(DataSourcePreference.ANDROID_APS)
                     },
                     Triple("xDrip+", preferences.dataSource == DataSourcePreference.XDRIP_PLUS) {
@@ -459,7 +455,7 @@ class DashboardViewFactory(
             chipRow(
                 listOf(
                     Triple(
-                        "AAPS",
+                        "Wie Datenquelle",
                         preferences.unit ==
                             DisplayUnitPreference.AAPS,
                     ) {
@@ -729,6 +725,13 @@ class DashboardViewFactory(
             addView(header)
 
             addView(
+                helper(
+                    "Unabhängiges Projekt · keine offizielle App einer Datenquelle",
+                    2,
+                ).apply { gravity = Gravity.CENTER },
+            )
+
+            addView(
                 chipRow(
                     listOf(
                         Triple(
@@ -737,19 +740,11 @@ class DashboardViewFactory(
                         ) {
                             callbacks.openContactEmail()
                         },
-                        Triple(
-                            "GITHUB",
-                            true,
-                        ) {
-                            callbacks.openGithub()
-                        },
                     ),
                 ).also { row ->
                     row.gravity = Gravity.CENTER
                     row.getChildAt(0).id =
                         R.id.dashboard_contact_email
-                    row.getChildAt(1).id =
-                        R.id.dashboard_github
                 },
             )
         }
@@ -1010,7 +1005,7 @@ addView(
             )
             addView(
                 helper(
-                    "Sugarlicious als AndroidAPS → Wear OS Bridge konfigurieren",
+                    "Sugarlicious und Wear OS konfigurieren",
                     2,
                 ),
             )

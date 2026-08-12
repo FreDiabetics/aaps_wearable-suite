@@ -1,7 +1,6 @@
 <resources>
     <string name="app_name">Sugarlicious</string>
     <string name="contact_email">typ1.diafreddy@gmail.com</string>
-    <string name="github_url">https://github.com/FreDiabetics/aaps_wearable-suite</string>
     <string name="brand_logo">FreDiabetics-Logo</string>
     <string name="overview">Übersicht</string>
     <string name="watch">Watch</string>

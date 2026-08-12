@@ -24,6 +24,7 @@ import androidx.wear.watchface.complications.datasource.SuspendingComplicationDa
 import app.aapswear.model.BasalState
 import app.aapswear.model.CarbState
 import app.aapswear.model.DataCapability
+import app.aapswear.model.DataSourceId
 import app.aapswear.model.DeviceState
 import app.aapswear.model.Freshness
 import app.aapswear.model.FreshnessPolicy
@@ -186,7 +187,11 @@ abstract class TherapyComplicationService(
                 percent(therapyState?.device?.phoneBatteryPercent) to "Phone battery"
 
             ProviderKind.SOURCE ->
-                (state?.sourceVersion ?: "No data") to freshnessLabel(freshness)
+                when (state?.source) {
+                    DataSourceId.ANDROID_APS -> "Loop-Daten"
+                    DataSourceId.XDRIP_PLUS -> "xDrip+"
+                    null -> "No data"
+                } to freshnessLabel(freshness)
 
             ProviderKind.AAPS_STATUS ->
                 "$glucoseText$trendText" to compactTherapyStatus(therapyState)
@@ -727,7 +732,7 @@ abstract class TherapyComplicationService(
 
         return TherapyDisplayState(
             receivedAtEpochMs = now,
-            sourceVersion = "AAPS dev",
+            sourceVersion = "Lokale Quelle",
             glucose = GlucoseState(
                 valueMgDl = 123.0,
                 displayUnit = GlucoseUnit.MG_DL,

@@ -65,13 +65,14 @@
       <Complication type="SMALL_IMAGE"><PartImage x="0" y="0" width="243" height="120"><Image resource="[COMPLICATION.SMALL_IMAGE]" /></PartImage></Complication>
       <Complication type="EMPTY" />
     </ComplicationSlot>
-    <AnalogClock x="0" y="0" width="450" height="450">
-      <HourHand resource="hourhand" x="0" y="0" width="450" height="450" pivotX="0.5" pivotY="0.5" />
-      <MinuteHand resource="minutehand" x="0" y="0" width="450" height="450" pivotX="0.5" pivotY="0.5" />
-    </AnalogClock>
     <PartImage x="0" y="0" width="450" height="450" alpha="255">
       <Variant mode="AMBIENT" target="alpha" value="0" />
       <Image resource="coverplate" />
     </PartImage>
+    <AnalogClock x="0" y="0" width="450" height="450">
+      <HourHand resource="hour_hand" x="0" y="0" width="450" height="450" pivotX="0.5" pivotY="0.5" />
+      <MinuteHand resource="minute_hand" x="0" y="0" width="450" height="450" pivotX="0.5" pivotY="0.5" />
+      <SecondHand resource="second_hand" x="0" y="0" width="450" height="450" pivotX="0.5" pivotY="0.5"><Variant mode="AMBIENT" target="alpha" value="0" /></SecondHand>
+    </AnalogClock>
   </Scene>
 </WatchFace>

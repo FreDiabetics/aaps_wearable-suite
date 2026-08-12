@@ -6,6 +6,8 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.TextView
 import androidx.test.core.app.ApplicationProvider
+import app.aapswear.mobile.ui.theme.SugarliciousColorRole
+import app.aapswear.mobile.ui.theme.SugarliciousColorStore
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Assert.assertEquals
@@ -63,7 +65,7 @@ class MainActivityTest {
         shadowOf(android.os.Looper.getMainLooper()).idle()
         val settingsText = textOf(activity.findViewById(R.id.dashboard_content))
         assertTrue(settingsText.contains("Datenquelle"))
-        assertTrue(settingsText.contains("AndroidAPS"))
+        assertTrue(settingsText.contains("Loop-App (lokal)"))
         controller.pause().stop().destroy()
     }
 
@@ -91,6 +93,51 @@ class MainActivityTest {
         controller.pause().stop().destroy()
     }
 
+    @Test fun `color store preserves configured transparency`() {
+        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+        val preferences = context.getSharedPreferences("dashboard_ui", android.content.Context.MODE_PRIVATE)
+        preferences.edit().clear().commit()
+        val configured = Color.argb(96, 84, 223, 48)
+
+        SugarliciousColorStore.save(preferences, SugarliciousColorRole.RANGE_IN_RANGE, configured)
+
+        assertEquals(96, Color.alpha(SugarliciousColorStore.load(preferences).argb(SugarliciousColorRole.RANGE_IN_RANGE)))
+    }
+
+    @Test fun `cgm dot appearance settings are read from preferences`() {
+        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+        val preferences = context.getSharedPreferences("dashboard_ui", android.content.Context.MODE_PRIVATE)
+        preferences.edit()
+            .clear()
+            .putFloat("cgm.dotRadiusDp", 4.25f)
+            .putBoolean("cgm.dotOutlineEnabled", false)
+            .putFloat("cgm.dotOutlineWidthDp", 1.75f)
+            .commit()
+
+        val ui = DashboardUiPreferences.read(preferences)
+
+        assertEquals(4.25f, ui.cgmDotRadiusDp, 0.001f)
+        assertFalse(ui.cgmDotOutlineEnabled)
+        assertEquals(1.75f, ui.cgmDotOutlineWidthDp, 0.001f)
+    }
+
+    @Test fun `fresh install defaults to CGM dots only`() {
+        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+        val preferences = context.getSharedPreferences("dashboard_ui", android.content.Context.MODE_PRIVATE)
+        preferences.edit().clear().commit()
+        val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
+
+        val ui = DashboardUiPreferences.read(preferences)
+        assertTrue(ui.showCgmGraph)
+        assertFalse(ui.showCgmTargetRange)
+        assertFalse(ui.showCgmBasal)
+        assertFalse(ui.showCgmActivity)
+        assertFalse(ui.anyCgmPredictionEnabled)
+        assertFalse(ui.showMetabolicGraph)
+
+        controller.pause().stop().destroy()
+    }
+
     @Test fun `saving carousel position does not rebuild the visible dashboard`() {
         val context = ApplicationProvider.getApplicationContext<android.content.Context>()
         val preferences = context.getSharedPreferences("dashboard_ui", android.content.Context.MODE_PRIVATE)
@@ -108,7 +155,7 @@ class MainActivityTest {
         controller.pause().stop().destroy()
     }
 
-    @Test fun `Sugarlicious about tile exposes project and contact links`() {
+    @Test fun `Sugarlicious about tile shows independent branding and contact`() {
         val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
         val activity = controller.get()
 
@@ -118,12 +165,10 @@ class MainActivityTest {
         assertTrue(settingsText.contains("Sugarlicious"))
         assertFalse(settingsText.contains("typ1.diafreddy@gmail.com"))
         assertFalse(settingsText.contains("FreDiabetics/aaps_wearable-suite"))
+        assertTrue(settingsText.contains("Unabhängiges Projekt"))
+        assertFalse(settingsText.contains("GITHUB"))
+        assertFalse(settingsText.contains("AndroidAPS"))
 
-        activity.findViewById<View>(R.id.dashboard_github).performClick()
-        assertEquals(
-            "https://github.com/FreDiabetics/aaps_wearable-suite",
-            shadowOf(activity).nextStartedActivity.dataString,
-        )
         activity.findViewById<View>(R.id.dashboard_contact_email).performClick()
         val emailIntent = shadowOf(activity).nextStartedActivity
         assertEquals("mailto", emailIntent.data?.scheme)

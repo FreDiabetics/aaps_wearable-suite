@@ -106,7 +106,7 @@ object SugarliciousColorStore {
         argb: Int,
     ) {
         preferences.edit {
-            putInt(PREFIX + role.preferenceKey, argb or 0xFF000000.toInt())
+            putInt(PREFIX + role.preferenceKey, argb)
         }
     }
 

@@ -38,7 +38,7 @@ data class WatchGraphColors(
 data class WatchConfig(
     val schemaVersion: Int = CURRENT_SCHEMA,
     val graphHours: Int = 3,
-    val showPredictions: Boolean = true,
+    val showPredictions: Boolean = false,
     val glucoseUnit: WatchGlucoseUnit = WatchGlucoseUnit.AAPS,
     val showTherapyStats: Boolean = true,
     val graphColors: WatchGraphColors = WatchGraphColors(),

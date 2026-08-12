@@ -25,7 +25,6 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.core.content.edit
-import androidx.core.net.toUri
 import app.aapswear.mobile.ui.theme.SugarliciousColorRole
 import app.aapswear.mobile.ui.theme.SugarliciousColorStore
 import app.aapswear.mobile.ui.theme.SugarliciousColors
@@ -81,6 +80,21 @@ class MainActivity : ComponentActivity() {
         if (!uiPreferences.getBoolean("graphHoursDefault3Migrated", false)) {
             uiPreferences.edit { putInt("graphHours", 3); putBoolean("graphHoursDefault3Migrated", true) }
         }
+        if (!uiPreferences.getBoolean("cgmDotsOnlyDefaultMigratedV1", false)) {
+            uiPreferences.edit {
+                putBoolean("showCgmGraph", true)
+                putBoolean("showMetabolicGraph", false)
+                putBoolean("showPredictions", false)
+                putBoolean("cgm.targetRange", false)
+                putBoolean("cgm.basal", false)
+                putBoolean("cgm.activity", false)
+                putBoolean("cgm.prediction.iob", false)
+                putBoolean("cgm.prediction.cob", false)
+                putBoolean("cgm.prediction.uam", false)
+                putBoolean("cgm.prediction.zeroTemp", false)
+                putBoolean("cgmDotsOnlyDefaultMigratedV1", true)
+            }
+        }
         content = findViewById(R.id.dashboard_content)
         scroll = findViewById(R.id.dashboard_scroll)
         screen = savedInstanceState?.getString("screen")?.let { runCatching { DashboardScreen.valueOf(it) }.getOrNull() } ?: DashboardScreen.OVERVIEW
@@ -91,7 +105,6 @@ class MainActivity : ComponentActivity() {
             setDataSource = { uiPreferences.edit { putString("dataSource", it.name) } },
             setThemeMode = { uiPreferences.edit { putString("themeMode", it.name) } },
             setShowDetails = { uiPreferences.edit { putBoolean("showDetails", it) } },
-            setShowPredictions = { uiPreferences.edit { putBoolean("showPredictions", it) } },
             setShowCgmGraph = { uiPreferences.edit { putBoolean("showCgmGraph", it) } },
             setCgmStream = { key, enabled ->
                 uiPreferences.edit {
@@ -114,7 +127,6 @@ class MainActivity : ComponentActivity() {
             },
             syncNow = ::syncNow,
             openContactEmail = ::openContactEmail,
-            openGithub = ::openGithub,
         ))
         bindNavigation()
         PersistentBridgeService.start(this)
@@ -324,7 +336,7 @@ styleTitle()
     private fun syncNow() {
         val latest = state
         if (latest == null) {
-            Toast.makeText(this, "Noch keine gültigen AAPS-Daten vorhanden", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "Noch keine gültigen Loop-Daten vorhanden", Toast.LENGTH_SHORT).show()
             return
         }
         diagnostics.edit { putString("lastSyncStatus", "pending") }
@@ -361,9 +373,6 @@ styleTitle()
         }
     }
 
-    private fun openGithub() {
-        openExternal(Intent(Intent.ACTION_VIEW, getString(R.string.github_url).toUri()))
-    }
 
     private fun openContactEmail() {
         val intent = Intent(Intent.ACTION_SENDTO, Uri.fromParts("mailto", getString(R.string.contact_email), null))

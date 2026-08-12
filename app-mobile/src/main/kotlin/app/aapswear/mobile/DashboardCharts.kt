@@ -368,30 +368,37 @@ internal class GlucoseDashboardChart @JvmOverloads constructor(
         strokeJoin = Paint.Join.ROUND
     }
     private val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
+    private val dotOutlinePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE }
     private val timeFormat = SimpleDateFormat("HH:mm", Locale.getDefault())
     private var state: TherapyDisplayState? = null
     private var unit = GlucoseUnit.MG_DL
-    private var showPredictions = true
-    private var showTargetRange = true
-    private var showBasal = true
-    private var showActivity = true
-    private var showPredictionIob = true
-    private var showPredictionCob = true
-    private var showPredictionUam = true
-    private var showPredictionZeroTemp = true
+    private var showPredictions = false
+    private var showTargetRange = false
+    private var showBasal = false
+    private var showActivity = false
+    private var showPredictionIob = false
+    private var showPredictionCob = false
+    private var showPredictionUam = false
+    private var showPredictionZeroTemp = false
+    private var cgmDotRadiusDp = 2.4f
+    private var cgmDotOutlineEnabled = true
+    private var cgmDotOutlineWidthDp = 0.95f
 
     fun bind(
         state: TherapyDisplayState?,
         unit: GlucoseUnit,
         showPredictions: Boolean,
         durationHours: Int,
-        showTargetRange: Boolean = true,
-        showBasal: Boolean = true,
-        showActivity: Boolean = true,
-        showPredictionIob: Boolean = true,
-        showPredictionCob: Boolean = true,
-        showPredictionUam: Boolean = true,
-        showPredictionZeroTemp: Boolean = true,
+        showTargetRange: Boolean = false,
+        showBasal: Boolean = false,
+        showActivity: Boolean = false,
+        showPredictionIob: Boolean = false,
+        showPredictionCob: Boolean = false,
+        showPredictionUam: Boolean = false,
+        showPredictionZeroTemp: Boolean = false,
+        cgmDotRadiusDp: Float = 2.4f,
+        cgmDotOutlineEnabled: Boolean = true,
+        cgmDotOutlineWidthDp: Float = 0.95f,
     ) {
         this.state =
             state
@@ -413,6 +420,12 @@ internal class GlucoseDashboardChart @JvmOverloads constructor(
             showPredictionUam
         this.showPredictionZeroTemp =
             showPredictionZeroTemp
+        this.cgmDotRadiusDp =
+            cgmDotRadiusDp.coerceIn(1.5f, 6.0f)
+        this.cgmDotOutlineEnabled =
+            cgmDotOutlineEnabled
+        this.cgmDotOutlineWidthDp =
+            cgmDotOutlineWidthDp.coerceIn(0.25f, 3.0f)
 
         if (
             !isAttachedToWindow
@@ -509,7 +522,8 @@ internal class GlucoseDashboardChart @JvmOverloads constructor(
 
             }
             val dividerX = mapX(now, start, end, plot).coerceIn(plot.left, plot.right)
-            if (visiblePredictions.isNotEmpty() && now in start..end) {
+            val predictionLaneVisible = visiblePredictions.isNotEmpty() && now in start..end
+            if (predictionLaneVisible) {
                 linePaint.color = SugarliciousColors.argb(SugarliciousColorRole.GRAPH_DIVIDER)
                 linePaint.strokeWidth = 1f.dp
                 linePaint.pathEffect = DashPathEffect(floatArrayOf(4f.dp, 4f.dp), 0f)
@@ -517,16 +531,36 @@ internal class GlucoseDashboardChart @JvmOverloads constructor(
                 linePaint.pathEffect = null
             }
 
+            val historyRightEdge =
+                if (predictionLaneVisible) {
+                    dividerX - 2f.dp
+                } else {
+                    plot.right - 4f.dp
+                }
+
             history.forEachIndexed { index, point ->
-                val x = min(mapX(point.measuredAtEpochMs, start, end, plot), dividerX - 2f.dp)
+                val x = min(mapX(point.measuredAtEpochMs, start, end, plot), historyRightEdge)
                 val y = mapGlucoseY(point.valueMgDl, plot)
                 val current = index == history.lastIndex
-                fillPaint.color = SugarliciousColors.argb(SugarliciousColorRole.GRAPH_CURRENT_OUTLINE)
-                canvas.drawCircle(x, y, (if (current) 3.75f else 3.35f).dp, fillPaint)
+                val dotRadius = (cgmDotRadiusDp + if (current) 0.1f else 0f).dp
                 fillPaint.color = dotColor(point.valueMgDl, targetLow, targetHigh)
-                canvas.drawCircle(x, y, (if (current) 2.5f else 2.4f).dp, fillPaint)
+                canvas.drawCircle(x, y, dotRadius, fillPaint)
+                if (cgmDotOutlineEnabled) {
+                    val outlineWidth = cgmDotOutlineWidthDp.dp
+                    dotOutlinePaint.color =
+                        SugarliciousColors.argb(SugarliciousColorRole.GRAPH_CURRENT_OUTLINE)
+                    dotOutlinePaint.strokeWidth = outlineWidth
+                    canvas.drawCircle(
+                        x,
+                        y,
+                        dotRadius + outlineWidth / 2f,
+                        dotOutlinePaint,
+                    )
+                }
             }
-            visiblePredictions.forEach { drawPrediction(canvas, it, plot, start, end, dividerX) }
+            if (predictionLaneVisible) {
+                visiblePredictions.forEach { drawPrediction(canvas, it, plot, start, end, dividerX) }
+            }
 
             if (
                 showTargetRange

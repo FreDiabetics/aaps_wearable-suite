@@ -47,7 +47,7 @@
     <AnalogClock x="0" y="0" width="450" height="450">
       <HourHand resource="hour_hand" x="0" y="0" width="450" height="450" pivotX="0.5" pivotY="0.5" />
       <MinuteHand resource="minute_hand" x="0" y="0" width="450" height="450" pivotX="0.5" pivotY="0.5" />
-      <SecondHand resource="secondhand" x="0" y="0" width="450" height="450" pivotX="0.5" pivotY="0.5"><Variant mode="AMBIENT" target="alpha" value="0" /></SecondHand>
+      <SecondHand resource="second_hand" x="0" y="0" width="450" height="450" pivotX="0.5" pivotY="0.5"><Variant mode="AMBIENT" target="alpha" value="0" /></SecondHand>
     </AnalogClock>
   </Scene>
 </WatchFace>

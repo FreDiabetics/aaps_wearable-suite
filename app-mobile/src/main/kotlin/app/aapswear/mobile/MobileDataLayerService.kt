@@ -72,7 +72,13 @@ internal fun readWatchConfig(context: Context): WatchConfig {
                 .getInt("graphHours", 3)
                 .takeIf { it in listOf(3, 6, 12, 24) }
                 ?: 3,
-        showPredictions = preferences.getBoolean("showPredictions", true),
+        showPredictions =
+            listOf(
+                "cgm.prediction.iob",
+                "cgm.prediction.cob",
+                "cgm.prediction.uam",
+                "cgm.prediction.zeroTemp",
+            ).any { preferences.getBoolean(it, false) },
         glucoseUnit = unit,
         showTherapyStats = preferences.getBoolean("showDetails", true),
         graphColors = WatchGraphColors(

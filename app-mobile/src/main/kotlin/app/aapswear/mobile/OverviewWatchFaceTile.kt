@@ -40,6 +40,7 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -168,13 +169,6 @@ internal fun OverviewWatchFaceTile(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(3.dp),
     ) {
-        Text(
-            "Galaxy Watch Ultra",
-            color = SugarliciousColors.TextPrimary,
-            fontSize = 13.sp,
-            fontWeight = FontWeight.SemiBold,
-        )
-
         BoxWithConstraints(
             Modifier.fillMaxWidth().height(carouselHeight).clipToBounds(),
             contentAlignment = Alignment.Center,
@@ -237,6 +231,13 @@ internal fun OverviewWatchFaceTile(
                     .clickable(onClick = onEdit),
             )
         }
+
+        Text(
+            "Galaxy Watch Ultra",
+            color = SugarliciousColors.TextPrimary,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.SemiBold,
+        )
 
         val statusColor =
             when {
@@ -536,113 +537,68 @@ internal fun FaceDial(
                 )
             }
 
-            fun handEnd(
-                angleDegrees: Double,
-                length: Float,
-            ): Offset {
-                val angle =
-                    Math.toRadians(
-                        angleDegrees -
-                            90.0,
-                    )
+            val scale = size.minDimension / 512f
 
-                return Offset(
-                    x =
-                        center.x +
-                            cos(
-                                angle,
-                            ).toFloat() *
-                            length,
-                    y =
-                        center.y +
-                            sin(
-                                angle,
-                            ).toFloat() *
-                            length,
+            fun sx(value: Float): Float = (center.x - 256f * scale) + value * scale
+            fun sy(value: Float): Float = (center.y - 256f * scale) + value * scale
+
+            // Fixed preview geometry: hour at 10, minute at 2, second at 6.
+            // Bottom -> top: hour, minute, grey dot, second, black dot.
+            val hourAngle = CAROUSEL_PREVIEW_HOUR_ANGLE.toFloat()
+            val minuteAngle = CAROUSEL_PREVIEW_MINUTE_ANGLE.toFloat()
+            val secondAngle = CAROUSEL_PREVIEW_SECOND_ANGLE.toFloat()
+
+            withTransform({ rotate(degrees = hourAngle, pivot = center) }) {
+                drawRect(
+                    color = Color.White,
+                    topLeft = Offset(sx(252.75f), sy(224.44f)),
+                    size = androidx.compose.ui.geometry.Size(6.5f * scale, 29.56f * scale),
+                )
+                drawRoundRect(
+                    color = Color.White,
+                    topLeft = Offset(sx(243f), sy(113.57f)),
+                    size = androidx.compose.ui.geometry.Size(26f * scale, 114f * scale),
+                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(13f * scale, 13f * scale),
                 )
             }
 
-            // Fixed preview geometry: hour at 10, minute at 2, second at 6.
-            // The preview hands never advance.
-            val hourAngle =
-                CAROUSEL_PREVIEW_HOUR_ANGLE
-            val minuteAngle =
-                CAROUSEL_PREVIEW_MINUTE_ANGLE
-            val secondAngle =
-                CAROUSEL_PREVIEW_SECOND_ANGLE
-
-            drawLine(
-                color =
-                    Color.White,
-                start =
-                    center,
-                end =
-                    handEnd(
-                        hourAngle,
-                        radius *
-                            0.48f,
-                    ),
-                strokeWidth =
-                    5.dp.toPx(),
-                cap =
-                    StrokeCap.Round,
-            )
-
-            drawLine(
-                color =
-                    Color.White,
-                start =
-                    center,
-                end =
-                    handEnd(
-                        minuteAngle,
-                        radius *
-                            0.70f,
-                    ),
-                strokeWidth =
-                    3.dp.toPx(),
-                cap =
-                    StrokeCap.Round,
-            )
-
-            drawLine(
-                color =
-                    accent,
-                start =
-                    handEnd(
-                        secondAngle +
-                            180.0,
-                        radius *
-                            0.16f,
-                    ),
-                end =
-                    handEnd(
-                        secondAngle,
-                        radius *
-                            0.78f,
-                    ),
-                strokeWidth =
-                    1.2.dp.toPx(),
-                cap =
-                    StrokeCap.Round,
-            )
+            withTransform({ rotate(degrees = minuteAngle, pivot = center) }) {
+                drawRect(
+                    color = Color.White,
+                    topLeft = Offset(sx(252.75f), sy(224.44f)),
+                    size = androidx.compose.ui.geometry.Size(6.5f * scale, 29.56f * scale),
+                )
+                drawRoundRect(
+                    color = Color.White,
+                    topLeft = Offset(sx(243f), sy(34.47f)),
+                    size = androidx.compose.ui.geometry.Size(26f * scale, 193.1f * scale),
+                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(13f * scale, 13f * scale),
+                )
+            }
 
             drawCircle(
-                color =
-                    accent,
-                radius =
-                    4.dp.toPx(),
-                center =
-                    center,
+                color = Color(0xFFBCBCBC),
+                radius = 12f * scale,
+                center = center,
             )
 
+            withTransform({ rotate(degrees = secondAngle, pivot = center) }) {
+                drawRect(
+                    color = Color.White,
+                    topLeft = Offset(sx(254f), sy(6f)),
+                    size = androidx.compose.ui.geometry.Size(4f * scale, 290f * scale),
+                )
+                drawCircle(
+                    color = Color.White,
+                    radius = 8.5f * scale,
+                    center = center,
+                )
+            }
+
             drawCircle(
-                color =
-                    Color.Black,
-                radius =
-                    1.8.dp.toPx(),
-                center =
-                    center,
+                color = Color.Black,
+                radius = 4f * scale,
+                center = center,
             )
         }
 

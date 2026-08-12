@@ -361,7 +361,7 @@ class WearActivity : Activity() {
 
         source.text =
             when (state?.source) {
-                DataSourceId.ANDROID_APS -> state.sourceVersion?.let { "AndroidAPS $it" } ?: "AndroidAPS"
+                DataSourceId.ANDROID_APS -> "Lokale Loop-Daten"
                 DataSourceId.XDRIP_PLUS -> state.sourceVersion?.let { "xDrip+ $it" } ?: "xDrip+"
                 null -> getString(R.string.data_source_unavailable)
             }

@@ -58,14 +58,14 @@
       <Complication type="SHORT_TEXT"><PartText x="0" y="0" width="67" height="23"><Text align="CENTER" ellipsis="TRUE"><Font family="SYNC_TO_DEVICE" size="22" color="#FFFFFFFF"><Template>%s<Parameter expression="[COMPLICATION.TEXT]" /></Template></Font></Text></PartText></Complication>
       <Complication type="EMPTY" />
     </ComplicationSlot>
-    <AnalogClock x="0" y="0" width="450" height="450">
-      <HourHand resource="hourhand" x="0" y="0" width="450" height="450" pivotX="0.5" pivotY="0.5" />
-      <MinuteHand resource="minutehand" x="0" y="0" width="450" height="450" pivotX="0.5" pivotY="0.5" />
-      <SecondHand resource="secondhand" x="0" y="0" width="450" height="450" pivotX="0.5" pivotY="0.5"><Variant mode="AMBIENT" target="alpha" value="0" /></SecondHand>
-    </AnalogClock>
     <PartImage x="0" y="0" width="450" height="450" alpha="255">
       <Variant mode="AMBIENT" target="alpha" value="0" />
       <Image resource="coverplate" />
     </PartImage>
+    <AnalogClock x="0" y="0" width="450" height="450">
+      <HourHand resource="hour_hand" x="0" y="0" width="450" height="450" pivotX="0.5" pivotY="0.5" />
+      <MinuteHand resource="minute_hand" x="0" y="0" width="450" height="450" pivotX="0.5" pivotY="0.5" />
+      <SecondHand resource="second_hand" x="0" y="0" width="450" height="450" pivotX="0.5" pivotY="0.5"><Variant mode="AMBIENT" target="alpha" value="0" /></SecondHand>
+    </AnalogClock>
   </Scene>
 </WatchFace>

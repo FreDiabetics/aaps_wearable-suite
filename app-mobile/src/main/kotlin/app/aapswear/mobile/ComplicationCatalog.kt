@@ -781,7 +781,7 @@ private fun previewFor(
         22 -> PhonePreview(number(state?.pump?.reservoirUnits, 0, "120") + " U", "Reservoir")
         23 -> PhonePreview(state?.pump?.batteryPercent?.let { "$it%" } ?: "80%", "Pumpenakku")
         24 -> PhonePreview(state?.device?.phoneBatteryPercent?.let { "$it%" } ?: "85%", "Telefonakku")
-        25 -> PhonePreview(state?.sourceVersion ?: "AAPS dev", "Datenquelle")
+        25 -> PhonePreview("Lokale Quelle", "Datenquelle")
         26 -> PhonePreview(
             "$glucoseText$trend",
             "IOB ${number(state?.insulin?.totalIob, 1, "1.2")} · " +

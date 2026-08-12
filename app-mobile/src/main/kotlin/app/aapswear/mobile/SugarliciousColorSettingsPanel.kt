@@ -23,6 +23,8 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Slider
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -56,6 +58,7 @@ internal fun SugarliciousColorSettingsPanel(
     showMetabolicGraph: Boolean = false,
 ) {
     val context = LocalContext.current
+    val locale = androidx.compose.ui.platform.LocalConfiguration.current.locales[0]
     val preferences =
         remember {
             context.getSharedPreferences(
@@ -71,6 +74,15 @@ internal fun SugarliciousColorSettingsPanel(
     }
     var editingRole by remember {
         mutableStateOf<SugarliciousColorRole?>(null)
+    }
+    var cgmDotRadiusDp by remember(showCgmGraph) {
+        mutableFloatStateOf(preferences.getFloat("cgm.dotRadiusDp", 2.4f).coerceIn(1.5f, 6.0f))
+    }
+    var cgmDotOutlineEnabled by remember(showCgmGraph) {
+        mutableStateOf(preferences.getBoolean("cgm.dotOutlineEnabled", true))
+    }
+    var cgmDotOutlineWidthDp by remember(showCgmGraph) {
+        mutableFloatStateOf(preferences.getFloat("cgm.dotOutlineWidthDp", 0.95f).coerceIn(0.25f, 3.0f))
     }
 
     fun reload() {
@@ -106,7 +118,7 @@ internal fun SugarliciousColorSettingsPanel(
                     letterSpacing = 0.6.sp,
                 )
                 Text(
-                    text = "Bereiche anpassen",
+                    text = "Darstellung & Farben",
                     color = SugarliciousColors.TextPrimary,
                     fontSize = 17.sp,
                     fontWeight = FontWeight.SemiBold,
@@ -124,6 +136,52 @@ internal fun SugarliciousColorSettingsPanel(
                     color = SugarliciousColors.Primary,
                     fontSize = 10.sp,
                     fontWeight = FontWeight.Bold,
+                )
+            }
+        }
+
+        if (showCgmGraph) {
+            Text(
+                text = "CGM-PUNKTE",
+                color = SugarliciousColors.TextSecondary,
+                fontSize = 10.sp,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(top = 6.dp),
+            )
+
+            GraphSettingSlider(
+                title = "Punktgröße",
+                description = "Größe der CGM-Dots im Glukosegraph",
+                value = cgmDotRadiusDp,
+                valueRange = 1.5f..6.0f,
+                valueText = "${String.format(locale, "%.1f", cgmDotRadiusDp)} dp",
+                onValueChange = { cgmDotRadiusDp = it },
+                onValueChangeFinished = {
+                    preferences.edit().putFloat("cgm.dotRadiusDp", cgmDotRadiusDp).apply()
+                },
+            )
+
+            GraphSettingSwitch(
+                title = "Kontur",
+                description = "Kontur um die CGM-Dots anzeigen",
+                checked = cgmDotOutlineEnabled,
+                onCheckedChange = { enabled ->
+                    cgmDotOutlineEnabled = enabled
+                    preferences.edit().putBoolean("cgm.dotOutlineEnabled", enabled).apply()
+                },
+            )
+
+            if (cgmDotOutlineEnabled) {
+                GraphSettingSlider(
+                    title = "Konturdicke",
+                    description = "Dicke der Dot-Kontur",
+                    value = cgmDotOutlineWidthDp,
+                    valueRange = 0.25f..3.0f,
+                    valueText = "${String.format(locale, "%.2f", cgmDotOutlineWidthDp)} dp",
+                    onValueChange = { cgmDotOutlineWidthDp = it },
+                    onValueChangeFinished = {
+                        preferences.edit().putFloat("cgm.dotOutlineWidthDp", cgmDotOutlineWidthDp).apply()
+                    },
                 )
             }
         }
@@ -216,6 +274,61 @@ internal fun colorRoleVisible(
         return false
     }
     return true
+}
+
+@Composable
+private fun GraphSettingSwitch(
+    title: String,
+    description: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(SugarliciousColors.SurfaceHigh, RoundedCornerShape(16.dp))
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(title, color = SugarliciousColors.TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+            Text(description, color = SugarliciousColors.TextSecondary, fontSize = 10.sp)
+        }
+        Switch(checked = checked, onCheckedChange = onCheckedChange)
+    }
+}
+
+@Composable
+private fun GraphSettingSlider(
+    title: String,
+    description: String,
+    value: Float,
+    valueRange: ClosedFloatingPointRange<Float>,
+    valueText: String,
+    onValueChange: (Float) -> Unit,
+    onValueChangeFinished: () -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(SugarliciousColors.SurfaceHigh, RoundedCornerShape(16.dp))
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text(title, color = SugarliciousColors.TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+                Text(description, color = SugarliciousColors.TextSecondary, fontSize = 10.sp)
+            }
+            Text(valueText, color = SugarliciousColors.Primary, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+        }
+        Slider(
+            value = value,
+            onValueChange = onValueChange,
+            onValueChangeFinished = onValueChangeFinished,
+            valueRange = valueRange,
+        )
+    }
 }
 
 @Composable

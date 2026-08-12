@@ -322,7 +322,7 @@
                     android:layout_marginTop="2dp"
                     android:ellipsize="end"
                     android:maxLines="1"
-                    android:text="AndroidAPS nicht erkannt"
+                    android:text="Lokale Loop-Daten nicht bereit"
                     android:textColor="@color/wear_text"
                     android:textSize="9sp" />
 

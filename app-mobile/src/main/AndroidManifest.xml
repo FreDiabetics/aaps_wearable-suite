@@ -22,7 +22,7 @@
   </receiver>
   <receiver android:name=".PersistentBridgeBootReceiver" android:exported="true"><intent-filter><action android:name="android.intent.action.BOOT_COMPLETED"/><action android:name="android.intent.action.MY_PACKAGE_REPLACED"/></intent-filter></receiver>
   <service android:name=".PersistentBridgeService" android:exported="false" android:foregroundServiceType="specialUse">
-   <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE" android:value="User-visible persistent local AndroidAPS status receiver and Wear OS read-only data bridge"/>
+   <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE" android:value="User-visible Sugarlicious therapy status receiver and read-only Wear OS synchronization"/>
   </service>
   <service android:name=".MobileDataLayerService" android:exported="true"><intent-filter><action android:name="com.google.android.gms.wearable.MESSAGE_RECEIVED"/><data android:scheme="wear" android:host="*" android:path="/aaps-display/v1/request"/></intent-filter></service>
  </application>

@@ -63,8 +63,18 @@ internal fun SugarliciousOverviewScreen(
     }
     val metrics = DashboardLayoutMetrics.forScreenHeight(screenHeightDp)
     val gap = if (preferences.compact) 6.dp else 9.dp
+    val compactGraphHeightDp = maxOf(
+        metrics.metabolicChartHeight - 18,
+        96,
+    )
 
-    val sharedChartViewport =
+    val cgmChartViewport =
+        remember {
+            ChartViewport(
+                preferences.graphHours,
+            )
+        }
+    val metabolicChartViewport =
         remember {
             ChartViewport(
                 preferences.graphHours,
@@ -124,26 +134,32 @@ internal fun SugarliciousOverviewScreen(
             0L
         }
 
-    val futureWindowMs =
-        maxOf(
-            predictionFutureWindowMs,
-            metabolicFutureWindowMs,
-        )
-
     LaunchedEffect(
         preferences.graphHours,
     ) {
-        sharedChartViewport.setHours(
+        cgmChartViewport.setHours(
+            preferences.graphHours.toFloat(),
+            resetPan = true,
+        )
+        metabolicChartViewport.setHours(
             preferences.graphHours.toFloat(),
             resetPan = true,
         )
     }
 
     LaunchedEffect(
-        futureWindowMs,
+        predictionFutureWindowMs,
     ) {
-        sharedChartViewport.setFutureWindow(
-            futureWindowMs,
+        cgmChartViewport.setFutureWindow(
+            predictionFutureWindowMs,
+        )
+    }
+
+    LaunchedEffect(
+        metabolicFutureWindowMs,
+    ) {
+        metabolicChartViewport.setFutureWindow(
+            metabolicFutureWindowMs,
         )
     }
 
@@ -203,8 +219,8 @@ internal fun SugarliciousOverviewScreen(
             GlucoseGraphSurface(
                 state = state,
                 preferences = preferences,
-                viewport = sharedChartViewport,
-                chartHeightDp = maxOf(metrics.glucoseChartHeight + 34, 148),
+                viewport = cgmChartViewport,
+                chartHeightDp = compactGraphHeightDp,
             )
         }
 
@@ -212,11 +228,8 @@ internal fun SugarliciousOverviewScreen(
             MetabolicGraphSurface(
                 state = state,
                 preferences = preferences,
-                viewport = sharedChartViewport,
-                chartHeightDp = maxOf(
-                    metrics.metabolicChartHeight - 18,
-                    96,
-                ),
+                viewport = metabolicChartViewport,
+                chartHeightDp = compactGraphHeightDp,
             )
         }
     }
@@ -658,6 +671,12 @@ private fun GlucoseGraphSurface(
                     preferences.showCgmPredictionUam,
                 showPredictionZeroTemp =
                     preferences.showCgmPredictionZeroTemp,
+                cgmDotRadiusDp =
+                    preferences.cgmDotRadiusDp,
+                cgmDotOutlineEnabled =
+                    preferences.cgmDotOutlineEnabled,
+                cgmDotOutlineWidthDp =
+                    preferences.cgmDotOutlineWidthDp,
             )
         },
     )
