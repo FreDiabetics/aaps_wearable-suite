@@ -46,7 +46,6 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.util.lerp
@@ -162,7 +161,6 @@ internal fun OverviewWatchFaceTile(
             "ok",
             "pending",
         )
-    val currentIndex = pager.currentPage % sugarliciousWatchFaceNames.size
 
     Column(
         modifier = Modifier.fillMaxWidth().padding(top = 2.dp, bottom = 5.dp),
@@ -232,15 +230,20 @@ internal fun OverviewWatchFaceTile(
             )
         }
 
-        Text(
-            "Galaxy Watch Ultra",
-            color = SugarliciousColors.TextPrimary,
-            fontSize = 13.sp,
-            fontWeight = FontWeight.SemiBold,
-        )
+        Column(
+            modifier = Modifier.offset(y = (-8).dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            Text(
+                "Galaxy Watch Ultra",
+                color = SugarliciousColors.TextPrimary,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Bold,
+            )
 
-        val statusColor =
-            when {
+            val statusColor =
+                when {
                 connected ->
                     SugarliciousColors.Primary
 
@@ -254,8 +257,8 @@ internal fun OverviewWatchFaceTile(
                     SugarliciousColors.Red
             }
 
-        val statusText =
-            when {
+            val statusText =
+                when {
                 connected ->
                     "Verbunden"
 
@@ -266,60 +269,55 @@ internal fun OverviewWatchFaceTile(
                     "Nicht verbunden"
             }
 
-        Surface(
-            shape = RoundedCornerShape(999.dp),
-            color = statusColor.copy(alpha = 0.14f),
-            border =
-                androidx.compose.foundation.BorderStroke(
-                    width = 1.dp,
-                    color = statusColor.copy(alpha = 0.72f),
-                ),
-        ) {
-            Row(
-                modifier =
-                    Modifier.padding(
-                        horizontal = 12.dp,
-                        vertical = 6.dp,
+            Surface(
+                shape = RoundedCornerShape(999.dp),
+                color = statusColor.copy(alpha = 0.14f),
+                border =
+                    androidx.compose.foundation.BorderStroke(
+                        width = 1.dp,
+                        color = statusColor.copy(alpha = 0.72f),
                     ),
-                verticalAlignment =
-                    Alignment.CenterVertically,
             ) {
-                Image(
-                    painter =
-                        painterResource(
-                            R.drawable.ic_watch_status,
-                        ),
-                    contentDescription = null,
+                Row(
                     modifier =
-                        Modifier
-                            .size(14.dp)
-                            .graphicsLayer {
-                                alpha = 1f
-                            },
-                    colorFilter =
-                        androidx.compose.ui.graphics.ColorFilter.tint(
-                            statusColor,
+                        Modifier.padding(
+                            horizontal = 12.dp,
+                            vertical = 6.dp,
                         ),
-                )
+                    verticalAlignment =
+                        Alignment.CenterVertically,
+                ) {
+                    Image(
+                        painter =
+                            painterResource(
+                                R.drawable.ic_watch_status,
+                            ),
+                        contentDescription = null,
+                        modifier =
+                            Modifier
+                                .size(14.dp)
+                                .graphicsLayer {
+                                    alpha = 1f
+                                },
+                        colorFilter =
+                            androidx.compose.ui.graphics.ColorFilter.tint(
+                                statusColor,
+                            ),
+                    )
 
-                Spacer(
-                    Modifier.width(6.dp),
-                )
+                    Spacer(
+                        Modifier.width(6.dp),
+                    )
 
-                Text(
-                    text = statusText,
-                    color = statusColor,
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.SemiBold,
-                )
+                    Text(
+                        text = statusText,
+                        color = statusColor,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                }
             }
         }
-        Text(
-            sugarliciousWatchFaceNames[currentIndex],
-            color = SugarliciousColors.TextSecondary,
-            fontSize = 9.sp,
-            textAlign = TextAlign.Center,
-        )
     }
 }
 
