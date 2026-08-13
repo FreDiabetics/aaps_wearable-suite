@@ -68,13 +68,7 @@ internal fun SugarliciousOverviewScreen(
         96,
     )
 
-    val cgmChartViewport =
-        remember {
-            ChartViewport(
-                preferences.graphHours,
-            )
-        }
-    val metabolicChartViewport =
+    val chartViewport =
         remember {
             ChartViewport(
                 preferences.graphHours,
@@ -89,9 +83,7 @@ internal fun SugarliciousOverviewScreen(
             state?.glucosePredictions
                 .orEmpty()
                 .filter { series ->
-                    when (
-                        series.kind
-                    ) {
+                    when (series.kind) {
                         app.aapswear.model.PredictionKind.IOB ->
                             preferences.showCgmPredictionIob
 
@@ -107,15 +99,9 @@ internal fun SugarliciousOverviewScreen(
                             preferences.showCgmPredictionZeroTemp
                     }
                 }
-                .flatMap {
-                    it.samples
-                }
-                .maxOfOrNull {
-                    it.measuredAtEpochMs
-                }
-                ?.minus(
-                    now,
-                )
+                .flatMap { it.samples }
+                .maxOfOrNull { it.measuredAtEpochMs }
+                ?.minus(now)
                 ?.coerceIn(
                     0L,
                     2L * 60L * 60_000L,
@@ -127,21 +113,16 @@ internal fun SugarliciousOverviewScreen(
 
     val metabolicFutureWindowMs =
         if (
-            preferences.showMetabolicGraph
+            preferences.showMetabolicGraph &&
+            preferences.anyCgmPredictionEnabled
         ) {
-            90L * 60_000L
+            predictionFutureWindowMs
         } else {
             0L
         }
 
-    LaunchedEffect(
-        preferences.graphHours,
-    ) {
-        cgmChartViewport.setHours(
-            preferences.graphHours.toFloat(),
-            resetPan = true,
-        )
-        metabolicChartViewport.setHours(
+    LaunchedEffect(preferences.graphHours) {
+        chartViewport.setHours(
             preferences.graphHours.toFloat(),
             resetPan = true,
         )
@@ -149,17 +130,13 @@ internal fun SugarliciousOverviewScreen(
 
     LaunchedEffect(
         predictionFutureWindowMs,
-    ) {
-        cgmChartViewport.setFutureWindow(
-            predictionFutureWindowMs,
-        )
-    }
-
-    LaunchedEffect(
         metabolicFutureWindowMs,
     ) {
-        metabolicChartViewport.setFutureWindow(
-            metabolicFutureWindowMs,
+        chartViewport.setFutureWindow(
+            maxOf(
+                predictionFutureWindowMs,
+                metabolicFutureWindowMs,
+            ),
         )
     }
 
@@ -204,8 +181,8 @@ internal fun SugarliciousOverviewScreen(
             glucoseColor = glucoseColor,
             trend = if (displayable) glucose?.trend ?: Trend.UNKNOWN else Trend.UNKNOWN,
             delta = delta,
-            
-            deltaMgDl = glucose?.deltaMgDl,age = age,
+            deltaMgDl = glucose?.deltaMgDl,
+            age = age,
             unitLabel = unitLabel(unit),
             tirStats = tirStats,
             heightDp = maxOf(metrics.summaryTileHeight + 18, 108),
@@ -219,7 +196,7 @@ internal fun SugarliciousOverviewScreen(
             GlucoseGraphSurface(
                 state = state,
                 preferences = preferences,
-                viewport = cgmChartViewport,
+                viewport = chartViewport,
                 chartHeightDp = compactGraphHeightDp,
             )
         }
@@ -228,7 +205,7 @@ internal fun SugarliciousOverviewScreen(
             MetabolicGraphSurface(
                 state = state,
                 preferences = preferences,
-                viewport = metabolicChartViewport,
+                viewport = chartViewport,
                 chartHeightDp = compactGraphHeightDp,
             )
         }
@@ -323,6 +300,7 @@ private fun GlucoseHeroCard(
         }
     }
 }
+
 private data class TirStats(
     val inRange: Int?,
     val below: Int?,
@@ -455,6 +433,7 @@ private fun TirProgress(
         )
     }
 }
+
 private fun correctedTrendForDisplay(
     sourceTrend: Trend,
     deltaMgDl: Double?,
@@ -492,8 +471,7 @@ private fun TrendIndicator(trend: Trend) {
             Trend.DOUBLE_DOWN,
             -> 25.dp
 
-            Trend.UNKNOWN ->
-                25.dp
+            Trend.UNKNOWN -> 25.dp
         }
 
     val rotation =
@@ -502,21 +480,15 @@ private fun TrendIndicator(trend: Trend) {
             Trend.SINGLE_UP,
             -> -90f
 
-            Trend.FORTY_FIVE_UP ->
-                -45f
-
-            Trend.FLAT ->
-                0f
-
-            Trend.FORTY_FIVE_DOWN ->
-                45f
+            Trend.FORTY_FIVE_UP -> -45f
+            Trend.FLAT -> 0f
+            Trend.FORTY_FIVE_DOWN -> 45f
 
             Trend.SINGLE_DOWN,
             Trend.DOUBLE_DOWN,
             -> 90f
 
-            Trend.UNKNOWN ->
-                return
+            Trend.UNKNOWN -> return
         }
 
     val doubleArrow =
@@ -526,53 +498,29 @@ private fun TrendIndicator(trend: Trend) {
     Box(
         modifier =
             Modifier.size(
-                width =
-                    if (doubleArrow) {
-                        54.dp
-                    } else {
-                        32.dp
-                    },
+                width = if (doubleArrow) 54.dp else 32.dp,
                 height = 44.dp,
             ),
-        contentAlignment =
-            Alignment.Center,
+        contentAlignment = Alignment.Center,
     ) {
         Row(
-            verticalAlignment =
-                Alignment.CenterVertically,
-            horizontalArrangement =
-                Arrangement.spacedBy(
-                    if (doubleArrow) {
-                        1.dp
-                    } else {
-                        0.dp
-                    },
-                ),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(if (doubleArrow) 1.dp else 0.dp),
         ) {
-            repeat(
-                if (doubleArrow) {
-                    2
-                } else {
-                    1
-                },
-            ) {
+            repeat(if (doubleArrow) 2 else 1) {
                 Image(
-                    painter =
-                        painterResource(
-                            R.drawable.ic_trend_arrow,
-                        ),
+                    painter = painterResource(R.drawable.ic_trend_arrow),
                     contentDescription = null,
                     modifier =
                         Modifier
                             .size(arrowSize)
-                            .graphicsLayer(
-                                rotationZ = rotation,
-                            ),
+                            .graphicsLayer(rotationZ = rotation),
                 )
             }
         }
     }
 }
+
 @Composable
 private fun QuickStatsRow(
     state: TherapyDisplayState?,
@@ -649,34 +597,20 @@ private fun GlucoseGraphSurface(
         update = {
             it.bind(
                 state = state,
-                unit =
-                    preferences.unitFor(
-                        state,
-                    ),
-                showPredictions =
-                    preferences.anyCgmPredictionEnabled,
-                durationHours =
-                    preferences.graphHours,
-                showTargetRange =
-                    preferences.showCgmTargetRange,
-                showBasal =
-                    preferences.showCgmBasal,
-                showActivity =
-                    preferences.showCgmActivity,
-                showPredictionIob =
-                    preferences.showCgmPredictionIob,
-                showPredictionCob =
-                    preferences.showCgmPredictionCob,
-                showPredictionUam =
-                    preferences.showCgmPredictionUam,
-                showPredictionZeroTemp =
-                    preferences.showCgmPredictionZeroTemp,
-                cgmDotRadiusDp =
-                    preferences.cgmDotRadiusDp,
-                cgmDotOutlineEnabled =
-                    preferences.cgmDotOutlineEnabled,
-                cgmDotOutlineWidthDp =
-                    preferences.cgmDotOutlineWidthDp,
+                unit = preferences.unitFor(state),
+                showPredictions = preferences.anyCgmPredictionEnabled,
+                durationHours = preferences.graphHours,
+                showTargetRange = preferences.showCgmTargetRange,
+                showTargetValue = preferences.showCgmTargetValue,
+                showBasal = preferences.showCgmBasal,
+                showActivity = preferences.showCgmActivity,
+                showPredictionIob = preferences.showCgmPredictionIob,
+                showPredictionCob = preferences.showCgmPredictionCob,
+                showPredictionUam = preferences.showCgmPredictionUam,
+                showPredictionZeroTemp = preferences.showCgmPredictionZeroTemp,
+                cgmDotRadiusDp = preferences.cgmDotRadiusDp,
+                cgmDotOutlineEnabled = preferences.cgmDotOutlineEnabled,
+                cgmDotOutlineWidthDp = preferences.cgmDotOutlineWidthDp,
             )
         },
     )
