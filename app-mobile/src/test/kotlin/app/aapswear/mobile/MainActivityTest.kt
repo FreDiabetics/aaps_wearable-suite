@@ -65,7 +65,7 @@ class MainActivityTest {
         shadowOf(android.os.Looper.getMainLooper()).idle()
         val settingsText = textOf(activity.findViewById(R.id.dashboard_content))
         assertTrue(settingsText.contains("Datenquelle"))
-        assertTrue(settingsText.contains("Loop-App (lokal)"))
+        assertTrue(settingsText.contains("Loop-App"))
         controller.pause().stop().destroy()
     }
 

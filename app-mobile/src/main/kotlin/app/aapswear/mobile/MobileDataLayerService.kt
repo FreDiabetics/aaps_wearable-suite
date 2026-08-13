@@ -1,10 +1,14 @@
 package app.aapswear.mobile
 
 import android.content.Context
+import android.os.Handler
+import android.os.Looper
+import android.widget.Toast
 import app.aapswear.protocol.WatchConfig
 import app.aapswear.protocol.WatchGlucoseUnit
 import app.aapswear.protocol.WearProtocol
 import app.aapswear.protocol.WatchGraphColors
+import app.aapswear.protocol.WatchGraphStyle
 import app.aapswear.mobile.ui.theme.SugarliciousColorRole
 import app.aapswear.mobile.ui.theme.SugarliciousColorStore
 import app.aapswear.storage.TherapyStateStore
@@ -39,6 +43,16 @@ class MobileDataLayerService : WearableListenerService() {
             WearProtocol.WATCH_CONFIG_REQUEST_PATH -> {
                 scope.launch {
                     publishWatchConfig(this@MobileDataLayerService)
+                }
+            }
+            WearProtocol.WATCH_FACE_STATUS_PATH -> {
+                val message = event.data.decodeToString()
+                Handler(Looper.getMainLooper()).post {
+                    Toast.makeText(
+                        applicationContext,
+                        message,
+                        Toast.LENGTH_SHORT,
+                    ).show()
                 }
             }
         }
@@ -91,7 +105,26 @@ internal fun readWatchConfig(context: Context): WatchConfig {
             cgmHigh = palette.argb(SugarliciousColorRole.CGM_DOT_HIGH),
             divider = palette.argb(SugarliciousColorRole.GRAPH_DIVIDER),
             outline = palette.argb(SugarliciousColorRole.GRAPH_CURRENT_OUTLINE),
+            predictionIob = palette.argb(SugarliciousColorRole.PREDICTION_IOB),
+            predictionCob = palette.argb(SugarliciousColorRole.PREDICTION_COB),
+            predictionUam = palette.argb(SugarliciousColorRole.PREDICTION_UAM),
+            predictionZeroTemp = palette.argb(SugarliciousColorRole.PREDICTION_ZERO_TEMP),
+        ),        graphStyle = WatchGraphStyle(
+            cgmDotRadiusDp =
+                preferences
+                    .getFloat("cgm.dotRadiusDp", 2.4f)
+                    .coerceIn(1.5f, 6.0f),
+            cgmDotOutlineEnabled =
+                preferences.getBoolean(
+                    "cgm.dotOutlineEnabled",
+                    true,
+                ),
+            cgmDotOutlineWidthDp =
+                preferences
+                    .getFloat("cgm.dotOutlineWidthDp", 0.95f)
+                    .coerceIn(0.25f, 3.0f),
         ),
+
         sentAtEpochMs = System.currentTimeMillis(),
     )
 }

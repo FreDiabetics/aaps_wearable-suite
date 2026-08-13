@@ -10,6 +10,7 @@ import app.aapswear.storage.TherapyStateStore
 import com.google.android.gms.wearable.DataEvent
 import com.google.android.gms.wearable.DataEventBuffer
 import com.google.android.gms.wearable.DataMapItem
+import com.google.android.gms.wearable.MessageEvent
 import com.google.android.gms.wearable.Wearable
 import com.google.android.gms.wearable.WearableListenerService
 import kotlinx.coroutines.CoroutineScope
@@ -52,6 +53,38 @@ class StateDataLayerService : WearableListenerService() {
         }
     }
 
+    override fun onMessageReceived(
+        event: MessageEvent,
+    ) {
+        if (event.path != WearProtocol.WATCH_FACE_APPLY_PATH) return
+
+        val index =
+            event.data
+                .decodeToString()
+                .toIntOrNull()
+                ?: return
+
+        scope.launch {
+            val status =
+                SugarliciousWatchFacePush.apply(
+                    this@StateDataLayerService,
+                    index,
+                )
+
+            runCatching {
+                Wearable
+                    .getMessageClient(
+                        this@StateDataLayerService,
+                    )
+                    .sendMessage(
+                        event.sourceNodeId,
+                        WearProtocol.WATCH_FACE_STATUS_PATH,
+                        status.encodeToByteArray(),
+                    )
+                    .await()
+            }
+        }
+    }
     private fun persistComplicationPreset(event: DataEvent) {
         val ids =
             runCatching {
@@ -62,7 +95,7 @@ class StateDataLayerService : WearableListenerService() {
             }
                 .getOrNull()
                 .orEmpty()
-                .filter { it in 1..27 }
+                .filter { it in 1..28 }
                 .distinct()
                 .take(MAX_PRESET_ITEMS)
 

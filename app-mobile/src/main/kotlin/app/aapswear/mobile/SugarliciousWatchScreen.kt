@@ -1,5 +1,7 @@
 package app.aapswear.mobile
 
+import android.widget.Toast
+
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
@@ -12,14 +14,19 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.aapswear.mobile.ui.theme.SugarliciousColors
 import app.aapswear.model.TherapyDisplayState
+import kotlinx.coroutines.launch
 
 internal data class SugarliciousWatchFaceCard(
     val name: String,
@@ -143,6 +150,47 @@ private fun SugarliciousWatchFaceCard(
                     color = if (selected) SugarliciousColors.Primary else SugarliciousColors.TextSecondary,
                     fontSize = 9.sp,
                 )
+                val applyContext = LocalContext.current
+                val applyScope = rememberCoroutineScope()
+
+                Button(
+                    onClick = {
+                        onSelected()
+
+                        applyScope.launch {
+                            val nodes =
+                                runCatching {
+                                    requestWatchFaceApply(
+                                        applyContext.applicationContext,
+                                        index,
+                                    )
+                                }.getOrDefault(0)
+
+                            if (nodes == 0) {
+                                Toast.makeText(
+                                    applyContext,
+                                    "Watch nicht erreichbar",
+                                    Toast.LENGTH_SHORT,
+                                ).show()
+                            }
+                        }
+                    },
+                    shape = RoundedCornerShape(999.dp),
+                    colors =
+                        ButtonDefaults.buttonColors(
+                            containerColor =
+                                SugarliciousColors.SurfaceHigh,
+                            contentColor =
+                                SugarliciousColors.Primary,
+                        ),
+                ) {
+                    Text(
+                        "AUF UHR",
+                        fontSize = 9.sp,
+                        fontWeight =
+                            androidx.compose.ui.text.font.FontWeight.Bold,
+                    )
+                }
             }
         }
     }

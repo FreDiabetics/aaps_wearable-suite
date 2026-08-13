@@ -52,6 +52,7 @@ import androidx.compose.ui.util.lerp
 import app.aapswear.mobile.ui.theme.SugarliciousColors
 import app.aapswear.model.TherapyDisplayState
 import app.aapswear.model.Trend
+import app.aapswear.model.TherapyDisplayFormatter
 import android.content.Context
 import android.graphics.BitmapFactory
 import android.util.Base64
@@ -352,36 +353,10 @@ internal fun FaceDial(
             ?.roundToInt()
             ?.toString()
             ?: "—"
-
     val trend =
-        when (
-            state?.glucose
-                ?.trend
-        ) {
-            Trend.DOUBLE_UP ->
-                "⇈"
-
-            Trend.SINGLE_UP ->
-                "↑"
-
-            Trend.FORTY_FIVE_UP ->
-                "↗"
-
-            Trend.FLAT ->
-                "→"
-
-            Trend.FORTY_FIVE_DOWN ->
-                "↘"
-
-            Trend.SINGLE_DOWN ->
-                "↓"
-
-            Trend.DOUBLE_DOWN ->
-                "⇊"
-
-            else ->
-                "·"
-        }
+        TherapyDisplayFormatter.trendArrow(
+            state?.glucose?.trend ?: Trend.UNKNOWN,
+        )
 
     val accent =
         when (index) {

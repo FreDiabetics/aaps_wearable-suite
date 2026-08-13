@@ -7,10 +7,11 @@ import android.os.Bundle
 import android.view.View
 import android.widget.LinearLayout
 import android.widget.TextView
+import app.aapswear.model.DataSourceId
 import app.aapswear.model.Freshness
 import app.aapswear.model.FreshnessPolicy
-import app.aapswear.model.DataSourceId
 import app.aapswear.model.GlucoseUnit
+import app.aapswear.model.TherapyDisplayFormatter
 import app.aapswear.model.TherapyDisplayState
 import app.aapswear.protocol.WatchGlucoseUnit
 import app.aapswear.storage.TherapyStateStore
@@ -54,6 +55,7 @@ class WearActivity : Activity() {
     private lateinit var basal: TextView
     private lateinit var therapyRow: LinearLayout
     private lateinit var chart: WearGlucoseChart
+    private lateinit var watchFacePushStatus: TextView
 
     private val displayPreferencesListener =
         SharedPreferences.OnSharedPreferenceChangeListener {
@@ -72,6 +74,12 @@ class WearActivity : Activity() {
             R.id.wear_connection_card,
         ).setOnClickListener {
             requestPhoneRefresh()
+        }
+
+        findViewById<View>(
+            R.id.wear_watchface_push_card,
+        ).setOnClickListener {
+            requestWatchFaceActivationPermission()
         }
 
         scope.launch {
@@ -142,6 +150,10 @@ class WearActivity : Activity() {
         basal = findViewById(R.id.wear_basal)
         therapyRow = findViewById(R.id.wear_therapy_row)
         chart = findViewById(R.id.wear_glucose_chart)
+        watchFacePushStatus =
+            findViewById(
+                R.id.wear_watchface_push_status,
+            )
     }
 
     private fun requestPhoneRefresh(
@@ -150,7 +162,10 @@ class WearActivity : Activity() {
         if (!::connection.isInitialized) return
 
         if (!initial) {
-            syncHint.text = getString(R.string.syncing_values)
+            syncHint.text =
+                getString(
+                    R.string.syncing_values,
+                )
         }
 
         scope.launch {
@@ -192,12 +207,16 @@ class WearActivity : Activity() {
 
         val canShowValue =
             glucoseState != null &&
-                freshness in setOf(
+                freshness in
+                setOf(
                     Freshness.CURRENT,
                     Freshness.DELAYED,
                 )
-        val targetLow = state?.target?.lowMgDl ?: 80.0
-        val targetHigh = state?.target?.highMgDl ?: 160.0
+
+        val targetLow =
+            state?.target?.lowMgDl ?: 80.0
+        val targetHigh =
+            state?.target?.highMgDl ?: 160.0
 
         clock.text =
             SimpleDateFormat(
@@ -253,7 +272,9 @@ class WearActivity : Activity() {
 
         trend.text =
             if (canShowValue) {
-                trendArrow(glucoseState.trend)
+                TherapyDisplayFormatter.trendArrow(
+                    glucoseState.trend,
+                )
             } else {
                 "—"
             }
@@ -329,6 +350,7 @@ class WearActivity : Activity() {
             showPredictions =
                 preferences.showPredictions,
             colors = preferences.graphColors,
+            style = preferences.graphStyle,
         )
 
         therapyRow.visibility =
@@ -361,9 +383,18 @@ class WearActivity : Activity() {
 
         source.text =
             when (state?.source) {
-                DataSourceId.ANDROID_APS -> "Lokale Loop-Daten"
-                DataSourceId.XDRIP_PLUS -> state.sourceVersion?.let { "xDrip+ $it" } ?: "xDrip+"
-                null -> getString(R.string.data_source_unavailable)
+                DataSourceId.ANDROID_APS ->
+                    "Lokale Loop-Daten"
+
+                DataSourceId.XDRIP_PLUS ->
+                    state.sourceVersion
+                        ?.let { "xDrip+ $it" }
+                        ?: "xDrip+"
+
+                null ->
+                    getString(
+                        R.string.data_source_unavailable,
+                    )
             }
 
         connection.text =
@@ -382,6 +413,67 @@ class WearActivity : Activity() {
                 },
             ),
         )
+
+        renderWatchFacePushStatus()
+    }
+
+    private fun requestWatchFaceActivationPermission() {
+        when {
+            !SugarliciousWatchFacePush.isSupported() ->
+                watchFacePushStatus.text =
+                    "Direktwechsel: Wear OS 6+ erforderlich"
+
+            SugarliciousWatchFacePush
+                .hasActivationPermission(this) ->
+                watchFacePushStatus.text =
+                    "Direktwechsel freigegeben"
+
+            else ->
+                requestPermissions(
+                    arrayOf(
+                        SugarliciousWatchFacePush
+                            .ACTIVE_PERMISSION,
+                    ),
+                    WATCH_FACE_PERMISSION_REQUEST,
+                )
+        }
+    }
+
+    private fun renderWatchFacePushStatus() {
+        if (!::watchFacePushStatus.isInitialized) {
+            return
+        }
+
+        watchFacePushStatus.text =
+            when {
+                !SugarliciousWatchFacePush.isSupported() ->
+                    "Direktwechsel auf diesem Wear OS nicht verfügbar"
+
+                SugarliciousWatchFacePush
+                    .hasActivationPermission(this) ->
+                    "Direktwechsel freigegeben"
+
+                else ->
+                    "Tippen, um Direktwechsel einmalig freizugeben"
+            }
+    }
+
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<out String>,
+        grantResults: IntArray,
+    ) {
+        super.onRequestPermissionsResult(
+            requestCode,
+            permissions,
+            grantResults,
+        )
+
+        if (requestCode ==
+            WATCH_FACE_PERMISSION_REQUEST
+        ) {
+            renderWatchFacePushStatus()
+        }
     }
 
     private fun resolveUnit(
@@ -410,7 +502,9 @@ class WearActivity : Activity() {
                 valueMgDl / 18.0,
             )
         } else {
-            valueMgDl.roundToInt().toString()
+            valueMgDl
+                .roundToInt()
+                .toString()
         }
 
     private fun formatDelta(
@@ -437,38 +531,11 @@ class WearActivity : Activity() {
                     value,
                 )
             } else {
-                value.roundToInt().toString()
+                value
+                    .roundToInt()
+                    .toString()
             }
     }
-
-    private fun trendArrow(
-        trend: app.aapswear.model.Trend,
-    ): String =
-        when (trend) {
-            app.aapswear.model.Trend.DOUBLE_UP ->
-                "⇈"
-
-            app.aapswear.model.Trend.SINGLE_UP ->
-                "↑"
-
-            app.aapswear.model.Trend.FORTY_FIVE_UP ->
-                "↗"
-
-            app.aapswear.model.Trend.FLAT ->
-                "→"
-
-            app.aapswear.model.Trend.FORTY_FIVE_DOWN ->
-                "↘"
-
-            app.aapswear.model.Trend.SINGLE_DOWN ->
-                "↓"
-
-            app.aapswear.model.Trend.DOUBLE_DOWN ->
-                "⇊"
-
-            app.aapswear.model.Trend.UNKNOWN ->
-                "—"
-        }
 
     private fun ageMinutes(
         timestamp: Long?,
@@ -497,6 +564,9 @@ class WearActivity : Activity() {
             ?: "—"
 
     companion object {
+        private const val WATCH_FACE_PERMISSION_REQUEST =
+            701
+
         private const val HISTORY_WINDOW_MS =
             24 * 60 * 60_000L
     }

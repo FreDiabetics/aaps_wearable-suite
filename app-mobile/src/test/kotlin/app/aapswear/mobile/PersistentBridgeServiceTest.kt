@@ -4,7 +4,6 @@ import android.app.Notification
 import android.app.NotificationManager
 import android.app.Service
 import android.content.Intent
-import android.graphics.Bitmap
 import android.graphics.Color
 import androidx.test.core.app.ApplicationProvider
 import app.aapswear.model.GlucoseState
@@ -82,25 +81,62 @@ class PersistentBridgeServiceTest {
         assertTrue(notification.extras.getBoolean(PersistentBridgeService.EXTRA_REQUEST_PROMOTED_ONGOING))
         assertTrue(content.contains("mg/dL"))
         assertNull(notification.getLargeIcon())
-        val picture = notification.extras.getParcelable(Notification.EXTRA_PICTURE, Bitmap::class.java)
-        assertNotNull(picture)
-        val rendered = requireNotNull(picture)
-        assertTrue("width=${rendered.width}", rendered.width > 0)
-        assertTrue("height=${rendered.height}", rendered.height > 0)
+        assertNotNull(notification.contentView)
+        assertNotNull(notification.bigContentView)
+        assertNull(notification.extras.getParcelable(Notification.EXTRA_PICTURE))
+
+        val collapsedGraph =
+            NotificationGraphRenderer.renderCollapsed(
+                context,
+                therapyState,
+                context.getSharedPreferences(
+                    "dashboard_ui",
+                    android.content.Context.MODE_PRIVATE,
+                ),
+            )
+        val expandedGraph =
+            NotificationGraphRenderer.renderExpanded(
+                context,
+                therapyState,
+                context.getSharedPreferences(
+                    "dashboard_ui",
+                    android.content.Context.MODE_PRIVATE,
+                ),
+            )
+
         assertEquals(
-            NotificationGraphRenderer.HEIGHT.toDouble() / NotificationGraphRenderer.WIDTH,
-            rendered.height.toDouble() / rendered.width,
-            0.02,
+            NotificationGraphRenderer.COLLAPSED_WIDTH,
+            collapsedGraph.width,
         )
-        val sourceGraph = NotificationGraphRenderer.render(
-            context,
-            therapyState,
-            context.getSharedPreferences("dashboard_ui", android.content.Context.MODE_PRIVATE),
+        assertEquals(
+            NotificationGraphRenderer.COLLAPSED_HEIGHT,
+            collapsedGraph.height,
         )
-        assertEquals(NotificationGraphRenderer.WIDTH, sourceGraph.width)
-        assertEquals(NotificationGraphRenderer.HEIGHT, sourceGraph.height)
-        assertEquals(0, Color.alpha(sourceGraph.getPixel(0, 0)))
-        assertTrue(Color.alpha(sourceGraph.getPixel(sourceGraph.width / 2, sourceGraph.height / 2)) > 0)
+        assertEquals(
+            NotificationGraphRenderer.EXPANDED_WIDTH,
+            expandedGraph.width,
+        )
+        assertEquals(
+            NotificationGraphRenderer.EXPANDED_HEIGHT,
+            expandedGraph.height,
+        )
+        assertEquals(
+            0,
+            Color.alpha(
+                collapsedGraph.getPixel(
+                    0,
+                    0,
+                ),
+            ),
+        )
+        assertTrue(
+            Color.alpha(
+                expandedGraph.getPixel(
+                    expandedGraph.width / 2,
+                    expandedGraph.height / 2,
+                ),
+            ) > 0,
+        )
         assertEquals(null, notification.extras.getCharSequence(Notification.EXTRA_SUB_TEXT))
         assertEquals(1, notification.actions.size)
         controller.destroy()

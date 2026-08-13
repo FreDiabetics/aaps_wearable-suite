@@ -32,6 +32,17 @@ data class WatchGraphColors(
     val cgmHigh: Int = 0xFFFFD040.toInt(),
     val divider: Int = 0xFF969696.toInt(),
     val outline: Int = 0xFF000000.toInt(),
+    val predictionIob: Int = 0xFF52C1FF.toInt(),
+    val predictionCob: Int = 0xFFF4DE00.toInt(),
+    val predictionUam: Int = 0xFFFFAE1F.toInt(),
+    val predictionZeroTemp: Int = 0xFF30DBDE.toInt(),
+)
+
+@Serializable
+data class WatchGraphStyle(
+    val cgmDotRadiusDp: Float = 2.4f,
+    val cgmDotOutlineEnabled: Boolean = true,
+    val cgmDotOutlineWidthDp: Float = 0.95f,
 )
 
 @Serializable
@@ -42,10 +53,11 @@ data class WatchConfig(
     val glucoseUnit: WatchGlucoseUnit = WatchGlucoseUnit.AAPS,
     val showTherapyStats: Boolean = true,
     val graphColors: WatchGraphColors = WatchGraphColors(),
+    val graphStyle: WatchGraphStyle = WatchGraphStyle(),
     val sentAtEpochMs: Long = 0L,
 ) {
     companion object {
-        const val CURRENT_SCHEMA = 2
+        const val CURRENT_SCHEMA = 3
     }
 }
 
@@ -55,6 +67,8 @@ object WearProtocol {
     const val WATCH_CONFIG_PATH = "/aaps-display/v1/watch-config"
     const val WATCH_CONFIG_REQUEST_PATH = "/aaps-display/v1/watch-config-request"
     const val COMPLICATION_PRESET_PATH = "/aaps-display/v1/complication-preset"
+    const val WATCH_FACE_APPLY_PATH = "/aaps-display/v1/watchface-apply"
+    const val WATCH_FACE_STATUS_PATH = "/aaps-display/v1/watchface-status"
     const val CAPABILITY = "aaps_display"
 
     private val json = Json {
@@ -78,6 +92,10 @@ object WearProtocol {
         val decoded = json.decodeFromString<WatchConfig>(bytes.decodeToString())
         return decoded.copy(
             graphHours = decoded.graphHours.takeIf { it in listOf(3, 6, 12, 24) } ?: 3,
+            graphStyle = decoded.graphStyle.copy(
+                cgmDotRadiusDp = decoded.graphStyle.cgmDotRadiusDp.coerceIn(1.5f, 6.0f),
+                cgmDotOutlineWidthDp = decoded.graphStyle.cgmDotOutlineWidthDp.coerceIn(0.25f, 3.0f),
+            ),
         )
     }
 

@@ -4,13 +4,14 @@ android {
     namespace="app.aapswear.watchface.sugarlicious.analog"
     compileSdk=36
     defaultConfig {
-        applicationId="app.aapswear.watchface.sugarlicious.analog"
+        applicationId = "app.aapswear.watchfacepush.analog"
         minSdk=33
         targetSdk=35
         versionCode=10
         versionName="0.6.2"
     }
     buildTypes {
+        debug { isMinifyEnabled = true }
         release {
             isMinifyEnabled=true
             isShrinkResources=false

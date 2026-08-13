@@ -41,6 +41,7 @@ import app.aapswear.model.TherapyDisplayState
 import app.aapswear.model.Trend
 import app.aapswear.storage.TherapyStateStore
 import app.aapswear.protocol.WatchGraphColors
+import app.aapswear.protocol.WatchGraphStyle
 import kotlinx.coroutines.flow.first
 
 enum class ProviderKind {
@@ -465,6 +466,7 @@ abstract class TherapyComplicationService(
         val width = canvas.width
         val glucose = state?.glucose
         val colors = readGraphColors()
+        val graphStyle = readGraphStyle()
         val targetLow = state?.target?.lowMgDl ?: DISPLAY_LOW_MGDL
         val targetHigh = state?.target?.highMgDl ?: DISPLAY_HIGH_MGDL
 
@@ -480,13 +482,11 @@ abstract class TherapyComplicationService(
 
         val targetPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = colors.rangeInRange
-            alpha = 55
-            style = Paint.Style.FILL
+style = Paint.Style.FILL
         }
         val guidePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = colors.divider
-            alpha = 120
-            style = Paint.Style.STROKE
+style = Paint.Style.STROKE
             strokeWidth = 2f
         }
         val inRangePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -591,21 +591,61 @@ abstract class TherapyComplicationService(
                     else -> inRangePaint
                 }
 
-            canvas.drawCircle(
-                xFor(sample.measuredAtEpochMs),
-                yFor(sample.valueMgDl),
-                5.5f,
-                paint,
-            )
+            run {
+                val x = xFor(sample.measuredAtEpochMs)
+                val y = yFor(sample.valueMgDl)
+                val density = resources.displayMetrics.density
+                val dotRadius =
+                    graphStyle.cgmDotRadiusDp
+                        .coerceIn(1.5f, 6.0f) *
+                        density
+                val outlineWidth =
+                    graphStyle.cgmDotOutlineWidthDp
+                        .coerceIn(0.25f, 3.0f) *
+                        density
+
+                if (graphStyle.cgmDotOutlineEnabled) {
+                    currentRingPaint.style = Paint.Style.FILL
+                    currentRingPaint.color = colors.outline
+                    canvas.drawCircle(
+                        x,
+                        y,
+                        dotRadius + outlineWidth,
+                        currentRingPaint,
+                    )
+                }
+
+                canvas.drawCircle(
+                    x,
+                    y,
+                    dotRadius,
+                    paint,
+                )
+            }
         }
 
         samples.lastOrNull()?.let { newest ->
-            canvas.drawCircle(
-                xFor(newest.measuredAtEpochMs),
-                yFor(newest.valueMgDl),
-                9f,
-                currentRingPaint,
-            )
+            val density = resources.displayMetrics.density
+            val dotRadius =
+                graphStyle.cgmDotRadiusDp
+                    .coerceIn(1.5f, 6.0f) *
+                    density *
+                    1.25f
+            val outlineWidth =
+                graphStyle.cgmDotOutlineWidthDp
+                    .coerceIn(0.25f, 3.0f) *
+                    density
+
+            if (graphStyle.cgmDotOutlineEnabled) {
+                currentRingPaint.style = Paint.Style.FILL
+                currentRingPaint.color = colors.outline
+                canvas.drawCircle(
+                    xFor(newest.measuredAtEpochMs),
+                    yFor(newest.valueMgDl),
+                    dotRadius + outlineWidth,
+                    currentRingPaint,
+                )
+            }
         }
     }
 
@@ -625,6 +665,36 @@ abstract class TherapyComplicationService(
         )
     }
 
+    private fun readGraphStyle(): WatchGraphStyle {
+        val defaults = WatchGraphStyle()
+        val preferences =
+            getSharedPreferences(
+                "watch_display",
+                Context.MODE_PRIVATE,
+            )
+
+        return WatchGraphStyle(
+            cgmDotRadiusDp =
+                preferences
+                    .getFloat(
+                        "cgm_dot_radius_dp",
+                        defaults.cgmDotRadiusDp,
+                    )
+                    .coerceIn(1.5f, 6.0f),
+            cgmDotOutlineEnabled =
+                preferences.getBoolean(
+                    "cgm_dot_outline_enabled",
+                    defaults.cgmDotOutlineEnabled,
+                ),
+            cgmDotOutlineWidthDp =
+                preferences
+                    .getFloat(
+                        "cgm_dot_outline_width_dp",
+                        defaults.cgmDotOutlineWidthDp,
+                    )
+                    .coerceIn(0.25f, 3.0f),
+        )
+    }
     private fun glucoseColor(glucose: GlucoseState?): Int =
         when {
             glucose == null -> Color.GRAY
@@ -780,6 +850,8 @@ class GlucoseComplication :
 
 class GlucoseTrendComplication :
     TherapyComplicationService(ProviderKind.GLUCOSE_TREND)
+class GlucoseTrendTextComplication :
+    TherapyComplicationService(ProviderKind.GLUCOSE_TREND)
 
 class GlucoseDeltaComplication :
     TherapyComplicationService(ProviderKind.GLUCOSE_DELTA)
@@ -860,6 +932,7 @@ object AllProviders {
     val classes = listOf(
         GlucoseComplication::class.java,
         GlucoseTrendComplication::class.java,
+        GlucoseTrendTextComplication::class.java,
         GlucoseDeltaComplication::class.java,
         GlucoseTrendDeltaComplication::class.java,
         GlucoseAgeComplication::class.java,

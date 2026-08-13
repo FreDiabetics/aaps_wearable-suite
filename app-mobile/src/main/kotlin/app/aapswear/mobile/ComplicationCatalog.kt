@@ -67,7 +67,7 @@ internal enum class ComplicationCategory(
     val label: String,
     val range: String,
 ) {
-    GLUCOSE("Glukose", "02 · 03 · 09 · 10"),
+    GLUCOSE("Glukose", "02 · 28 · 03 · 09 · 10"),
     THERAPY("Therapie", "11 · 14"),
 }
 
@@ -77,6 +77,12 @@ internal val SugarliciousComplicationCatalog = listOf(
         "Glucose + Trend",
         ComplicationCategory.GLUCOSE,
         "RANGED",
+    ),
+    ComplicationCatalogEntry(
+        28,
+        "Glucose + Trend Text",
+        ComplicationCategory.GLUCOSE,
+        "SHORT",
     ),
     ComplicationCatalogEntry(
         3,
@@ -715,6 +721,7 @@ private fun previewFor(
     return when (id) {
         1 -> PhonePreview(glucoseText, unitLabel(g?.displayUnit), glucoseColor)
         2 -> PhonePreview("$glucoseText$trend", "Glucose + Trend", glucoseColor)
+        28 -> PhonePreview("$glucoseText$trend", "Text", glucoseColor)
         3 -> PhonePreview("$delta · $age", "")
         4 -> PhonePreview("$glucoseText$trend", "Δ $delta", glucoseColor)
         5 -> PhonePreview(age, freshness.name.lowercase())

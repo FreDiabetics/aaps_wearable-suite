@@ -73,9 +73,10 @@ enum class SugarliciousColorRole(
 
 data class SugarliciousPalette(
     private val values: Map<SugarliciousColorRole, Int>,
+    val isLight: Boolean = false,
 ) {
     fun argb(role: SugarliciousColorRole): Int =
-        values[role] ?: role.defaultArgb
+        values[role] ?: if (isLight) role.lightArgb else role.defaultArgb
 
     fun compose(role: SugarliciousColorRole): Color =
         Color(argb(role))
@@ -83,20 +84,63 @@ data class SugarliciousPalette(
     companion object {
         fun defaults(): SugarliciousPalette =
             SugarliciousPalette(
-                SugarliciousColorRole.entries.associateWith { it.defaultArgb },
+                values =
+                    SugarliciousColorRole.entries.associateWith {
+                        it.defaultArgb
+                    },
+                isLight = false,
             )
     }
 }
 
 object SugarliciousColorStore {
-    private const val PREFIX = "color."
+    private const val LEGACY_PREFIX = "color."
+    private const val DARK_PREFIX = "color.dark."
+    private const val LIGHT_PREFIX = "color.light."
+
+    private fun isLight(preferences: SharedPreferences): Boolean =
+        preferences.getString("themeMode", "DARK") == "LIGHT"
+
+    private fun currentPrefix(preferences: SharedPreferences): String =
+        if (isLight(preferences)) LIGHT_PREFIX else DARK_PREFIX
 
     fun load(preferences: SharedPreferences): SugarliciousPalette {
-        val light = preferences.getString("themeMode", "DARK") == "LIGHT"
+        val light = isLight(preferences)
+        val prefix = if (light) LIGHT_PREFIX else DARK_PREFIX
+
         return SugarliciousPalette(
-            SugarliciousColorRole.entries.associateWith { role ->
-                preferences.getInt(PREFIX + role.preferenceKey, if (light) role.lightArgb else role.defaultArgb)
-            },
+            values =
+                SugarliciousColorRole.entries.associateWith { role ->
+                    val modeKey = prefix + role.preferenceKey
+                    val legacyKey =
+                        LEGACY_PREFIX + role.preferenceKey
+
+                    when {
+                        preferences.contains(modeKey) ->
+                            preferences.getInt(
+                                modeKey,
+                                if (light) {
+                                    role.lightArgb
+                                } else {
+                                    role.defaultArgb
+                                },
+                            )
+
+                        !light &&
+                            preferences.contains(legacyKey) ->
+                            preferences.getInt(
+                                legacyKey,
+                                role.defaultArgb,
+                            )
+
+                        light ->
+                            role.lightArgb
+
+                        else ->
+                            role.defaultArgb
+                    }
+                },
+            isLight = light,
         )
     }
 
@@ -106,7 +150,11 @@ object SugarliciousColorStore {
         argb: Int,
     ) {
         preferences.edit {
-            putInt(PREFIX + role.preferenceKey, argb)
+            putInt(
+                currentPrefix(preferences) +
+                    role.preferenceKey,
+                argb,
+            )
         }
     }
 
@@ -114,15 +162,37 @@ object SugarliciousColorStore {
         preferences: SharedPreferences,
         role: SugarliciousColorRole,
     ) {
+        val light = isLight(preferences)
         preferences.edit {
-            remove(PREFIX + role.preferenceKey)
+            remove(
+                currentPrefix(preferences) +
+                    role.preferenceKey,
+            )
+
+            if (!light) {
+                remove(
+                    LEGACY_PREFIX +
+                        role.preferenceKey,
+                )
+            }
         }
     }
 
     fun resetAll(preferences: SharedPreferences) {
         preferences.edit {
             SugarliciousColorRole.entries.forEach { role ->
-                remove(PREFIX + role.preferenceKey)
+                remove(
+                    LEGACY_PREFIX +
+                        role.preferenceKey,
+                )
+                remove(
+                    DARK_PREFIX +
+                        role.preferenceKey,
+                )
+                remove(
+                    LIGHT_PREFIX +
+                        role.preferenceKey,
+                )
             }
         }
     }
@@ -135,15 +205,21 @@ object SugarliciousColorStore {
  * immediately when a color is saved in Settings.
  */
 object SugarliciousColors {
-    var palette by mutableStateOf(SugarliciousPalette.defaults())
+    var palette by mutableStateOf(
+        SugarliciousPalette.defaults(),
+    )
         private set
 
     fun apply(palette: SugarliciousPalette) {
         this.palette = palette
     }
 
-    fun argb(role: SugarliciousColorRole): Int = palette.argb(role)
-    fun color(role: SugarliciousColorRole): Color = palette.compose(role)
+    fun argb(role: SugarliciousColorRole): Int =
+        palette.argb(role)
+
+    fun color(role: SugarliciousColorRole): Color =
+        palette.compose(role)
+
     val Primary get() = color(SugarliciousColorRole.PRIMARY)
     val OnPrimary get() = color(SugarliciousColorRole.ON_PRIMARY)
     val Secondary get() = color(SugarliciousColorRole.SECONDARY)

@@ -212,7 +212,7 @@ internal fun SugarliciousColorSettingsPanel(
                     ColorSettingRow(
                         role = role,
                         argb = argb,
-                        isDefault = argb == role.defaultArgb,
+                        isDefault = argb == if (palette.isLight) role.lightArgb else role.defaultArgb,
                         onEdit = {
                             editingRole = role
                         },
