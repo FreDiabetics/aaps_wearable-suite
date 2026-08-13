@@ -92,3 +92,17 @@ jobs:
             git commit -m "Restructure complications and watch customization"
             git push
           fi
+
+      - name: Remove temporary integration tooling
+        shell: bash
+        run: |
+          git rm \
+            .github/workflows/integrate-complication-watch-pass.yml \
+            tools/complication-constants-fix.py \
+            tools/complication-manifest-fix.py \
+            tools/complication-pass.py \
+            tools/complication-test-expectation-fix.py \
+            tools/complication-tests-fix.py \
+            tools/ui-watchface-pass.py
+          git commit -m "Remove temporary complication integration tooling"
+          git push
