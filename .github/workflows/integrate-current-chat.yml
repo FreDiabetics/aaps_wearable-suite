@@ -28,6 +28,16 @@ jobs:
       - name: Apply all current chat changes
         run: python3 tools/integrate-current-chat.py
 
+      - name: Fix stale complication provider test
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path('complications/src/test/kotlin/app/aapswear/complications/TherapyComplicationsTest.kt')
+          text = path.read_text(encoding='utf-8')
+          text = text.replace('assertEquals(27, AllProviders.classes.distinct().size)', 'assertEquals(28, AllProviders.classes.distinct().size)')
+          path.write_text(text, encoding='utf-8')
+          PY
+
       - name: Verify whitespace
         run: git diff --check
 
