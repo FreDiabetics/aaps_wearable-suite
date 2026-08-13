@@ -344,6 +344,9 @@ class PersistentBridgeService : Service(), SharedPreferences.OnSharedPreferenceC
         const val PREFERENCE_LIVE_NOTIFICATION = "liveNotification"
         const val PREFERENCE_NOTIFICATION_GRAPH_ENABLED = "notification.graphEnabled"
         const val PREFERENCE_NOTIFICATION_GRAPH_HOURS = "notification.graphHours"
+        const val PREFERENCE_NOTIFICATION_DOT_RADIUS = "notification.cgmDotRadiusDp"
+        const val PREFERENCE_NOTIFICATION_DOT_OUTLINE_ENABLED = "notification.cgmDotOutlineEnabled"
+        const val PREFERENCE_NOTIFICATION_DOT_OUTLINE_WIDTH = "notification.cgmDotOutlineWidthDp"
         const val EXTRA_REQUEST_PROMOTED_ONGOING = "android.requestPromotedOngoing"
         const val CHANNEL_ID = "sugarlicious_background"
         const val NOTIFICATION_ID = 4101
@@ -438,6 +441,16 @@ internal object NotificationGraphRenderer {
             SugarliciousColorStore.load(
                 preferences,
             )
+        val notificationColorPrefix =
+            if (palette.isLight) "notification.color.light." else "notification.color.dark."
+        fun graphColor(role: SugarliciousColorRole): Int {
+            val key = notificationColorPrefix + role.preferenceKey
+            return if (preferences.contains(key)) {
+                preferences.getInt(key, palette.argb(role))
+            } else {
+                palette.argb(role)
+            }
+        }
 
         val bounds =
             RectF(
@@ -466,9 +479,7 @@ internal object NotificationGraphRenderer {
             )
 
         paint.color =
-            palette.argb(
-                SugarliciousColorRole.GRAPH_BACKGROUND,
-            )
+            graphColor(SugarliciousColorRole.GRAPH_BACKGROUND)
         canvas.drawRoundRect(
             bounds,
             radius,
@@ -661,9 +672,7 @@ internal object NotificationGraphRenderer {
         paint.style =
             Paint.Style.FILL
         paint.color =
-            palette.argb(
-                SugarliciousColorRole.RANGE_IN_RANGE,
-            )
+            graphColor(SugarliciousColorRole.RANGE_IN_RANGE)
         canvas.drawRoundRect(
             plotLeft,
             y(targetHigh),
@@ -682,9 +691,7 @@ internal object NotificationGraphRenderer {
                 height / displayHeightDp,
             )
         paint.color =
-            palette.argb(
-                SugarliciousColorRole.GRAPH_DIVIDER,
-            )
+            graphColor(SugarliciousColorRole.GRAPH_DIVIDER)
 
         canvas.drawLine(
             plotLeft,
@@ -705,26 +712,20 @@ internal object NotificationGraphRenderer {
             height /
                 displayHeightDp
         val dotRadiusDp =
-            preferences
-                .getFloat(
-                    "cgm.dotRadiusDp",
-                    2.4f,
-                )
-                .coerceIn(
-                    1.5f,
-                    6.0f,
-                )
+            preferences.getFloat(
+                PersistentBridgeService.PREFERENCE_NOTIFICATION_DOT_RADIUS,
+                preferences.getFloat("cgm.dotRadiusDp", 2.4f),
+            ).coerceIn(1.5f, 6.0f)
         val outlineEnabled =
             preferences.getBoolean(
-                "cgm.dotOutlineEnabled",
-                true,
+                PersistentBridgeService.PREFERENCE_NOTIFICATION_DOT_OUTLINE_ENABLED,
+                preferences.getBoolean("cgm.dotOutlineEnabled", true),
             )
         val outlineWidthDp =
-            preferences
-                .getFloat(
-                    "cgm.dotOutlineWidthDp",
-                    0.95f,
-                )
+            preferences.getFloat(
+                PersistentBridgeService.PREFERENCE_NOTIFICATION_DOT_OUTLINE_WIDTH,
+                preferences.getFloat("cgm.dotOutlineWidthDp", 0.95f),
+            ).coerceIn(0.25f, 3.0f)
                 .coerceIn(
                     0.25f,
                     3.0f,
@@ -763,9 +764,7 @@ internal object NotificationGraphRenderer {
                 paint.style =
                     Paint.Style.FILL
                 paint.color =
-                    palette.argb(
-                        SugarliciousColorRole.GRAPH_CURRENT_OUTLINE,
-                    )
+                    graphColor(SugarliciousColorRole.GRAPH_CURRENT_OUTLINE)
                 canvas.drawCircle(
                     px,
                     py,
@@ -785,20 +784,14 @@ internal object NotificationGraphRenderer {
                 when {
                     point.value <
                         targetLow ->
-                        palette.argb(
-                            SugarliciousColorRole.CGM_DOT_LOW,
-                        )
+                        graphColor(SugarliciousColorRole.CGM_DOT_LOW)
 
                     point.value >
                         targetHigh ->
-                        palette.argb(
-                            SugarliciousColorRole.CGM_DOT_HIGH,
-                        )
+                        graphColor(SugarliciousColorRole.CGM_DOT_HIGH)
 
                     else ->
-                        palette.argb(
-                            SugarliciousColorRole.CGM_DOT_IN_RANGE,
-                        )
+                        graphColor(SugarliciousColorRole.CGM_DOT_IN_RANGE)
                 }
 
             canvas.drawCircle(

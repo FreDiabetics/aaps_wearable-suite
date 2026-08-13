@@ -18,9 +18,9 @@ class TherapyComplicationsTest {
 
     @Test
     fun `all documented providers remain active`() {
-        assertEquals(34, AllProviders.classes.distinct().size)
+        assertEquals(19, AllProviders.classes.distinct().size)
         assertEquals(GlucoseComplication::class.java, AllProviders.classes.first())
-        assertEquals(LongStatusComplication::class.java, AllProviders.classes.last())
+        assertEquals(GlucoseGraphComplication::class.java, AllProviders.classes.last())
     }
 
     @Test

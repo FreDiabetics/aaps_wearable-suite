@@ -973,6 +973,100 @@ private fun AlphaPicker(color: Color, alpha: Float, onChange: (Float) -> Unit) {
     }
 }
 
+
+@Composable
+internal fun NotificationGraphSettingsPanel() {
+    val context = LocalContext.current
+    val locale = androidx.compose.ui.platform.LocalConfiguration.current.locales[0]
+    val preferences = remember { context.getSharedPreferences("dashboard_ui", Context.MODE_PRIVATE) }
+    var revision by remember { mutableStateOf(0) }
+    var editingRole by remember { mutableStateOf<SugarliciousColorRole?>(null) }
+    val palette = SugarliciousColorStore.load(preferences)
+    val modePrefix = if (palette.isLight) "notification.color.light." else "notification.color.dark."
+    fun key(role: SugarliciousColorRole) = modePrefix + role.preferenceKey
+    fun resolved(role: SugarliciousColorRole): Int =
+        if (preferences.contains(key(role))) preferences.getInt(key(role), palette.argb(role)) else palette.argb(role)
+    var dotRadius by remember(revision) {
+        mutableFloatStateOf(preferences.getFloat(PersistentBridgeService.PREFERENCE_NOTIFICATION_DOT_RADIUS, preferences.getFloat("cgm.dotRadiusDp", 2.4f)).coerceIn(1.5f, 6f))
+    }
+    var outlineEnabled by remember(revision) {
+        mutableStateOf(preferences.getBoolean(PersistentBridgeService.PREFERENCE_NOTIFICATION_DOT_OUTLINE_ENABLED, preferences.getBoolean("cgm.dotOutlineEnabled", true)))
+    }
+    var outlineWidth by remember(revision) {
+        mutableFloatStateOf(preferences.getFloat(PersistentBridgeService.PREFERENCE_NOTIFICATION_DOT_OUTLINE_WIDTH, preferences.getFloat("cgm.dotOutlineWidthDp", 0.95f)).coerceIn(0.25f, 3f))
+    }
+    val roles = listOf(
+        SugarliciousColorRole.CGM_DOT_LOW,
+        SugarliciousColorRole.CGM_DOT_IN_RANGE,
+        SugarliciousColorRole.CGM_DOT_HIGH,
+        SugarliciousColorRole.GRAPH_CURRENT_OUTLINE,
+        SugarliciousColorRole.RANGE_IN_RANGE,
+        SugarliciousColorRole.GRAPH_BACKGROUND,
+        SugarliciousColorRole.GRAPH_DIVIDER,
+    )
+    Column(
+        Modifier.fillMaxWidth().background(SugarliciousColors.Surface, RoundedCornerShape(24.dp))
+            .border(1.dp, SugarliciousColors.Border, RoundedCornerShape(24.dp)).padding(14.dp),
+        verticalArrangement = Arrangement.spacedBy(9.dp),
+    ) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text("NOTIFICATION-GRAPH", color = SugarliciousColors.TextSecondary, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                Text("CGM-Dots & Farben", color = SugarliciousColors.TextPrimary, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                Text(if (palette.isLight) "Aktuelle Farbvariante: Hell" else "Aktuelle Farbvariante: Dunkel", color = SugarliciousColors.TextSecondary, fontSize = 9.sp)
+            }
+            TextButton(onClick = {
+                preferences.edit().apply {
+                    remove(PersistentBridgeService.PREFERENCE_NOTIFICATION_DOT_RADIUS)
+                    remove(PersistentBridgeService.PREFERENCE_NOTIFICATION_DOT_OUTLINE_ENABLED)
+                    remove(PersistentBridgeService.PREFERENCE_NOTIFICATION_DOT_OUTLINE_WIDTH)
+                    roles.forEach { remove(key(it)) }
+                }.apply()
+                revision++
+            }) { Text("RESET", color = SugarliciousColors.Primary, fontSize = 9.sp, fontWeight = FontWeight.Bold) }
+        }
+        GraphSettingSlider(
+            "Punktgröße", "Nur die CGM-Dots in der Notification", dotRadius, 1.5f..6f,
+            "${String.format(locale, "%.1f", dotRadius)} dp",
+            { dotRadius = it },
+            { preferences.edit().putFloat(PersistentBridgeService.PREFERENCE_NOTIFICATION_DOT_RADIUS, dotRadius).apply() },
+        )
+        GraphSettingSwitch("Kontur", "Kontur der Notification-CGM-Dots", outlineEnabled) {
+            outlineEnabled = it
+            preferences.edit().putBoolean(PersistentBridgeService.PREFERENCE_NOTIFICATION_DOT_OUTLINE_ENABLED, it).apply()
+        }
+        if (outlineEnabled) {
+            GraphSettingSlider(
+                "Konturdicke", "Nur für Notification-CGM-Dots", outlineWidth, 0.25f..3f,
+                "${String.format(locale, "%.2f", outlineWidth)} dp",
+                { outlineWidth = it },
+                { preferences.edit().putFloat(PersistentBridgeService.PREFERENCE_NOTIFICATION_DOT_OUTLINE_WIDTH, outlineWidth).apply() },
+            )
+        }
+        roles.forEach { role ->
+            ColorSettingRow(
+                role = role,
+                argb = resolved(role),
+                isDefault = !preferences.contains(key(role)),
+                onEdit = { editingRole = role },
+                onReset = { preferences.edit().remove(key(role)).apply(); revision++ },
+            )
+        }
+    }
+    editingRole?.let { role ->
+        ColorEditorDialog(
+            role = role,
+            initialArgb = resolved(role),
+            onDismiss = { editingRole = null },
+            onSave = { argb ->
+                preferences.edit().putInt(key(role), argb).apply()
+                revision++
+                editingRole = null
+            },
+        )
+    }
+}
+
 private fun toHex(argb: Int): String =
     String.format(
         "#%02X%02X%02X%02X",

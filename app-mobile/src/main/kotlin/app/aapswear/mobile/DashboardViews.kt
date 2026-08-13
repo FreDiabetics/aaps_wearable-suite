@@ -680,6 +680,19 @@ class DashboardViewFactory(
         )
 
         parent.addView(settingsGroupLabel("BENACHRICHTIGUNG"), fullWidth())
+        val notificationGraphCustomization = LinearLayout(context).apply {
+            orientation = LinearLayout.VERTICAL
+            visibility = View.GONE
+            addView(
+                androidx.compose.ui.platform.ComposeView(context).apply {
+                    setViewCompositionStrategy(
+                        androidx.compose.ui.platform.ViewCompositionStrategy.DisposeOnDetachedFromWindow,
+                    )
+                    setContent { SugarliciousTheme { NotificationGraphSettingsPanel() } }
+                },
+                fullWidth(),
+            )
+        }
         parent.addView(
             tile(null).apply {
                 addView(
@@ -717,10 +730,19 @@ class DashboardViewFactory(
                             ),
                         ),
                     )
+                    addView(divider())
+                    addView(
+                        actionRow("CGM-Dots & Farben", "Anpassen") {
+                            notificationGraphCustomization.visibility =
+                                if (notificationGraphCustomization.visibility == View.VISIBLE) View.GONE else View.VISIBLE
+                        },
+                    )
                 }
             },
             cardParams(top = 4),
         )
+
+        parent.addView(notificationGraphCustomization, cardParams(top = 4))
 
         parent.addView(settingsGroupLabel("UHR & WATCHFACES"), fullWidth())
         parent.addView(

@@ -138,7 +138,10 @@ internal fun OverviewWatchFaceTile(
     selectedFaceIndex: Int,
     onSelectedFace: (Int) -> Unit,
     onEdit: () -> Unit,
+    interactive: Boolean = true,
 ) {
+    val context = LocalContext.current
+    val activeComplicationIds = loadComplicationPreset(context)
     val selected = selectedFaceIndex.coerceIn(0, sugarliciousWatchFaceNames.lastIndex)
     val midpoint = carouselPages / 2
     val aligned = midpoint - midpoint % sugarliciousWatchFaceNames.size
@@ -220,15 +223,18 @@ internal fun OverviewWatchFaceTile(
                     FaceDial(
                         index = index,
                         state = state,
+                        activeComplicationIds = activeComplicationIds,
                         modifier = Modifier.size(carouselFaceSize),
                     )
                 }
             }
-            Box(
-                Modifier.matchParentSize()
-                    .then(oneStepSwipe)
-                    .clickable(onClick = onEdit),
-            )
+            if (interactive) {
+                Box(
+                    Modifier.matchParentSize()
+                        .then(oneStepSwipe)
+                        .clickable(onClick = onEdit),
+                )
+            }
         }
 
         Column(
@@ -345,6 +351,7 @@ private fun GalaxyWatchUltraFrame() {
 internal fun FaceDial(
     index: Int,
     state: TherapyDisplayState?,
+    activeComplicationIds: List<Int> = emptyList(),
     modifier: Modifier = Modifier,
 ) {
     val glucose =
@@ -515,11 +522,14 @@ internal fun FaceDial(
             fun sx(value: Float): Float = (center.x - 256f * scale) + value * scale
             fun sy(value: Float): Float = (center.y - 256f * scale) + value * scale
 
-            // Fixed preview geometry: hour at 10, minute at 2, second at 6.
-            // Bottom -> top: hour, minute, grey dot, second, black dot.
-            val hourAngle = CAROUSEL_PREVIEW_HOUR_ANGLE.toFloat()
-            val minuteAngle = CAROUSEL_PREVIEW_MINUTE_ANGLE.toFloat()
-            val secondAngle = CAROUSEL_PREVIEW_SECOND_ANGLE.toFloat()
+            // Live preview time.
+            val calendar = java.util.Calendar.getInstance()
+            val hour = calendar.get(java.util.Calendar.HOUR)
+            val minute = calendar.get(java.util.Calendar.MINUTE)
+            val second = calendar.get(java.util.Calendar.SECOND)
+            val hourAngle = (hour % 12) * 30f + minute * 0.5f
+            val minuteAngle = minute * 6f + second * 0.1f
+            val secondAngle = second * 6f
 
             withTransform({ rotate(degrees = hourAngle, pivot = center) }) {
                 drawRect(
@@ -619,27 +629,22 @@ internal fun FaceDial(
                 )
             }
 
-            Text(
-                "IOB ${
-                    state?.insulin
-                        ?.totalIob
-                        ?.let {
-                            String.format(
-                                Locale.getDefault(),
-                                "%.1f",
-                                it,
-                            )
-                        }
-                        ?: "—"
-                }",
-                color =
-                    Color.White.copy(
-                        alpha =
-                            0.58f,
-                    ),
-                fontSize =
-                    5.5.sp,
-            )
+            if (activeComplicationIds.isEmpty()) {
+                Text(
+                    "Keine Complications",
+                    color = Color.White.copy(alpha = 0.48f),
+                    fontSize = 5.2.sp,
+                )
+            } else {
+                activeComplicationIds.take(3).forEach { complicationId ->
+                    Text(
+                        complicationPreviewLabel(complicationId, state),
+                        color = Color.White.copy(alpha = 0.62f),
+                        fontSize = 4.9.sp,
+                        maxLines = 1,
+                    )
+                }
+            }
         }
     }
 }

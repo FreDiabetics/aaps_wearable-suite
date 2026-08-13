@@ -192,6 +192,8 @@ internal fun SugarliciousOverviewScreen(
             },
         )
 
+        Spacer(Modifier.height(8.dp))
+
         GlucoseHeroCard(
             glucoseText = glucoseText,
             glucoseColor = glucoseColor,

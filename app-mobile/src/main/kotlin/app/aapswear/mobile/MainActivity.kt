@@ -160,7 +160,7 @@ class MainActivity : ComponentActivity() {
             syncNow = ::syncNow,
             openContactEmail = ::openContactEmail,
         ))
-        bindNavigation()
+        bindTopNavigation()
         PersistentBridgeService.start(this)
         requestNotificationPermissionIfNeeded()
         scope.launch {
@@ -247,14 +247,8 @@ class MainActivity : ComponentActivity() {
         if (screen != DashboardScreen.SETTINGS || forceSettingsRender) {
             factory.render(content, screen, state, diagnosticState, uiState, System.currentTimeMillis())
         }
-        val sourceAvailable = diagnosticState.sourceVersion != null
-        findViewById<ImageView>(R.id.source_shield).apply {
-            alpha = if (sourceAvailable) 1f else 0.45f
-            imageTintList = ColorStateList.valueOf(
-                SugarliciousColors.argb(if (sourceAvailable) SugarliciousColorRole.PRIMARY else SugarliciousColorRole.TEXT_SECONDARY),
-            )
-        }
-        updateNavigation()
+        renderFixedWatchHeader(diagnosticState, uiState)
+        updateTopBar()
     }
 
 
@@ -301,18 +295,14 @@ class MainActivity : ComponentActivity() {
         findViewById<TextView>(R.id.app_title)
             .setTextColor(text)
 
-        findViewById<View>(R.id.bottom_navigation).background =
-            GradientDrawable().apply {
-                cornerRadius = 28.dp.toFloat()
-                setColor(surface)
-                setStroke(1.dp, border)
-            }
-styleTitle()
+        findViewById<ImageView>(R.id.brand_logo).imageTintList = ColorStateList.valueOf(text)
+        findViewById<ImageView>(R.id.top_back).imageTintList = ColorStateList.valueOf(text)
+        findViewById<ImageView>(R.id.top_settings).imageTintList = ColorStateList.valueOf(text)
+        updateTopBar()
     }
-    private fun bindNavigation() {
-        findViewById<View>(R.id.nav_overview).setOnClickListener { navigate(DashboardScreen.OVERVIEW) }
-        findViewById<View>(R.id.nav_watch).setOnClickListener { navigate(DashboardScreen.WATCH) }
-        findViewById<View>(R.id.nav_settings).setOnClickListener { navigate(DashboardScreen.SETTINGS) }
+    private fun bindTopNavigation() {
+        findViewById<View>(R.id.top_settings).setOnClickListener { navigate(DashboardScreen.SETTINGS) }
+        findViewById<View>(R.id.top_back).setOnClickListener { navigate(DashboardScreen.OVERVIEW) }
     }
 
     private fun navigate(target: DashboardScreen) {
@@ -322,41 +312,71 @@ styleTitle()
         refresh(forceSettingsRender = true)
     }
 
-    private fun updateNavigation() {
-        val entries = listOf(
-            DashboardScreen.OVERVIEW to Triple(R.id.nav_overview, R.id.nav_overview_icon, R.id.nav_overview_label),
-            DashboardScreen.WATCH to Triple(R.id.nav_watch, R.id.nav_watch_icon, R.id.nav_watch_label),
-            DashboardScreen.SETTINGS to Triple(R.id.nav_settings, R.id.nav_settings_icon, R.id.nav_settings_label),
-        )
-        entries.forEach { (target, views) ->
-            val (itemId, iconId, labelId) = views
-            val selected = screen == target
-            val color = SugarliciousColors.argb(if (selected) SugarliciousColorRole.PRIMARY else SugarliciousColorRole.TEXT_SECONDARY)
-            findViewById<View>(itemId).background =
-                GradientDrawable().apply {
-                    cornerRadius = 20.dp.toFloat()
-                    setColor(
-                        if (selected) {
-                            SugarliciousColors.argb(
-                                SugarliciousColorRole.SURFACE_SELECTED,
-                            )
-                        } else {
-                            Color.TRANSPARENT
-                        },
-                    )
-                }
-            findViewById<ImageView>(iconId).apply {
-                imageTintList = ColorStateList.valueOf(color)
-                alpha = if (selected) 1f else 0.72f
+    private fun updateTopBar() {
+        val back = findViewById<View>(R.id.top_back)
+        val brand = findViewById<View>(R.id.brand_logo)
+        val title = findViewById<TextView>(R.id.app_title)
+        val settings = findViewById<View>(R.id.top_settings)
+        when (screen) {
+            DashboardScreen.OVERVIEW -> {
+                back.visibility = View.GONE
+                brand.visibility = View.VISIBLE
+                settings.visibility = View.VISIBLE
+                styleTitle()
             }
-            findViewById<TextView>(labelId).apply {
-                setTextColor(color)
-                setTypeface(
-                    typeface,
-                    if (selected) android.graphics.Typeface.BOLD else android.graphics.Typeface.NORMAL,
-                )
+            DashboardScreen.WATCH -> {
+                back.visibility = View.VISIBLE
+                brand.visibility = View.GONE
+                settings.visibility = View.GONE
+                title.text = "Watch"
+            }
+            DashboardScreen.SETTINGS -> {
+                back.visibility = View.VISIBLE
+                brand.visibility = View.GONE
+                settings.visibility = View.GONE
+                title.text = "Einstellungen"
             }
         }
+    }
+
+    private fun renderFixedWatchHeader(
+        diagnosticState: DiagnosticsSnapshot,
+        uiState: DashboardUiPreferences,
+    ) {
+        val container = findViewById<android.widget.FrameLayout>(R.id.watch_fixed_header)
+        if (screen != DashboardScreen.WATCH) {
+            container.visibility = View.GONE
+            container.removeAllViews()
+            return
+        }
+        container.visibility = View.VISIBLE
+        container.removeAllViews()
+        val composeView = androidx.compose.ui.platform.ComposeView(this).apply {
+            setViewCompositionStrategy(
+                androidx.compose.ui.platform.ViewCompositionStrategy.DisposeOnDetachedFromWindow,
+            )
+            setContent {
+                app.aapswear.mobile.ui.theme.SugarliciousTheme {
+                    OverviewWatchFaceTile(
+                        state = state,
+                        diagnostics = diagnosticState,
+                        selectedFaceIndex = uiState.watchFaceIndex,
+                        onSelectedFace = { index ->
+                            uiPreferences.edit { putInt("watchFaceIndex", index.coerceIn(0, 3)) }
+                        },
+                        onEdit = {},
+                        interactive = false,
+                    )
+                }
+            }
+        }
+        container.addView(
+            composeView,
+            android.widget.FrameLayout.LayoutParams(
+                android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+                android.view.ViewGroup.LayoutParams.WRAP_CONTENT,
+            ),
+        )
     }
 
     private fun styleTitle() {

@@ -32,7 +32,8 @@
                     android:layout_width="26dp"
                     android:layout_height="26dp"
                     android:contentDescription="@string/brand_logo"
-                    android:src="@drawable/frediabetics_logo" />
+                    android:src="@drawable/ic_sugarlicious_monochrome"
+                    android:tint="@color/wear_text" />
 
                 <TextView
                     android:layout_width="0dp"

@@ -15,7 +15,11 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -69,15 +73,10 @@ internal fun SugarliciousWatchScreen(
     onSelectedFace: (Int) -> Unit,
     onNavigate: (DashboardScreen) -> Unit,
 ) {
+    val context = LocalContext.current
+    var activePreset by remember { mutableStateOf(loadComplicationPreset(context)) }
     Column(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .menuSwipeNavigation(
-                    screen = DashboardScreen.WATCH,
-                    onNavigate = onNavigate,
-                )
-                .padding(horizontal = 2.dp, vertical = 4.dp),
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 2.dp, vertical = 4.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         sugarliciousWatchFaceCards.indices.chunked(2).forEach { indices ->
@@ -91,6 +90,7 @@ internal fun SugarliciousWatchScreen(
                         face = sugarliciousWatchFaceCards[index],
                         index = index,
                         state = state,
+                        activeComplicationIds = activePreset,
                         selected = preferences.watchFaceIndex == index,
                         onSelected = { onSelectedFace(index) },
                     )
@@ -102,7 +102,7 @@ internal fun SugarliciousWatchScreen(
             }
         }
 
-        ComplicationStudio(state = state)
+        ComplicationStudio(state = state, onPresetChanged = { activePreset = it })
     }
 }
 
@@ -112,6 +112,7 @@ private fun WatchFaceTile(
     face: SugarliciousWatchFaceCard,
     index: Int,
     state: TherapyDisplayState?,
+    activeComplicationIds: List<Int>,
     selected: Boolean,
     onSelected: () -> Unit,
 ) {
@@ -172,6 +173,7 @@ private fun WatchFaceTile(
             FaceDial(
                 index = index,
                 state = state,
+                activeComplicationIds = activeComplicationIds,
                 modifier = Modifier.size(116.dp),
             )
 

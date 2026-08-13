@@ -95,7 +95,7 @@ class StateDataLayerService : WearableListenerService() {
             DataMapItem.fromDataItem(event.dataItem).dataMap
         }.getOrNull() ?: return
         val ids = dataMap.getIntegerArrayList("ids").orEmpty()
-            .filter { it in 1..34 }
+            .filter { it in 1..36 }
             .distinct()
             .take(MAX_PRESET_ITEMS)
         val graphHours = dataMap.getInt("graphHours", 3)

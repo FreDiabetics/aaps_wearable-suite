@@ -52,6 +52,8 @@ import kotlinx.coroutines.flow.first
 
 enum class ProviderKind {
     GLUCOSE,
+    TREND_ONLY,
+    DELTA_ONLY,
     GLUCOSE_PLUS_DELTA,
     GLUCOSE_TREND_DELTA_AGE,
     GLUCOSE_TREND_AGE,
@@ -129,6 +131,12 @@ abstract class TherapyComplicationService(
         val pair: Pair<String, String> = when (kind) {
             ProviderKind.GLUCOSE ->
                 glucoseText to "Glucose"
+
+            ProviderKind.TREND_ONLY ->
+                trendText.ifBlank { DASH } to "Trend"
+
+            ProviderKind.DELTA_ONLY ->
+                deltaText.ifBlank { DASH } to "Delta"
 
             ProviderKind.GLUCOSE_PLUS_DELTA ->
                 "$glucoseText ${deltaText.ifBlank { DASH }}" to "Glucose + Delta"
@@ -888,6 +896,10 @@ abstract class TherapyComplicationService(
 
 class GlucoseComplication :
     TherapyComplicationService(ProviderKind.GLUCOSE)
+class TrendOnlyComplication :
+    TherapyComplicationService(ProviderKind.TREND_ONLY)
+class DeltaOnlyComplication :
+    TherapyComplicationService(ProviderKind.DELTA_ONLY)
 
 class GlucosePlusDeltaComplication :
     TherapyComplicationService(ProviderKind.GLUCOSE_PLUS_DELTA)
@@ -986,38 +998,23 @@ class LongStatusComplication :
 object AllProviders {
     val classes = listOf(
         GlucoseComplication::class.java,
+        TrendOnlyComplication::class.java,
+        DeltaOnlyComplication::class.java,
+        GlucoseAgeComplication::class.java,
+        BasalComplication::class.java,
+        IobComplication::class.java,
+        CobComplication::class.java,
+        GlucoseTrendComplication::class.java,
         GlucosePlusDeltaComplication::class.java,
-        GlucoseTrendDeltaAgeComplication::class.java,
+        GlucoseDeltaComplication::class.java,
         GlucoseTrendAgeComplication::class.java,
+        GlucoseTrendDeltaComplication::class.java,
+        GlucoseTrendDeltaAgeComplication::class.java,
+        IobCobBasalComplication::class.java,
+        LoopComplication::class.java,
+        ReservoirComplication::class.java,
         SensorAgeComplication::class.java,
         TirComplication::class.java,
-        GlucoseTrendComplication::class.java,
-        GlucoseTrendTextComplication::class.java,
-        GlucoseDeltaComplication::class.java,
-        GlucoseTrendDeltaComplication::class.java,
-        GlucoseAgeComplication::class.java,
-        GlucoseImageComplication::class.java,
-        GlucoseRangeComplication::class.java,
-        GlucoseRangedComplication::class.java,
         GlucoseGraphComplication::class.java,
-        GlucoseGraphLargeComplication::class.java,
-        IobComplication::class.java,
-        BolusIobComplication::class.java,
-        BasalIobComplication::class.java,
-        CobComplication::class.java,
-        IobCobComplication::class.java,
-        IobCobBasalComplication::class.java,
-        BasalComplication::class.java,
-        TempBasalComplication::class.java,
-        TempTargetComplication::class.java,
-        LoopComplication::class.java,
-        LastLoopComplication::class.java,
-        ProfileComplication::class.java,
-        ReservoirComplication::class.java,
-        PumpBatteryComplication::class.java,
-        PhoneBatteryComplication::class.java,
-        SourceComplication::class.java,
-        AapsStatusComplication::class.java,
-        LongStatusComplication::class.java,
     )
 }

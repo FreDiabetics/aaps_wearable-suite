@@ -44,6 +44,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.aapswear.mobile.ui.theme.SugarliciousColors
+import app.aapswear.mobile.ui.theme.SugarliciousColorRole
 import app.aapswear.model.Freshness
 import app.aapswear.model.FreshnessPolicy
 import app.aapswear.model.GlucoseSample
@@ -74,25 +75,30 @@ internal enum class ComplicationCategory(
 
 internal val SugarliciousComplicationCatalog = listOf(
     ComplicationCatalogEntry(1, "Glukose", ComplicationCategory.GLUCOSE, "SHORT · RANGED · LONG"),
-    ComplicationCatalogEntry(29, "Glukose + Delta", ComplicationCategory.GLUCOSE, "SHORT · LONG"),
+    ComplicationCatalogEntry(35, "Trend", ComplicationCategory.GLUCOSE, "SHORT"),
+    ComplicationCatalogEntry(36, "Delta", ComplicationCategory.GLUCOSE, "SHORT"),
+    ComplicationCatalogEntry(5, "Zeit seit letztem Wert", ComplicationCategory.GLUCOSE, "SHORT"),
+    ComplicationCatalogEntry(16, "Basal", ComplicationCategory.THERAPY, "SHORT"),
     ComplicationCatalogEntry(11, "IOB", ComplicationCategory.THERAPY, "SHORT · RANGED"),
     ComplicationCatalogEntry(14, "COB", ComplicationCategory.THERAPY, "SHORT · RANGED"),
-    ComplicationCatalogEntry(16, "Basal", ComplicationCategory.THERAPY, "SHORT"),
+    ComplicationCatalogEntry(2, "Glukose + Trend", ComplicationCategory.GLUCOSE, "SHORT · RANGED"),
+    ComplicationCatalogEntry(29, "Glukose + Delta", ComplicationCategory.GLUCOSE, "SHORT · LONG"),
+    ComplicationCatalogEntry(3, "Zeit + Delta", ComplicationCategory.GLUCOSE, "SHORT"),
+    ComplicationCatalogEntry(33, "Glukose + Trend + Zeit", ComplicationCategory.GLUCOSE, "SHORT · LONG"),
+    ComplicationCatalogEntry(4, "Glukose + Trend + Delta", ComplicationCategory.GLUCOSE, "SHORT"),
+    ComplicationCatalogEntry(32, "Glukose + Trend + Delta + Zeit", ComplicationCategory.GLUCOSE, "SHORT · LONG"),
+    ComplicationCatalogEntry(34, "IOB + COB + Basal", ComplicationCategory.THERAPY, "SHORT · LONG"),
     ComplicationCatalogEntry(19, "Loop Status", ComplicationCategory.THERAPY, "SHORT · ICON"),
     ComplicationCatalogEntry(22, "Pumpe / Reservoir", ComplicationCategory.THERAPY, "SHORT · RANGED"),
     ComplicationCatalogEntry(30, "Sensoralter", ComplicationCategory.GLUCOSE, "SHORT · RANGED"),
     ComplicationCatalogEntry(31, "TIR", ComplicationCategory.GLUCOSE, "SHORT · GOAL · WEIGHTED"),
     ComplicationCatalogEntry(9, "CGM Graph", ComplicationCategory.GLUCOSE, "IMAGE"),
-    ComplicationCatalogEntry(3, "Zeit + Delta", ComplicationCategory.GLUCOSE, "SHORT"),
-    ComplicationCatalogEntry(32, "Glukose + Trend + Delta + Zeit", ComplicationCategory.GLUCOSE, "SHORT · LONG"),
-    ComplicationCatalogEntry(33, "Glukose + Trend + Zeit", ComplicationCategory.GLUCOSE, "SHORT · LONG"),
-    ComplicationCatalogEntry(4, "Glukose + Trend + Delta", ComplicationCategory.GLUCOSE, "SHORT"),
-    ComplicationCatalogEntry(34, "IOB + COB + Basal", ComplicationCategory.THERAPY, "SHORT · LONG"),
 )
 
 @Composable
 internal fun ComplicationStudio(
     state: TherapyDisplayState?,
+    onPresetChanged: (List<Int>) -> Unit = {},
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -241,6 +247,7 @@ internal fun ComplicationStudio(
                                 Toast.makeText(context, "Das Watch-Preset hat maximal 4 Plätze.", Toast.LENGTH_SHORT).show()
                             } else {
                                 selected = updated
+                                onPresetChanged(updated)
                                 syncLabel = "Preset geändert · wird synchronisiert"
                                 scope.launch {
                                     runCatching { syncComplicationPreset(context, updated, graphHours) }
@@ -349,24 +356,27 @@ private fun ComplicationCatalogTile(
 ) {
     val shape = RoundedCornerShape(18.dp)
     Column(
-        modifier = modifier
-            .aspectRatio(0.92f)
+        modifier = modifier.aspectRatio(1f)
             .background(if (selected) SugarliciousColors.SurfaceSelected else SugarliciousColors.SurfaceHigh, shape)
-            .border(1.dp, if (selected) SugarliciousColors.Primary.copy(alpha = 0.55f) else SugarliciousColors.Border.copy(alpha = 0.55f), shape)
+            .border(1.dp, if (selected) SugarliciousColors.Primary.copy(alpha = 0.62f) else SugarliciousColors.Border.copy(alpha = 0.55f), shape)
             .clickable(onClick = onToggle)
-            .padding(7.dp),
+            .padding(horizontal = 6.dp, vertical = 8.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(4.dp),
+        verticalArrangement = Arrangement.spacedBy(5.dp),
     ) {
-        Text(entry.name, color = SugarliciousColors.TextPrimary, fontSize = 8.5.sp, lineHeight = 10.sp,
-            fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis,
-            textAlign = androidx.compose.ui.text.style.TextAlign.Center)
-        Text(entry.types, color = SugarliciousColors.TextSecondary, fontSize = 6.5.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(
+            entry.name,
+            color = SugarliciousColors.TextPrimary,
+            fontSize = 8.5.sp,
+            lineHeight = 10.sp,
+            fontWeight = FontWeight.Bold,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+        )
         Spacer(Modifier.weight(1f))
         CompactComplicationPreview(entry, state, graphHours)
-        Text(if (selected) "✓ PRESET" else "+ PRESET",
-            color = if (selected) SugarliciousColors.Primary else SugarliciousColors.TextSecondary,
-            fontSize = 6.5.sp, fontWeight = FontWeight.Bold)
+        Spacer(Modifier.weight(1f))
     }
 }
 
@@ -675,56 +685,55 @@ private fun CircularGlucoseComplicationPreview(
     }
 }
 @Composable
-private fun MiniGlucosePreview(
-    samples: List<GlucoseSample>,
-    current: GlucoseSample?,
-    hours: Int,
-) {
+private fun MiniGlucosePreview(samples: List<GlucoseSample>, current: GlucoseSample?, hours: Int) {
+    val context = LocalContext.current
+    val preferences = remember { context.getSharedPreferences("dashboard_ui", Context.MODE_PRIVATE) }
     val now = System.currentTimeMillis()
     val cutoff = now - hours * 60L * 60_000L
-    val fallback = demoHistory(now, hours)
     val merged = (samples + listOfNotNull(current))
-        .filter { it.measuredAtEpochMs >= cutoff && it.valueMgDl in 20.0..1000.0 }
+        .filter { it.measuredAtEpochMs in cutoff..(now + 5 * 60_000L) && it.valueMgDl in 20.0..1000.0 }
         .distinctBy { it.measuredAtEpochMs }
         .sortedBy { it.measuredAtEpochMs }
-        .ifEmpty { fallback }
-
+        .ifEmpty { demoHistory(now, hours) }
+    val dotRadiusDp = preferences.getFloat("cgm.dotRadiusDp", 2.4f).coerceIn(1.5f, 6f)
+    val outlineEnabled = preferences.getBoolean("cgm.dotOutlineEnabled", true)
+    val outlineWidthDp = preferences.getFloat("cgm.dotOutlineWidthDp", 0.95f).coerceIn(0.25f, 3f)
     Canvas(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(48.dp),
+        Modifier.fillMaxWidth().height(52.dp)
+            .background(SugarliciousColors.color(SugarliciousColorRole.GRAPH_BACKGROUND)),
     ) {
-        val lowY = size.height * ((260.0 - 80.0) / 220.0).toFloat()
-        val highY = size.height * ((260.0 - 160.0) / 220.0).toFloat()
-
+        val left = 3.dp.toPx()
+        val right = size.width - 3.dp.toPx()
+        val top = 3.dp.toPx()
+        val bottom = size.height - 3.dp.toPx()
+        val values = merged.map { it.valueMgDl }
+        val minimum = kotlin.math.min(40.0, values.minOrNull() ?: 40.0) - 10.0
+        val maximum = kotlin.math.max(200.0, values.maxOrNull() ?: 200.0) + 10.0
+        val yMin = kotlin.math.floor(minimum / 20.0) * 20.0
+        val yMax = kotlin.math.ceil(maximum / 20.0) * 20.0
+        fun x(timestamp: Long) = left + (((timestamp - cutoff).toDouble() / (hours * 60L * 60_000L).toDouble()).coerceIn(0.0, 1.0) * (right - left)).toFloat()
+        fun y(value: Double) = bottom - (((value - yMin) / (yMax - yMin).coerceAtLeast(1.0)).coerceIn(0.0, 1.0) * (bottom - top)).toFloat()
+        val low = 80.0
+        val high = 160.0
         drawRect(
-            color = SugarliciousColors.TargetBand,
-            topLeft = Offset(0f, highY),
-            size = androidx.compose.ui.geometry.Size(
-                size.width,
-                (lowY - highY).coerceAtLeast(1f),
-            ),
+            color = SugarliciousColors.color(SugarliciousColorRole.RANGE_IN_RANGE),
+            topLeft = Offset(left, y(high)),
+            size = androidx.compose.ui.geometry.Size(right - left, (y(low) - y(high)).coerceAtLeast(1f)),
         )
-
-        fun x(timestamp: Long): Float =
-            (((timestamp - cutoff).toDouble() /
-                (hours * 60L * 60_000L).toDouble())
-                .coerceIn(0.0, 1.0) * size.width).toFloat()
-
-        fun y(value: Double): Float =
-            (((260.0 - value.coerceIn(40.0, 260.0)) / 220.0) *
-                size.height).toFloat()
-
-        merged.forEach { sample ->
-            drawCircle(
-                color = if (sample.valueMgDl in 80.0..160.0) {
-                    SugarliciousColors.Green
-                } else {
-                    SugarliciousColors.Red
-                },
-                radius = 2.4.dp.toPx(),
-                center = Offset(x(sample.measuredAtEpochMs), y(sample.valueMgDl)),
-            )
+        drawLine(SugarliciousColors.color(SugarliciousColorRole.GRAPH_DIVIDER), Offset(left, y(high)), Offset(right, y(high)), 0.7.dp.toPx())
+        drawLine(SugarliciousColors.color(SugarliciousColorRole.GRAPH_DIVIDER), Offset(left, y(low)), Offset(right, y(low)), 0.7.dp.toPx())
+        merged.forEachIndexed { index, sample ->
+            val radius = dotRadiusDp.dp.toPx() * if (index == merged.lastIndex) 1.25f else 1f
+            val center = Offset(x(sample.measuredAtEpochMs), y(sample.valueMgDl))
+            if (outlineEnabled) {
+                drawCircle(SugarliciousColors.color(SugarliciousColorRole.GRAPH_CURRENT_OUTLINE), radius + outlineWidthDp.dp.toPx(), center)
+            }
+            val dotColor = when {
+                sample.valueMgDl < low -> SugarliciousColors.color(SugarliciousColorRole.CGM_DOT_LOW)
+                sample.valueMgDl > high -> SugarliciousColors.color(SugarliciousColorRole.CGM_DOT_HIGH)
+                else -> SugarliciousColors.color(SugarliciousColorRole.CGM_DOT_IN_RANGE)
+            }
+            drawCircle(dotColor, radius, center)
         }
     }
 }
@@ -767,6 +776,8 @@ private fun previewFor(
 
     return when (id) {
         1 -> PhonePreview(glucoseText, unitLabel(g?.displayUnit), glucoseColor)
+        35 -> PhonePreview(trend, "")
+        36 -> PhonePreview(delta, "")
         2 -> PhonePreview("$glucoseText$trend", "Glucose + Trend", glucoseColor)
         28 -> PhonePreview("$glucoseText$trend", "Text", glucoseColor)
         29 -> PhonePreview("$glucoseText $delta", "", glucoseColor)
@@ -865,6 +876,12 @@ private fun previewFor(
     }
 }
 
+internal fun complicationPreviewLabel(id: Int, state: TherapyDisplayState?): String {
+    val entry = SugarliciousComplicationCatalog.firstOrNull { it.id == id }
+    val preview = previewFor(id, state)
+    return "${entry?.name ?: "Comp"} ${preview.primary}".take(20)
+}
+
 private fun demoHistory(now: Long, hours: Int): List<GlucoseSample> {
     val count = hours * 12
     return (0..count).map { index ->
@@ -886,7 +903,7 @@ private const val PRESET_PREFS = "complication_setup"
 private const val PRESET_KEY = "selected_ids"
 private const val COMPLICATION_GRAPH_HOURS_KEY = "graph_hours"
 
-private fun loadComplicationPreset(context: Context): List<Int> =
+internal fun loadComplicationPreset(context: Context): List<Int> =
     context.getSharedPreferences(PRESET_PREFS, Context.MODE_PRIVATE)
         .getString(PRESET_KEY, null)
         ?.split(',')
