@@ -15,12 +15,9 @@ if (-not $NoPull) {
     if ($LASTEXITCODE -ne 0) { throw "git pull failed" }
 }
 
-if ($Test) {
-    & .\dev.ps1 wfp -NoPull -Test
-} else {
-    & .\dev.ps1 wfp -NoPull
-}
-if (-not $?) { throw "WFP/Wear step failed" }
+Write-Host "Preparing Watch Face Push assets..."
+& .\tools\watchface-push\Prepare-WatchFacePushAssets.ps1
+if (-not $?) { throw "Watch Face Push asset preparation failed" }
 
 if ($Test) {
     & .\dev.ps1 all -NoPull -Test
