@@ -1,7 +1,9 @@
 name: build
+
 on:
   push:
   pull_request:
+
 jobs:
   verify:
     runs-on: ubuntu-latest
@@ -13,36 +15,27 @@ jobs:
           java-version: '21'
       - uses: android-actions/setup-android@v3
       - run: sdkmanager "platforms;android-36" "build-tools;36.0.0"
+      - name: Make Gradle wrapper executable
+        run: chmod +x gradlew
       - name: Test and build all applications and watchfaces
-        run: >-
-          ./gradlew test assembleDebug
-          :watchfaces:test-wff:assembleRelease
-          :watchfaces:aaps-v4:assembleRelease
-          :watchfaces:aaps-v2:assembleRelease
-          :watchfaces:aaps-circle:assembleRelease
-          :watchfaces:aaps-digital-style:assembleRelease
-          :watchfaces:aaps-standard:assembleRelease
-          :watchfaces:aaps-big-chart:assembleRelease
-          :watchfaces:aaps-large:assembleRelease
-          :watchfaces:aaps-no-chart:assembleRelease
-          :watchfaces:aaps-cockpit:assembleRelease
-          :watchfaces:aaps-v2-tt-dark:assembleRelease
-          :watchfaces:aaps-community:assembleRelease
-          :watchfaces:aimico:assembleRelease
-          :watchfaces:analog-g-watch:assembleRelease
-          :watchfaces:blue-ring:assembleRelease
-          :watchfaces:digital-big-graph:assembleRelease
-          :watchfaces:digital-g-watch:assembleRelease
-          :watchfaces:gears:assembleRelease
-          :watchfaces:gota:assembleRelease
-          :watchfaces:lucky-loop-koeln:assembleRelease
-          :watchfaces:p-zero:assembleRelease
-          :watchfaces:robby:assembleRelease
-          :watchfaces:simple-digital:assembleRelease
-          :watchfaces:steam-punk:assembleRelease
+        run: ./gradlew test assembleDebug
       - name: Validate Watch Face Format XML
-        shell: pwsh
-        run: ./tools/wff-validator/validate.ps1
+        run: |
+          python tools/validate_watchface_xml.py watchfaces/wff-digital/src/main/res/raw/watchface.xml
+          python tools/validate_watchface_xml.py watchfaces/wff-analog/src/main/res/raw/watchface.xml
+          python tools/validate_watchface_xml.py watchfaces/wff-orbit/src/main/res/raw/watchface.xml
+          python tools/validate_watchface_xml.py watchfaces/wff-rings/src/main/res/raw/watchface.xml
+          python tools/validate_watchface_xml.py watchfaces/wff-graph/src/main/res/raw/watchface.xml
+      - name: Build release Watch Face Push APKs
+        run: |
+          ./gradlew \
+            :watchfaces:wff-analog:assembleRelease \
+            :watchfaces:wff-orbit:assembleRelease \
+            :watchfaces:wff-rings:assembleRelease \
+            :watchfaces:wff-graph:assembleRelease
       - name: Verify code-free watchface APKs
-        shell: pwsh
-        run: ./tools/verify-codefree-watchfaces.ps1
+        run: |
+          python tools/verify_wff_apk.py watchfaces/wff-analog/build/outputs/apk/release/wff-analog-release.apk
+          python tools/verify_wff_apk.py watchfaces/wff-orbit/build/outputs/apk/release/wff-orbit-release.apk
+          python tools/verify_wff_apk.py watchfaces/wff-rings/build/outputs/apk/release/wff-rings-release.apk
+          python tools/verify_wff_apk.py watchfaces/wff-graph/build/outputs/apk/release/wff-graph-release.apk
