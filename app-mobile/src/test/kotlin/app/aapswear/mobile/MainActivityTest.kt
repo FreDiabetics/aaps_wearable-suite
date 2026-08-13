@@ -61,7 +61,7 @@ class MainActivityTest {
         assertTrue(dashboard.childCount > 0)
         assertSame(originalComposeView, dashboard.getChildAt(0))
 
-        activity.findViewById<View>(R.id.nav_settings).performClick()
+        activity.findViewById<View>(R.id.top_settings).performClick()
         shadowOf(android.os.Looper.getMainLooper()).idle()
         val settingsText = textOf(activity.findViewById(R.id.dashboard_content))
         assertTrue(settingsText.contains("Datenquelle"))
@@ -76,7 +76,7 @@ class MainActivityTest {
         val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
         val activity = controller.get()
 
-        activity.findViewById<View>(R.id.nav_settings).performClick()
+        activity.findViewById<View>(R.id.top_settings).performClick()
         shadowOf(android.os.Looper.getMainLooper()).idle()
         val details = activity.findViewById<android.widget.Switch>(R.id.dashboard_details_switch)
         assertTrue(details.isChecked)
@@ -180,7 +180,7 @@ class MainActivityTest {
         val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
         val activity = controller.get()
 
-        activity.findViewById<View>(R.id.nav_settings).performClick()
+        activity.findViewById<View>(R.id.top_settings).performClick()
         shadowOf(android.os.Looper.getMainLooper()).idle()
         val settingsText = textOf(activity.findViewById(R.id.dashboard_content))
         assertTrue(settingsText.contains("Sugarlicious"))
@@ -197,13 +197,15 @@ class MainActivityTest {
         controller.pause().stop().destroy()
     }
 
-    @Test fun `header menus are removed and bottom navigation remains available`() {
+    @Test fun `bottom navigation is removed and compact top navigation is available`() {
         val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
         val activity = controller.get()
         assertEquals(0, activity.resources.getIdentifier("menu_button", "id", activity.packageName))
         assertEquals(0, activity.resources.getIdentifier("more_button", "id", activity.packageName))
-        assertNotNull(activity.findViewById<View>(R.id.bottom_navigation))
-        activity.findViewById<View>(R.id.nav_settings).performClick()
+        assertEquals(0, activity.resources.getIdentifier("bottom_navigation", "id", activity.packageName))
+        assertNotNull(activity.findViewById<View>(R.id.top_app_bar))
+        assertNotNull(activity.findViewById<View>(R.id.top_settings))
+        activity.findViewById<View>(R.id.top_settings).performClick()
         shadowOf(android.os.Looper.getMainLooper()).idle()
         assertTrue(textOf(activity.findViewById(R.id.dashboard_content)).contains("Einstellungen"))
         controller.pause().stop().destroy()
@@ -217,7 +219,7 @@ class MainActivityTest {
         val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
         val activity = controller.get()
 
-        activity.findViewById<View>(R.id.nav_settings).performClick()
+        activity.findViewById<View>(R.id.top_settings).performClick()
         activity.findViewById<View>(R.id.dashboard_live_notification_switch).performClick()
         shadowOf(android.os.Looper.getMainLooper()).idle()
 
