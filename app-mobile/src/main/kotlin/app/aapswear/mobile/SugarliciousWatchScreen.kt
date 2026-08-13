@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.weight
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -35,33 +34,12 @@ internal data class SugarliciousWatchFaceCard(
     val features: List<String>,
 )
 
-internal val sugarliciousWatchFaceCards =
-    listOf(
-        SugarliciousWatchFaceCard(
-            name = "Sugarlicious Analog",
-            style = "Analog",
-            slots = 8,
-            features = listOf("Graph", "AOD"),
-        ),
-        SugarliciousWatchFaceCard(
-            name = "Sugarlicious Orbit",
-            style = "Analog",
-            slots = 4,
-            features = listOf("Glukosering", "Graph", "AOD"),
-        ),
-        SugarliciousWatchFaceCard(
-            name = "Sugarlicious Rings",
-            style = "Analog",
-            slots = 4,
-            features = listOf("Glukosering", "Graph", "AOD"),
-        ),
-        SugarliciousWatchFaceCard(
-            name = "Sugarlicious Graph",
-            style = "Analog",
-            slots = 4,
-            features = listOf("Großer Graph", "AOD"),
-        ),
-    )
+internal val sugarliciousWatchFaceCards = listOf(
+    SugarliciousWatchFaceCard("Sugarlicious Analog", "Analog", 8, listOf("Graph", "AOD")),
+    SugarliciousWatchFaceCard("Sugarlicious Orbit", "Analog", 4, listOf("Glukosering", "Graph", "AOD")),
+    SugarliciousWatchFaceCard("Sugarlicious Rings", "Analog", 4, listOf("Glukosering", "Graph", "AOD")),
+    SugarliciousWatchFaceCard("Sugarlicious Graph", "Analog", 4, listOf("Großer Graph", "AOD")),
+)
 
 @Composable
 internal fun SugarliciousWatchScreen(
@@ -95,12 +73,9 @@ internal fun SugarliciousWatchScreen(
                         onSelected = { onSelectedFace(index) },
                     )
                 }
-                if (indices.size == 1) {
-                    Spacer(Modifier.weight(1f))
-                }
+                if (indices.size == 1) Spacer(Modifier.weight(1f))
             }
         }
-
         ComplicationStudio(state = state)
     }
 }
@@ -123,56 +98,32 @@ private fun WatchFaceTile(
             .aspectRatio(1f)
             .border(
                 width = if (selected) 2.dp else 1.dp,
-                color = if (selected) {
-                    SugarliciousColors.Primary
-                } else {
-                    SugarliciousColors.Border.copy(alpha = 0.58f)
-                },
+                color = if (selected) SugarliciousColors.Primary else SugarliciousColors.Border.copy(alpha = 0.58f),
                 shape = shape,
             )
             .clickable {
                 onSelected()
                 scope.launch {
                     val nodes = runCatching {
-                        requestWatchFaceApply(
-                            context.applicationContext,
-                            index,
-                        )
+                        requestWatchFaceApply(context.applicationContext, index)
                     }.getOrDefault(0)
-
                     if (nodes == 0) {
-                        Toast.makeText(
-                            context,
-                            "Watch nicht erreichbar",
-                            Toast.LENGTH_SHORT,
-                        ).show()
+                        Toast.makeText(context, "Watch nicht erreichbar", Toast.LENGTH_SHORT).show()
                     }
                 }
             },
         shape = shape,
-        color = if (selected) {
-            SugarliciousColors.SurfaceSelected
-        } else {
-            SugarliciousColors.Surface
-        },
+        color = if (selected) SugarliciousColors.SurfaceSelected else SugarliciousColors.Surface,
     ) {
         Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 10.dp, vertical = 10.dp),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 10.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center,
         ) {
-            FaceDial(
-                index = index,
-                state = state,
-                modifier = Modifier.size(116.dp),
-            )
+            FaceDial(index = index, state = state, modifier = Modifier.size(116.dp))
             Text(
                 text = face.name,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 7.dp),
+                modifier = Modifier.fillMaxWidth().padding(top = 7.dp),
                 color = SugarliciousColors.TextPrimary,
                 fontSize = 13.sp,
                 fontWeight = FontWeight.Bold,
