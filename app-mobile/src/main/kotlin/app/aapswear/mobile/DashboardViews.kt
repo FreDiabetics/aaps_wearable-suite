@@ -11,6 +11,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.LinearLayout
+import android.widget.SeekBar
 import android.widget.Switch
 import android.widget.TextView
 import app.aapswear.mobile.ui.theme.SugarliciousColorRole
@@ -18,6 +19,7 @@ import app.aapswear.mobile.ui.theme.SugarliciousColors
 import app.aapswear.mobile.ui.theme.SugarliciousTheme
 import app.aapswear.model.GlucoseUnit
 import app.aapswear.model.TherapyDisplayState
+import java.util.Locale
 
 enum class DashboardScreen { OVERVIEW, WATCH, SETTINGS }
 enum class DisplayUnitPreference { AAPS, MG_DL, MMOL_L }
@@ -38,6 +40,8 @@ data class DashboardUiPreferences(
     val cgmDotRadiusDp: Float = 2.4f,
     val cgmDotOutlineEnabled: Boolean = true,
     val cgmDotOutlineWidthDp: Float = 0.95f,
+    val predictionDotRadiusDp: Float = 1.75f,
+    val predictionDotOutlineWidthDp: Float = 0.70f,
     val compact: Boolean = true,
     val graphHours: Int = 3,
     val liveNotification: Boolean = false,
@@ -132,6 +136,14 @@ data class DashboardUiPreferences(
                     preferences
                         .getFloat("cgm.dotOutlineWidthDp", 0.95f)
                         .coerceIn(0.25f, 3.0f),
+                predictionDotRadiusDp =
+                    preferences
+                        .getFloat("cgm.prediction.dotRadiusDp", 1.75f)
+                        .coerceIn(1.0f, 6.0f),
+                predictionDotOutlineWidthDp =
+                    preferences
+                        .getFloat("cgm.prediction.dotOutlineWidthDp", 0.70f)
+                        .coerceIn(0.0f, 3.0f),
                 compact =
                     preferences.getBoolean(
                         "compact",
@@ -238,6 +250,7 @@ data class DashboardCallbacks(
     val setShowDetails: (Boolean) -> Unit,
     val setShowCgmGraph: (Boolean) -> Unit,
     val setCgmStream: (String, Boolean) -> Unit = { _, _ -> },
+    val setCgmFloat: (String, Float) -> Unit = { _, _ -> },
     val setShowMetabolicGraph: (Boolean) -> Unit,
     val setCompact: (Boolean) -> Unit,
     val setLiveNotification: (Boolean) -> Unit,
@@ -582,6 +595,28 @@ class DashboardViewFactory(
                                 View.generateViewId(),
                             ) { callbacks.setCgmStream("cgm.prediction.zeroTemp", it) },
                         )
+                        addView(divider())
+                        addView(
+                            sliderRowCompact(
+                                title = "Prediction-Punktgröße",
+                                description = "Größe der Vorhersagepunkte im CGM-Graph",
+                                value = preferences.predictionDotRadiusDp,
+                                minimum = 1.0f,
+                                maximum = 6.0f,
+                                decimals = 1,
+                            ) { callbacks.setCgmFloat("cgm.prediction.dotRadiusDp", it) },
+                        )
+                        addView(divider())
+                        addView(
+                            sliderRowCompact(
+                                title = "Prediction-Konturdicke",
+                                description = "0,00 dp blendet die Kontur aus",
+                                value = preferences.predictionDotOutlineWidthDp,
+                                minimum = 0.0f,
+                                maximum = 3.0f,
+                                decimals = 2,
+                            ) { callbacks.setCgmFloat("cgm.prediction.dotOutlineWidthDp", it) },
+                        )
                     },
                     fullWidth(),
                 )
@@ -847,6 +882,92 @@ class DashboardViewFactory(
                         callback(value)
                     }
                 },
+            )
+        }
+
+    private fun sliderRowCompact(
+        title: String,
+        description: String,
+        value: Float,
+        minimum: Float,
+        maximum: Float,
+        decimals: Int,
+        callback: (Float) -> Unit,
+    ) =
+        LinearLayout(context).apply {
+            orientation = LinearLayout.VERTICAL
+            minimumHeight = 72.dp
+            setPadding(0, 7.dp, 0, 7.dp)
+
+            val valueLabel =
+                TextView(context).apply {
+                    textSize = 12f
+                    gravity = Gravity.END
+                    setTextColor(accent)
+                    applyChromaticOutline(accent)
+                }
+
+            val titleRow =
+                LinearLayout(context).apply {
+                    orientation = LinearLayout.HORIZONTAL
+                    gravity = Gravity.CENTER_VERTICAL
+                    addView(
+                        LinearLayout(context).apply {
+                            orientation = LinearLayout.VERTICAL
+                            addView(value(title, text, 15f, 1))
+                            addView(helper(description, 1))
+                        },
+                        LinearLayout.LayoutParams(
+                            0,
+                            ViewGroup.LayoutParams.WRAP_CONTENT,
+                            1f,
+                        ),
+                    )
+                    addView(
+                        valueLabel,
+                        LinearLayout.LayoutParams(
+                            72.dp,
+                            ViewGroup.LayoutParams.WRAP_CONTENT,
+                        ),
+                    )
+                }
+            addView(titleRow)
+
+            val steps = 1000
+            fun progressToValue(progress: Int): Float =
+                minimum + (maximum - minimum) * progress.toFloat() / steps.toFloat()
+            fun valueToProgress(current: Float): Int =
+                (((current.coerceIn(minimum, maximum) - minimum) / (maximum - minimum)) * steps)
+                    .toInt()
+                    .coerceIn(0, steps)
+            fun format(current: Float): String =
+                String.format(Locale.getDefault(), "%.${decimals}f dp", current)
+
+            valueLabel.text = format(value)
+            addView(
+                SeekBar(context).apply {
+                    max = steps
+                    progress = valueToProgress(value)
+                    progressTintList = ColorStateList.valueOf(accent)
+                    thumbTintList = ColorStateList.valueOf(accent)
+                    setOnSeekBarChangeListener(
+                        object : SeekBar.OnSeekBarChangeListener {
+                            private var currentValue = value.coerceIn(minimum, maximum)
+
+                            override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
+                                currentValue = progressToValue(progress)
+                                valueLabel.text = format(currentValue)
+                            }
+
+                            override fun onStartTrackingTouch(seekBar: SeekBar?) = Unit
+
+                            override fun onStopTrackingTouch(seekBar: SeekBar?) {
+                                callback(currentValue)
+                            }
+                        },
+                    )
+                },
+                fullWidth(),
             )
         }
 

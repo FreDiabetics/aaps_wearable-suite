@@ -114,6 +114,14 @@ class MainActivity : ComponentActivity() {
                     )
                 }
             },
+            setCgmFloat = { key, value ->
+                uiPreferences.edit {
+                    putFloat(
+                        key,
+                        value,
+                    )
+                }
+            },
             setShowMetabolicGraph = { uiPreferences.edit { putBoolean("showMetabolicGraph", it) } },
             setCompact = { uiPreferences.edit { putBoolean("compact", it) } },
             setLiveNotification = ::setLiveNotification,

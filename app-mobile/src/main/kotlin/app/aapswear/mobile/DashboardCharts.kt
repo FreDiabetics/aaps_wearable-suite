@@ -383,6 +383,8 @@ internal class GlucoseDashboardChart @JvmOverloads constructor(
     private var cgmDotRadiusDp = 2.4f
     private var cgmDotOutlineEnabled = true
     private var cgmDotOutlineWidthDp = 0.95f
+    private var predictionDotRadiusDp = 1.75f
+    private var predictionDotOutlineWidthDp = 0.70f
 
     fun bind(
         state: TherapyDisplayState?,
@@ -399,6 +401,8 @@ internal class GlucoseDashboardChart @JvmOverloads constructor(
         cgmDotRadiusDp: Float = 2.4f,
         cgmDotOutlineEnabled: Boolean = true,
         cgmDotOutlineWidthDp: Float = 0.95f,
+        predictionDotRadiusDp: Float = 1.75f,
+        predictionDotOutlineWidthDp: Float = 0.70f,
     ) {
         this.state =
             state
@@ -426,6 +430,10 @@ internal class GlucoseDashboardChart @JvmOverloads constructor(
             cgmDotOutlineEnabled
         this.cgmDotOutlineWidthDp =
             cgmDotOutlineWidthDp.coerceIn(0.25f, 3.0f)
+        this.predictionDotRadiusDp =
+            predictionDotRadiusDp.coerceIn(1.0f, 6.0f)
+        this.predictionDotOutlineWidthDp =
+            predictionDotOutlineWidthDp.coerceIn(0.0f, 3.0f)
 
         if (
             !isAttachedToWindow
@@ -954,10 +962,22 @@ internal class GlucoseDashboardChart @JvmOverloads constructor(
             val x = max(mapX(point.measuredAtEpochMs, start, end, plot), dividerX + 3f.dp)
             if (x > plot.right) return@forEach
             val y = mapGlucoseY(point.valueMgDl, plot)
-            fillPaint.color = withAlpha(SugarliciousColors.argb(SugarliciousColorRole.GRAPH_CURRENT_OUTLINE), 190)
-            drawChromaticCircle(canvas, x, y, 2.45f.dp, fillPaint)
+            val dotRadius = predictionDotRadiusDp.dp
             fillPaint.color = color
-            drawChromaticCircle(canvas, x, y, 1.75f.dp, fillPaint)
+            drawChromaticCircle(canvas, x, y, dotRadius, fillPaint)
+            if (predictionDotOutlineWidthDp > 0f) {
+                val outlineWidth = predictionDotOutlineWidthDp.dp
+                dotOutlinePaint.color =
+                    withAlpha(SugarliciousColors.argb(SugarliciousColorRole.GRAPH_CURRENT_OUTLINE), 190)
+                dotOutlinePaint.strokeWidth = outlineWidth
+                drawChromaticCircle(
+                    canvas,
+                    x,
+                    y,
+                    dotRadius + outlineWidth / 2f,
+                    dotOutlinePaint,
+                )
+            }
         }
     }
 

@@ -204,7 +204,7 @@ internal fun SugarliciousOverviewScreen(
             glucoseColor = glucoseColor,
             trend = if (displayable) glucose?.trend ?: Trend.UNKNOWN else Trend.UNKNOWN,
             delta = delta,
-            
+
             deltaMgDl = glucose?.deltaMgDl,age = age,
             unitLabel = unitLabel(unit),
             tirStats = tirStats,
@@ -677,6 +677,10 @@ private fun GlucoseGraphSurface(
                     preferences.cgmDotOutlineEnabled,
                 cgmDotOutlineWidthDp =
                     preferences.cgmDotOutlineWidthDp,
+                predictionDotRadiusDp =
+                    preferences.predictionDotRadiusDp,
+                predictionDotOutlineWidthDp =
+                    preferences.predictionDotOutlineWidthDp,
             )
         },
     )
