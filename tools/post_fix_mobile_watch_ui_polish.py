@@ -3,6 +3,13 @@ from pathlib import Path
 # Fix the generated Mobile complication preview to use the actual SugarliciousColors API.
 p = Path('app-mobile/src/main/kotlin/app/aapswear/mobile/ComplicationCatalog.kt')
 s = p.read_text(encoding='utf-8')
+if 'import app.aapswear.mobile.ui.theme.SugarliciousColorRole' not in s:
+    s = s.replace(
+        'import app.aapswear.mobile.ui.theme.SugarliciousColors\n',
+        'import app.aapswear.mobile.ui.theme.SugarliciousColors\n'
+        'import app.aapswear.mobile.ui.theme.SugarliciousColorRole\n',
+        1,
+    )
 replacements = {
     'SugarliciousColors.GraphBackground': 'SugarliciousColors.color(SugarliciousColorRole.GRAPH_BACKGROUND)',
     'SugarliciousColors.RangeInRange': 'SugarliciousColors.color(SugarliciousColorRole.RANGE_IN_RANGE)',
