@@ -20,6 +20,8 @@ jobs:
       - run: sdkmanager "platforms;android-36" "build-tools;36.0.0"
       - name: Apply requested source changes
         run: python tools/apply_mobile_watch_ui_polish.py
+      - name: Fix generated integration output
+        run: python tools/post_fix_mobile_watch_ui_polish.py
       - name: Verify patch formatting
         run: git diff --check
       - name: Test and build affected modules
@@ -27,6 +29,8 @@ jobs:
       - name: Commit source-only integration
         run: |
           rm -f tools/apply_mobile_watch_ui_polish.py
+          rm -f tools/post_fix_mobile_watch_ui_polish.py
+          rm -f tools/fix_mobile_watch_apply_script.py
           rm -f .github/workflows/apply-mobile-watch-ui-polish.yml
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
