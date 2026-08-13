@@ -19,6 +19,8 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.tasks.await
 
 class StateDataLayerService : WearableListenerService() {
@@ -64,24 +66,27 @@ class StateDataLayerService : WearableListenerService() {
                 .toIntOrNull()
                 ?: return
 
-        scope.launch {
-            val status =
-                SugarliciousWatchFacePush.apply(
-                    this@StateDataLayerService,
-                    index,
-                )
+        val appContext = applicationContext
+        val sourceNodeId = event.sourceNodeId
 
-            runCatching {
-                Wearable
-                    .getMessageClient(
-                        this@StateDataLayerService,
+        watchFacePushScope.launch {
+            watchFacePushMutex.withLock {
+                val status =
+                    SugarliciousWatchFacePush.apply(
+                        appContext,
+                        index,
                     )
-                    .sendMessage(
-                        event.sourceNodeId,
-                        WearProtocol.WATCH_FACE_STATUS_PATH,
-                        status.encodeToByteArray(),
-                    )
-                    .await()
+
+                runCatching {
+                    Wearable
+                        .getMessageClient(appContext)
+                        .sendMessage(
+                            sourceNodeId,
+                            WearProtocol.WATCH_FACE_STATUS_PATH,
+                            status.encodeToByteArray(),
+                        )
+                        .await()
+                }
             }
         }
     }
@@ -204,6 +209,10 @@ class StateDataLayerService : WearableListenerService() {
     }
 
     companion object {
+        private val watchFacePushScope =
+            CoroutineScope(SupervisorJob() + Dispatchers.IO)
+        private val watchFacePushMutex = Mutex()
+
         private const val HISTORY_WINDOW_MS =
             24 * 60 * 60_000L
         private const val FUTURE_TOLERANCE_MS =

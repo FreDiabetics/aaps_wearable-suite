@@ -1,6 +1,8 @@
 package app.aapswear.mobile.ui.theme
 
 import android.content.SharedPreferences
+import android.content.res.Configuration
+import android.content.res.Resources
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -98,8 +100,16 @@ object SugarliciousColorStore {
     private const val DARK_PREFIX = "color.dark."
     private const val LIGHT_PREFIX = "color.light."
 
+    private fun systemIsLight(): Boolean =
+        (Resources.getSystem().configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) !=
+            Configuration.UI_MODE_NIGHT_YES
+
     private fun isLight(preferences: SharedPreferences): Boolean =
-        preferences.getString("themeMode", "DARK") == "LIGHT"
+        when (preferences.getString("themeMode", "SYSTEM")) {
+            "LIGHT" -> true
+            "DARK" -> false
+            else -> systemIsLight()
+        }
 
     private fun currentPrefix(preferences: SharedPreferences): String =
         if (isLight(preferences)) LIGHT_PREFIX else DARK_PREFIX

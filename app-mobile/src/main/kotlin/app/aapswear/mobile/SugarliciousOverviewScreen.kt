@@ -28,6 +28,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -74,12 +75,7 @@ internal fun SugarliciousOverviewScreen(
                 preferences.graphHours,
             )
         }
-    val metabolicChartViewport =
-        remember {
-            ChartViewport(
-                preferences.graphHours,
-            )
-        }
+    val metabolicChartViewport = cgmChartViewport
 
     val predictionFutureWindowMs =
         if (
@@ -127,7 +123,8 @@ internal fun SugarliciousOverviewScreen(
 
     val metabolicFutureWindowMs =
         if (
-            preferences.showMetabolicGraph
+            preferences.showMetabolicGraph &&
+            preferences.anyCgmPredictionEnabled
         ) {
             90L * 60_000L
         } else {
@@ -149,17 +146,13 @@ internal fun SugarliciousOverviewScreen(
 
     LaunchedEffect(
         predictionFutureWindowMs,
-    ) {
-        cgmChartViewport.setFutureWindow(
-            predictionFutureWindowMs,
-        )
-    }
-
-    LaunchedEffect(
         metabolicFutureWindowMs,
     ) {
-        metabolicChartViewport.setFutureWindow(
-            metabolicFutureWindowMs,
+        cgmChartViewport.setFutureWindow(
+            maxOf(
+                predictionFutureWindowMs,
+                metabolicFutureWindowMs,
+            ),
         )
     }
 
@@ -562,6 +555,7 @@ private fun TrendIndicator(trend: Trend) {
                             R.drawable.ic_trend_arrow,
                         ),
                     contentDescription = null,
+                    colorFilter = ColorFilter.tint(SugarliciousColors.TextPrimary),
                     modifier =
                         Modifier
                             .size(arrowSize)

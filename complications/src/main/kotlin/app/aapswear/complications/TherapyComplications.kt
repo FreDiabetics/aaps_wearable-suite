@@ -6,6 +6,7 @@ import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
+import android.graphics.DashPathEffect
 import android.graphics.Paint
 import android.graphics.Typeface
 import android.graphics.drawable.Icon
@@ -469,90 +470,57 @@ abstract class TherapyComplicationService(
         val graphStyle = readGraphStyle()
         val targetLow = state?.target?.lowMgDl ?: DISPLAY_LOW_MGDL
         val targetHigh = state?.target?.highMgDl ?: DISPLAY_HIGH_MGDL
+        val density = resources.displayMetrics.density
+        val plotLeft = 1f
+        val plotRight = width - 1f
+        val plotTop = 1f
+        val plotBottom = height - 1f
+        val plotHeight = plotBottom - plotTop
 
-        val plotLeft = 12f
-        val plotRight = width - 12f
-        val plotTop = 12f
-        val plotBottom = height - 12f
-
-        Paint(Paint.ANTI_ALIAS_FLAG).also {
-            it.color = colors.graphBackground
-            canvas.drawRoundRect(0f, 0f, width.toFloat(), height.toFloat(), 22f, 22f, it)
+        val backgroundPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = colors.graphBackground
+            style = Paint.Style.FILL
         }
+        canvas.drawRoundRect(0f, 0f, width.toFloat(), height.toFloat(), 22f, 22f, backgroundPaint)
+
+        fun glucoseRatio(valueMgDl: Double): Double {
+            val value = valueMgDl.coerceIn(0.0, 400.0)
+            return when {
+                value <= 80.0 -> 0.055 + value / 80.0 * (0.215 - 0.055)
+                value <= 160.0 -> 0.215 + (value - 80.0) / 80.0 * (0.515 - 0.215)
+                else -> 0.515 + (value - 160.0) / (400.0 - 160.0) * (1.0 - 0.515)
+            }.coerceIn(0.055, 1.0)
+        }
+
+        fun yFor(valueMgDl: Double): Float =
+            plotBottom - (glucoseRatio(valueMgDl) * plotHeight).toFloat()
 
         val targetPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = colors.rangeInRange
-style = Paint.Style.FILL
+            style = Paint.Style.FILL
         }
-        val guidePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        canvas.drawRect(plotLeft, yFor(targetHigh), plotRight, yFor(targetLow), targetPaint)
+
+        val gridPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = colors.divider
-style = Paint.Style.STROKE
-            strokeWidth = 2f
-        }
-        val inRangePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = colors.cgmInRange
-            style = Paint.Style.FILL
-        }
-        val outOfRangePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = colors.cgmLow
-            style = Paint.Style.FILL
-        }
-        val currentRingPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = colors.outline
             style = Paint.Style.STROKE
-            strokeWidth = 3f
+            strokeWidth = 0.7f * density
         }
-
-        fun yFor(valueMgDl: Double): Float {
-            val clamped = valueMgDl.coerceIn(GRAPH_MIN_MGDL, GRAPH_MAX_MGDL)
-            val fraction =
-                (GRAPH_MAX_MGDL - clamped) /
-                    (GRAPH_MAX_MGDL - GRAPH_MIN_MGDL)
-            return plotTop +
-                (fraction * (plotBottom - plotTop)).toFloat()
+        canvas.drawLine(plotLeft, yFor(0.0), plotRight, yFor(0.0), gridPaint)
+        gridPaint.pathEffect = DashPathEffect(floatArrayOf(3f * density, 3f * density), 0f)
+        for (index in 1..3) {
+            val y = plotTop + plotHeight * index / 4f
+            canvas.drawLine(plotLeft, y, plotRight, y, gridPaint)
         }
-
-        val targetTop = yFor(targetHigh)
-        val targetBottom = yFor(targetLow)
-        canvas.drawRoundRect(
-            plotLeft,
-            targetTop,
-            plotRight,
-            targetBottom,
-            10f,
-            10f,
-            targetPaint,
-        )
-        canvas.drawLine(
-            plotLeft,
-            targetTop,
-            plotRight,
-            targetTop,
-            guidePaint,
-        )
-        canvas.drawLine(
-            plotLeft,
-            targetBottom,
-            plotRight,
-            targetBottom,
-            guidePaint,
-        )
+        gridPaint.pathEffect = null
 
         val cutoff = now - windowMs
         val merged = linkedMapOf<Long, GlucoseSample>()
-
-        state?.glucoseHistory
-            .orEmpty()
-            .forEach { merged[it.measuredAtEpochMs] = it }
-
+        state?.glucoseHistory.orEmpty().forEach { merged[it.measuredAtEpochMs] = it }
         glucose?.let {
-            merged[it.measuredAtEpochMs] =
-                GlucoseSample(it.valueMgDl, it.measuredAtEpochMs)
+            merged[it.measuredAtEpochMs] = GlucoseSample(it.valueMgDl, it.measuredAtEpochMs)
         }
-
-        val samples = merged
-            .values
-            .asSequence()
+        val samples = merged.values.asSequence()
             .filter {
                 it.measuredAtEpochMs in cutoff..(now + FUTURE_TOLERANCE_MS) &&
                     it.valueMgDl in 20.0..1000.0
@@ -562,91 +530,51 @@ style = Paint.Style.STROKE
 
         if (samples.isEmpty()) {
             val emptyPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                color = Color.LTGRAY
+                color = colors.divider
                 textAlign = Paint.Align.CENTER
                 textSize = 26f
             }
-            canvas.drawText(
-                "No history",
-                width / 2f,
-                (plotTop + plotBottom) / 2f,
-                emptyPaint,
-            )
+            canvas.drawText("No history", width / 2f, (plotTop + plotBottom) / 2f, emptyPaint)
             return
         }
 
         fun xFor(timestamp: Long): Float {
-            val fraction =
-                ((timestamp - cutoff).toDouble() / windowMs.toDouble())
-                    .coerceIn(0.0, 1.0)
-            return plotLeft +
-                (fraction * (plotRight - plotLeft)).toFloat()
+            val fraction = ((timestamp - cutoff).toDouble() / windowMs.toDouble()).coerceIn(0.0, 1.0)
+            return plotLeft + (fraction * (plotRight - plotLeft)).toFloat()
         }
 
-        samples.forEach { sample ->
-            val paint =
-                when {
-                    sample.valueMgDl < targetLow -> outOfRangePaint.apply { color = colors.cgmLow }
-                    sample.valueMgDl > targetHigh -> outOfRangePaint.apply { color = colors.cgmHigh }
-                    else -> inRangePaint
-                }
+        val dotPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
+        val outlinePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            style = Paint.Style.STROKE
+            color = colors.outline
+        }
 
-            run {
-                val x = xFor(sample.measuredAtEpochMs)
-                val y = yFor(sample.valueMgDl)
-                val density = resources.displayMetrics.density
-                val dotRadius =
-                    graphStyle.cgmDotRadiusDp
-                        .coerceIn(1.5f, 6.0f) *
-                        density
-                val outlineWidth =
-                    graphStyle.cgmDotOutlineWidthDp
-                        .coerceIn(0.25f, 3.0f) *
-                        density
-
-                if (graphStyle.cgmDotOutlineEnabled) {
-                    currentRingPaint.style = Paint.Style.FILL
-                    currentRingPaint.color = colors.outline
-                    canvas.drawCircle(
-                        x,
-                        y,
-                        dotRadius + outlineWidth,
-                        currentRingPaint,
-                    )
-                }
-
-                canvas.drawCircle(
-                    x,
-                    y,
-                    dotRadius,
-                    paint,
-                )
+        samples.forEachIndexed { index, sample ->
+            dotPaint.color = when {
+                sample.valueMgDl < targetLow -> colors.cgmLow
+                sample.valueMgDl > targetHigh -> colors.cgmHigh
+                else -> colors.cgmInRange
             }
-        }
-
-        samples.lastOrNull()?.let { newest ->
-            val density = resources.displayMetrics.density
-            val dotRadius =
-                graphStyle.cgmDotRadiusDp
-                    .coerceIn(1.5f, 6.0f) *
-                    density *
-                    1.25f
-            val outlineWidth =
-                graphStyle.cgmDotOutlineWidthDp
-                    .coerceIn(0.25f, 3.0f) *
-                    density
-
+            val dotRadius = (
+                graphStyle.cgmDotRadiusDp.coerceIn(1.5f, 6.0f) +
+                    if (index == samples.lastIndex) 0.1f else 0f
+                ) * density
+            val x = xFor(sample.measuredAtEpochMs)
+            val y = yFor(sample.valueMgDl)
+            canvas.drawCircle(x, y, dotRadius, dotPaint)
             if (graphStyle.cgmDotOutlineEnabled) {
-                currentRingPaint.style = Paint.Style.FILL
-                currentRingPaint.color = colors.outline
-                canvas.drawCircle(
-                    xFor(newest.measuredAtEpochMs),
-                    yFor(newest.valueMgDl),
-                    dotRadius + outlineWidth,
-                    currentRingPaint,
-                )
+                val outlineWidth = graphStyle.cgmDotOutlineWidthDp.coerceIn(0.25f, 3.0f) * density
+                outlinePaint.strokeWidth = outlineWidth
+                canvas.drawCircle(x, y, dotRadius + outlineWidth / 2f, outlinePaint)
             }
         }
+
+        val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = colors.divider
+            style = Paint.Style.STROKE
+            strokeWidth = 1f * density
+        }
+        canvas.drawRoundRect(plotLeft, plotTop, plotRight, plotBottom, 22f, 22f, borderPaint)
     }
 
     private fun readGraphColors(): WatchGraphColors {

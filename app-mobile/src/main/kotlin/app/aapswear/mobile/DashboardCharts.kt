@@ -109,6 +109,7 @@ internal class ChartViewport(
         }
 
         futureWindowMs = next
+        clampPan()
         notifyChanged()
     }
 
@@ -193,7 +194,7 @@ internal class ChartViewport(
         panMs =
             panMs.coerceIn(
                 -24L * HOUR_MS,
-                2L * HOUR_MS,
+                0L,
             )
     }
 }
@@ -374,6 +375,7 @@ internal class GlucoseDashboardChart @JvmOverloads constructor(
     private var unit = GlucoseUnit.MG_DL
     private var showPredictions = false
     private var showTargetRange = false
+    private var showTargetValue = false
     private var showBasal = false
     private var showActivity = false
     private var showPredictionIob = false
@@ -390,6 +392,7 @@ internal class GlucoseDashboardChart @JvmOverloads constructor(
         showPredictions: Boolean,
         durationHours: Int,
         showTargetRange: Boolean = false,
+        showTargetValue: Boolean = false,
         showBasal: Boolean = false,
         showActivity: Boolean = false,
         showPredictionIob: Boolean = false,
@@ -408,6 +411,8 @@ internal class GlucoseDashboardChart @JvmOverloads constructor(
             showPredictions
         this.showTargetRange =
             showTargetRange
+        this.showTargetValue =
+            showTargetValue
         this.showBasal =
             showBasal
         this.showActivity =
@@ -466,7 +471,13 @@ internal class GlucoseDashboardChart @JvmOverloads constructor(
                 } else {
                     emptyList()
                 }
-            val end = viewport.endEpochMs(now)
+            val liveEdge =
+                if (viewport.futureWindowMs == 0L) {
+                    state?.glucose?.measuredAtEpochMs?.coerceAtMost(now) ?: now
+                } else {
+                    now
+                }
+            val end = viewport.endEpochMs(liveEdge)
 
             val start = end - (viewport.hours * HOUR_MS).toLong()
 
@@ -497,6 +508,24 @@ internal class GlucoseDashboardChart @JvmOverloads constructor(
                 )
             }
             drawGrid(canvas, plot, start, end)
+            if (showTargetValue) {
+                val targetValue = (targetLow + targetHigh) / 2.0
+                val targetY = mapGlucoseY(targetValue, plot)
+                linePaint.color = SugarliciousColors.argb(SugarliciousColorRole.GRAPH_LABEL)
+                linePaint.strokeWidth = 1f.dp
+                linePaint.pathEffect = DashPathEffect(floatArrayOf(5f.dp, 4f.dp), 0f)
+                canvas.drawLine(plot.left, targetY, plot.right, targetY, linePaint)
+                linePaint.pathEffect = null
+                drawText(
+                    canvas,
+                    "Ziel ${glucoseLabel(targetValue)}",
+                    plot.right - 1f.dp,
+                    (targetY - 4f.dp).coerceAtLeast(plot.top + 12f.dp),
+                    10f,
+                    SugarliciousColors.argb(SugarliciousColorRole.GRAPH_LABEL),
+                    Paint.Align.RIGHT,
+                )
+            }
             if (
                 showBasal
             ) {
@@ -567,7 +596,7 @@ internal class GlucoseDashboardChart @JvmOverloads constructor(
             ) {            drawTargetLabel(
                 canvas = canvas,
                 value = glucoseLabel(targetHigh),
-                x = plot.right - 8f.dp,
+                x = plot.right - 1f.dp,
                 y =
                     (targetTop - 4f.dp)
                         .coerceAtLeast(
@@ -577,7 +606,7 @@ internal class GlucoseDashboardChart @JvmOverloads constructor(
             drawTargetLabel(
                 canvas = canvas,
                 value = glucoseLabel(targetLow),
-                x = plot.right - 8f.dp,
+                x = plot.right - 1f.dp,
                 y =
                     (targetBottom + 12f.dp)
                         .coerceAtMost(
@@ -622,20 +651,6 @@ internal class GlucoseDashboardChart @JvmOverloads constructor(
             plot.right,
             zeroY,
             linePaint,
-        )
-
-        drawText(
-            canvas,
-            "0",
-            plot.right -
-                8f.dp,
-            zeroY -
-                4f.dp,
-            8f,
-            SugarliciousColors.argb(
-                SugarliciousColorRole.GRAPH_LABEL,
-            ),
-            Paint.Align.RIGHT,
         )
         linePaint.color =
             SugarliciousColors.argb(
@@ -979,8 +994,19 @@ internal class GlucoseDashboardChart @JvmOverloads constructor(
         String.format(Locale.getDefault(), "%.1f", valueMgDl / 18.0)
     } else valueMgDl.toInt().toString()
 
-    private fun drawTargetLabel(canvas: Canvas, value: String, x: Float, y: Float) =
-        drawText(canvas, value, x, y, 9f, Color.WHITE, Paint.Align.RIGHT)
+    private fun drawTargetLabel(canvas: Canvas, value: String, x: Float, y: Float) {
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            textSize = TypedValue.applyDimension(
+                TypedValue.COMPLEX_UNIT_SP,
+                10f,
+                resources.displayMetrics,
+            )
+            color = SugarliciousColors.argb(SugarliciousColorRole.GRAPH_LABEL)
+            textAlign = Paint.Align.RIGHT
+            typeface = android.graphics.Typeface.DEFAULT_BOLD
+        }
+        canvas.drawText(value, x, y, paint)
+    }
 
     private val Float.dp get() = this * density
 }
@@ -1020,9 +1046,16 @@ internal class MetabolicDashboardChart @JvmOverloads constructor(
         canvas.withClip(clip) {
             fillPaint.color = SugarliciousColors.argb(SugarliciousColorRole.GRAPH_BACKGROUND)
             canvas.drawRoundRect(outer, radius, radius, fillPaint)
+            val chartNow = System.currentTimeMillis()
+            val liveEdge =
+                if (viewport.futureWindowMs == 0L) {
+                    state?.glucose?.measuredAtEpochMs?.coerceAtMost(chartNow) ?: chartNow
+                } else {
+                    chartNow
+                }
             val end =
                 viewport.endEpochMs(
-                    System.currentTimeMillis(),
+                    liveEdge,
                 )
             val start =
                 end -

@@ -38,7 +38,22 @@ class DashboardChartsTest {
             glucosePredictions = listOf(GlucosePrediction(PredictionKind.IOB, listOf(129.0, 120.0, 108.0).mapIndexed { index, value -> GlucoseSample(value, now + index * 5 * 60_000L) })),
             target = TargetState(80.0, 160.0),
         )
-        val bitmap = render(GlucoseDashboardChart(context).apply { bind(state, GlucoseUnit.MG_DL, true, 6) }, 230)
+        val viewport = ChartViewport(6).apply {
+            setFutureWindow(15L * 60_000L)
+        }
+        val bitmap = render(
+            GlucoseDashboardChart(context = context, sharedViewport = viewport).apply {
+                bind(
+                    state = state,
+                    unit = GlucoseUnit.MG_DL,
+                    showPredictions = true,
+                    durationHours = 6,
+                    showTargetRange = true,
+                    showPredictionIob = true,
+                )
+            },
+            230,
+        )
         val inRangePixels = count(bitmap) {
             Color.green(it) > 150 && Color.green(it) > Color.red(it) * 1.3
         }
@@ -169,6 +184,20 @@ class DashboardChartsTest {
             maximum,
             0.0001,
         )
+    }
+
+    @Test fun `viewport cannot pan beyond configured future edge`() {
+        val now = 10_000_000L
+        val viewport = ChartViewport(6)
+        viewport.setFutureWindow(0L)
+        viewport.pan(-10_000f, 100f)
+        assertEquals(0L, viewport.panMs)
+        assertEquals(now, viewport.endEpochMs(now))
+
+        viewport.setFutureWindow(60L * 60_000L)
+        viewport.pan(-10_000f, 100f)
+        assertEquals(0L, viewport.panMs)
+        assertEquals(now + 60L * 60_000L, viewport.endEpochMs(now))
     }
 
     private fun render(view: View, height: Int): Bitmap {

@@ -323,8 +323,8 @@ class PersistentBridgeService : Service(), SharedPreferences.OnSharedPreferenceC
 }
 
 internal object NotificationGraphRenderer {
-    const val COLLAPSED_WIDTH = 560
-    const val COLLAPSED_HEIGHT = 96
+    const val COLLAPSED_WIDTH = 704
+    const val COLLAPSED_HEIGHT = 184
     const val EXPANDED_WIDTH = 640
     const val EXPANDED_HEIGHT = 256
 
@@ -332,7 +332,7 @@ internal object NotificationGraphRenderer {
     const val WIDTH = EXPANDED_WIDTH
     const val HEIGHT = EXPANDED_HEIGHT
 
-    private const val COLLAPSED_DISPLAY_HEIGHT_DP = 44f
+    private const val COLLAPSED_DISPLAY_HEIGHT_DP = 46f
     private const val EXPANDED_DISPLAY_HEIGHT_DP = 148f
 
     fun renderCollapsed(
@@ -348,6 +348,7 @@ internal object NotificationGraphRenderer {
             height = COLLAPSED_HEIGHT,
             displayHeightDp =
                 COLLAPSED_DISPLAY_HEIGHT_DP,
+            graphHoursOverride = 3,
         )
 
     fun renderExpanded(
@@ -373,6 +374,7 @@ internal object NotificationGraphRenderer {
         height: Int = HEIGHT,
         displayHeightDp: Float =
             EXPANDED_DISPLAY_HEIGHT_DP,
+        graphHoursOverride: Int? = null,
     ): Bitmap {
         val bitmap =
             createBitmap(
@@ -426,7 +428,7 @@ internal object NotificationGraphRenderer {
         val now =
             System.currentTimeMillis()
         val graphHours =
-            preferences
+            graphHoursOverride ?: preferences
                 .getInt(
                     "graphHours",
                     3,

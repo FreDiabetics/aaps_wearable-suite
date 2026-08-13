@@ -95,6 +95,22 @@ class MainActivity : ComponentActivity() {
                 putBoolean("cgmDotsOnlyDefaultMigratedV1", true)
             }
         }
+        if (!uiPreferences.getBoolean("overviewDefaultsMigratedV2", false)) {
+            uiPreferences.edit {
+                putBoolean("showCgmGraph", true)
+                putBoolean("showDetails", true)
+                putBoolean("showMetabolicGraph", false)
+                putBoolean("cgm.targetRange", true)
+                putBoolean("cgm.targetValue", false)
+                putBoolean("cgm.basal", false)
+                putBoolean("cgm.activity", false)
+                putBoolean("cgm.prediction.iob", false)
+                putBoolean("cgm.prediction.cob", false)
+                putBoolean("cgm.prediction.uam", false)
+                putBoolean("cgm.prediction.zeroTemp", false)
+                putBoolean("overviewDefaultsMigratedV2", true)
+            }
+        }
         content = findViewById(R.id.dashboard_content)
         scroll = findViewById(R.id.dashboard_scroll)
         screen = savedInstanceState?.getString("screen")?.let { runCatching { DashboardScreen.valueOf(it) }.getOrNull() } ?: DashboardScreen.OVERVIEW
@@ -253,7 +269,7 @@ class MainActivity : ComponentActivity() {
         )
         window.statusBarColor = backgroundColor
         window.navigationBarColor = backgroundColor
-        val light = DashboardUiPreferences.read(uiPreferences).themeMode == DashboardThemeMode.LIGHT
+        val light = SugarliciousColors.palette.isLight
         if (Build.VERSION.SDK_INT >= 30) {
             val mask = android.view.WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS or
                 android.view.WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS

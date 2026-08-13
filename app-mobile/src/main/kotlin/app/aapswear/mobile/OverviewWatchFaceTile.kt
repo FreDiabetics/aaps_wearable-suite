@@ -239,7 +239,7 @@ internal fun OverviewWatchFaceTile(
             Text(
                 "Galaxy Watch Ultra",
                 color = SugarliciousColors.TextPrimary,
-                fontSize = 16.sp,
+                fontSize = 20.sp,
                 fontWeight = FontWeight.Bold,
             )
 

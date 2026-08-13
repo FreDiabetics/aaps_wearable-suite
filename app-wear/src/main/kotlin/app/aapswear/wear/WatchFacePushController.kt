@@ -5,6 +5,7 @@ import android.content.pm.PackageManager
 import android.os.ParcelFileDescriptor
 import androidx.wear.watchfacepush.WatchFacePushManagerFactory
 import java.io.File
+import kotlinx.coroutines.CancellationException
 
 internal object SugarliciousWatchFacePush {
     const val ACTIVE_PERMISSION =
@@ -136,6 +137,8 @@ internal object SugarliciousWatchFacePush {
                     "Watchface aktiv"
                 }
             }
+        } catch (cancelled: CancellationException) {
+            throw cancelled
         } catch (error: Exception) {
             "Watchface-Wechsel fehlgeschlagen: ${error.javaClass.simpleName}"
         } finally {

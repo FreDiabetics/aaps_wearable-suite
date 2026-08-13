@@ -21,13 +21,14 @@ import app.aapswear.model.TherapyDisplayState
 
 enum class DashboardScreen { OVERVIEW, WATCH, SETTINGS }
 enum class DisplayUnitPreference { AAPS, MG_DL, MMOL_L }
-enum class DashboardThemeMode { DARK, LIGHT }
+enum class DashboardThemeMode { SYSTEM, LIGHT, DARK }
 
 data class DashboardUiPreferences(
     val unit: DisplayUnitPreference = DisplayUnitPreference.AAPS,
     val showDetails: Boolean = true,
     val showCgmGraph: Boolean = true,
-    val showCgmTargetRange: Boolean = false,
+    val showCgmTargetRange: Boolean = true,
+    val showCgmTargetValue: Boolean = false,
     val showCgmBasal: Boolean = false,
     val showCgmActivity: Boolean = false,
     val showCgmPredictionIob: Boolean = false,
@@ -43,7 +44,7 @@ data class DashboardUiPreferences(
     val liveNotification: Boolean = false,
     val watchFaceIndex: Int = 1,
     val dataSource: DataSourcePreference = DataSourcePreference.AUTOMATIC,
-    val themeMode: DashboardThemeMode = DashboardThemeMode.DARK,
+    val themeMode: DashboardThemeMode = DashboardThemeMode.SYSTEM,
 ) {
     val anyCgmPredictionEnabled: Boolean
         get() =
@@ -82,6 +83,11 @@ data class DashboardUiPreferences(
                 showCgmTargetRange =
                     preferences.getBoolean(
                         "cgm.targetRange",
+                        true,
+                    ),
+                showCgmTargetValue =
+                    preferences.getBoolean(
+                        "cgm.targetValue",
                         false,
                     ),
                 showCgmBasal =
@@ -161,8 +167,8 @@ data class DashboardUiPreferences(
                     )
                 }.getOrDefault(DataSourcePreference.AUTOMATIC),
                 themeMode = runCatching {
-                    DashboardThemeMode.valueOf(preferences.getString("themeMode", "DARK")!!)
-                }.getOrDefault(DashboardThemeMode.DARK),
+                    DashboardThemeMode.valueOf(preferences.getString("themeMode", "SYSTEM")!!)
+                }.getOrDefault(DashboardThemeMode.SYSTEM),
             )
     }
 }
@@ -493,11 +499,20 @@ class DashboardViewFactory(
         parent.addView(
             tile(null).apply {
                 addView(
-                    switchRowCompact(
-                        "Heller Modus",
-                        preferences.themeMode == DashboardThemeMode.LIGHT,
-                        View.generateViewId(),
-                    ) { callbacks.setThemeMode(if (it) DashboardThemeMode.LIGHT else DashboardThemeMode.DARK) },
+                    choiceRow(
+                        "Darstellung",
+                        listOf(
+                            Triple("System", preferences.themeMode == DashboardThemeMode.SYSTEM) {
+                                callbacks.setThemeMode(DashboardThemeMode.SYSTEM)
+                            },
+                            Triple("Hell", preferences.themeMode == DashboardThemeMode.LIGHT) {
+                                callbacks.setThemeMode(DashboardThemeMode.LIGHT)
+                            },
+                            Triple("Dunkel", preferences.themeMode == DashboardThemeMode.DARK) {
+                                callbacks.setThemeMode(DashboardThemeMode.DARK)
+                            },
+                        ),
+                    ),
                 )
                 addView(divider())
                 addView(
@@ -591,6 +606,14 @@ class DashboardViewFactory(
                             preferences.showCgmTargetRange,
                             View.generateViewId(),
                         ) { callbacks.setCgmStream("cgm.targetRange", it) },
+                    )
+                    addView(divider())
+                    addView(
+                        switchRowCompact(
+                            "Aktueller Zielwert",
+                            preferences.showCgmTargetValue,
+                            View.generateViewId(),
+                        ) { callbacks.setCgmStream("cgm.targetValue", it) },
                     )
                     addView(divider())
                     addView(

@@ -121,7 +121,7 @@ class MainActivityTest {
         assertEquals(1.75f, ui.cgmDotOutlineWidthDp, 0.001f)
     }
 
-    @Test fun `fresh install defaults to CGM dots only`() {
+    @Test fun `fresh install uses requested overview and CGM defaults`() {
         val context = ApplicationProvider.getApplicationContext<android.content.Context>()
         val preferences = context.getSharedPreferences("dashboard_ui", android.content.Context.MODE_PRIVATE)
         preferences.edit().clear().commit()
@@ -129,7 +129,9 @@ class MainActivityTest {
 
         val ui = DashboardUiPreferences.read(preferences)
         assertTrue(ui.showCgmGraph)
-        assertFalse(ui.showCgmTargetRange)
+        assertTrue(ui.showDetails)
+        assertTrue(ui.showCgmTargetRange)
+        assertFalse(ui.showCgmTargetValue)
         assertFalse(ui.showCgmBasal)
         assertFalse(ui.showCgmActivity)
         assertFalse(ui.anyCgmPredictionEnabled)
