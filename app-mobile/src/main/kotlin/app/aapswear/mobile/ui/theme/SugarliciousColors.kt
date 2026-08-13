@@ -49,6 +49,7 @@ enum class SugarliciousColorRole(
     CGM_DOT_IN_RANGE("cgm_dot_in_range", "CGM-Punkte · im Ziel", SugarliciousColorGroup.GLUCOSE, 0xFF54DF30.toInt(), 0xFF2E9C45.toInt(), true),
     CGM_DOT_HIGH("cgm_dot_high", "CGM-Punkte · hoch", SugarliciousColorGroup.GLUCOSE, 0xFFFFD040.toInt(), 0xFFD47D00.toInt(), true),
     TARGET_BAND("target_band", "Zielbereich im Graph", SugarliciousColorGroup.GLUCOSE, 0xFF0A391C.toInt()),
+    TARGET_VALUE("target_value", "Zielwert im Graph", SugarliciousColorGroup.GLUCOSE, 0xFFF5F5F5.toInt(), 0xFF252525.toInt(), true),
 
     GREEN("green", "Grün / Status", SugarliciousColorGroup.THERAPY, 0xFF54DF30.toInt()),
     BLUE("blue", "Blau / IOB", SugarliciousColorGroup.THERAPY, 0xFF64BFFF.toInt()),
@@ -74,6 +75,7 @@ enum class SugarliciousColorRole(
 data class SugarliciousPalette(
     private val values: Map<SugarliciousColorRole, Int>,
     val isLight: Boolean = false,
+    val lightChromaticOutlineEnabled: Boolean = false,
 ) {
     fun argb(role: SugarliciousColorRole): Int =
         values[role] ?: if (isLight) role.lightArgb else role.defaultArgb
@@ -94,6 +96,7 @@ data class SugarliciousPalette(
 }
 
 object SugarliciousColorStore {
+    const val PREFERENCE_LIGHT_CHROMATIC_OUTLINE = "light.chromaticOutlineEnabled"
     private const val LEGACY_PREFIX = "color."
     private const val DARK_PREFIX = "color.dark."
     private const val LIGHT_PREFIX = "color.light."
@@ -141,6 +144,12 @@ object SugarliciousColorStore {
                     }
                 },
             isLight = light,
+            lightChromaticOutlineEnabled =
+                light &&
+                    preferences.getBoolean(
+                        PREFERENCE_LIGHT_CHROMATIC_OUTLINE,
+                        true,
+                    ),
         )
     }
 
@@ -180,6 +189,7 @@ object SugarliciousColorStore {
 
     fun resetAll(preferences: SharedPreferences) {
         preferences.edit {
+            remove(PREFERENCE_LIGHT_CHROMATIC_OUTLINE)
             SugarliciousColorRole.entries.forEach { role ->
                 remove(
                     LEGACY_PREFIX +
@@ -220,6 +230,17 @@ object SugarliciousColors {
     fun color(role: SugarliciousColorRole): Color =
         palette.compose(role)
 
+    fun shouldOutlineChromatic(argb: Int): Boolean {
+        if (!palette.isLight || !palette.lightChromaticOutlineEnabled) return false
+        val red = (argb shr 16) and 0xFF
+        val green = (argb shr 8) and 0xFF
+        val blue = argb and 0xFF
+        return maxOf(red, green, blue) - minOf(red, green, blue) >= 18
+    }
+
+    val ChromaticOutlineArgb: Int
+        get() = 0x78000000
+
     val Primary get() = color(SugarliciousColorRole.PRIMARY)
     val OnPrimary get() = color(SugarliciousColorRole.ON_PRIMARY)
     val Secondary get() = color(SugarliciousColorRole.SECONDARY)
@@ -239,6 +260,7 @@ object SugarliciousColors {
     val GlucoseInRange get() = color(SugarliciousColorRole.GLUCOSE_IN_RANGE)
     val GlucoseHigh get() = color(SugarliciousColorRole.GLUCOSE_HIGH)
     val TargetBand get() = color(SugarliciousColorRole.TARGET_BAND)
+    val TargetValue get() = color(SugarliciousColorRole.TARGET_VALUE)
 
     val Green get() = color(SugarliciousColorRole.GREEN)
     val Blue get() = color(SugarliciousColorRole.BLUE)

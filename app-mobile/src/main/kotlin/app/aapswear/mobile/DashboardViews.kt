@@ -250,6 +250,21 @@ class DashboardViewFactory(
     private val context: Context,
     private val callbacks: DashboardCallbacks,
 ) {
+    private enum class SettingsPanel {
+        COLORS,
+        CGM_PREDICTIONS,
+    }
+
+    private val expandedSettingsPanels = mutableSetOf<SettingsPanel>()
+
+    private fun settingsPanelVisibility(panel: SettingsPanel): Int =
+        if (panel in expandedSettingsPanels) View.VISIBLE else View.GONE
+
+    private fun toggleSettingsPanel(panel: SettingsPanel): Int {
+        if (!expandedSettingsPanels.add(panel)) expandedSettingsPanels.remove(panel)
+        return settingsPanelVisibility(panel)
+    }
+
     private data class ComposeRenderState(
         val state: TherapyDisplayState?,
         val diagnostics: DiagnosticsSnapshot,
@@ -472,7 +487,7 @@ class DashboardViewFactory(
         val colorContainer =
             LinearLayout(context).apply {
                 orientation = LinearLayout.VERTICAL
-                visibility = View.GONE
+                visibility = settingsPanelVisibility(SettingsPanel.COLORS)
                 val colorSettings =
                     androidx.compose.ui.platform.ComposeView(context).apply {
                         setViewCompositionStrategy(
@@ -521,7 +536,7 @@ class DashboardViewFactory(
                 addView(
                     actionRow("Farben & Darstellung", "Anpassen") {
                         colorContainer.visibility =
-                            if (colorContainer.visibility == View.VISIBLE) View.GONE else View.VISIBLE
+                            toggleSettingsPanel(SettingsPanel.COLORS)
                     },
                 )
             },
@@ -533,7 +548,7 @@ class DashboardViewFactory(
         val predictionContainer =
             LinearLayout(context).apply {
                 orientation = LinearLayout.VERTICAL
-                visibility = View.GONE
+                visibility = settingsPanelVisibility(SettingsPanel.CGM_PREDICTIONS)
                 addView(
                     tile(null).apply {
                         addView(
@@ -615,7 +630,7 @@ class DashboardViewFactory(
                             if (preferences.anyCgmPredictionEnabled) "Aktiv" else "Aus",
                         ) {
                             predictionContainer.visibility =
-                                if (predictionContainer.visibility == View.VISIBLE) View.GONE else View.VISIBLE
+                                toggleSettingsPanel(SettingsPanel.CGM_PREDICTIONS)
                         },
                     )
                 }
@@ -705,6 +720,7 @@ class DashboardViewFactory(
             text = label
             textSize = 11f
             setTextColor(accent)
+            applyChromaticOutline(accent)
             typeface = Typeface.create("sans", Typeface.BOLD)
             letterSpacing = 0.04f
             setPadding(4.dp, 12.dp, 4.dp, 3.dp)
@@ -886,13 +902,14 @@ addView(
                 11f
             minHeight =
                 36.dp
-            setTextColor(
+            val chipTextColor =
                 if (selected) {
                     accent
                 } else {
                     secondary
-                },
-            )
+                }
+            setTextColor(chipTextColor)
+            applyChromaticOutline(chipTextColor)
             background =
                 roundedBackground(
                     if (selected) {
@@ -1028,6 +1045,7 @@ addView(
             setTextColor(
                 color,
             )
+            applyChromaticOutline(color)
             typeface =
                 Typeface.create(
                     "sans",
@@ -1055,9 +1073,23 @@ addView(
             setTextColor(
                 color,
             )
+            applyChromaticOutline(color)
             this.maxLines =
                 maxLines
         }
+
+    private fun TextView.applyChromaticOutline(color: Int) {
+        if (SugarliciousColors.shouldOutlineChromatic(color)) {
+            setShadowLayer(
+                0.65f * density,
+                0f,
+                0f,
+                SugarliciousColors.ChromaticOutlineArgb,
+            )
+        } else {
+            setShadowLayer(0f, 0f, 0f, 0)
+        }
+    }
 
     private fun fullWidth() =
         LinearLayout.LayoutParams(

@@ -488,7 +488,7 @@ internal class GlucoseDashboardChart @JvmOverloads constructor(
                     SugarliciousColors.argb(
                         SugarliciousColorRole.RANGE_IN_RANGE,
                     )
-                canvas.drawRect(
+                drawChromaticRect(canvas,
                     plot.left,
                     targetTop,
                     plot.right,
@@ -527,7 +527,7 @@ internal class GlucoseDashboardChart @JvmOverloads constructor(
                 linePaint.color = SugarliciousColors.argb(SugarliciousColorRole.GRAPH_DIVIDER)
                 linePaint.strokeWidth = 1f.dp
                 linePaint.pathEffect = DashPathEffect(floatArrayOf(4f.dp, 4f.dp), 0f)
-                canvas.drawLine(dividerX, plot.top, dividerX, plot.bottom, linePaint)
+                drawChromaticLine(canvas, dividerX, plot.top, dividerX, plot.bottom, linePaint)
                 linePaint.pathEffect = null
             }
 
@@ -544,13 +544,13 @@ internal class GlucoseDashboardChart @JvmOverloads constructor(
                 val current = index == history.lastIndex
                 val dotRadius = (cgmDotRadiusDp + if (current) 0.1f else 0f).dp
                 fillPaint.color = dotColor(point.valueMgDl, targetLow, targetHigh)
-                canvas.drawCircle(x, y, dotRadius, fillPaint)
+                drawChromaticCircle(canvas, x, y, dotRadius, fillPaint)
                 if (cgmDotOutlineEnabled) {
                     val outlineWidth = cgmDotOutlineWidthDp.dp
                     dotOutlinePaint.color =
                         SugarliciousColors.argb(SugarliciousColorRole.GRAPH_CURRENT_OUTLINE)
                     dotOutlinePaint.strokeWidth = outlineWidth
-                    canvas.drawCircle(
+                    drawChromaticCircle(canvas,
                         x,
                         y,
                         dotRadius + outlineWidth / 2f,
@@ -616,7 +616,7 @@ internal class GlucoseDashboardChart @JvmOverloads constructor(
         linePaint.pathEffect =
             null
 
-        canvas.drawLine(
+        drawChromaticLine(canvas,
             plot.left,
             zeroY,
             plot.right,
@@ -659,7 +659,7 @@ internal class GlucoseDashboardChart @JvmOverloads constructor(
                     index /
                     4f
 
-            canvas.drawLine(
+            drawChromaticLine(canvas,
                 plot.left,
                 y,
                 plot.right,
@@ -692,7 +692,7 @@ internal class GlucoseDashboardChart @JvmOverloads constructor(
                 x >= plot.left &&
                 x <= plot.right
             ) {
-                canvas.drawLine(
+                drawChromaticLine(canvas,
                     x,
                     plot.top,
                     x,
@@ -738,7 +738,7 @@ internal class GlucoseDashboardChart @JvmOverloads constructor(
                     x,
                     plot.bottom - 7f.dp,
                     8.5f,
-                    Color.WHITE,
+                    SugarliciousColors.argb(SugarliciousColorRole.GRAPH_LABEL),
                     Paint.Align.CENTER,
                 )
             }
@@ -766,15 +766,15 @@ internal class GlucoseDashboardChart @JvmOverloads constructor(
         canvas.withClip(clip) {
             val area = stepPath(effective, start, end, plot, ::basalY, closeAt = plot.top)
             fillPaint.color = withAlpha(cyan, 76)
-            drawPath(area, fillPaint)
+            this@GlucoseDashboardChart.drawChromaticPath(this, area, fillPaint)
 
             linePaint.color = cyan
             linePaint.strokeWidth = 1.2f.dp
             linePaint.pathEffect = null
-            drawPath(stepPath(effective, start, end, plot, ::basalY), linePaint)
+            this@GlucoseDashboardChart.drawChromaticPath(this, stepPath(effective, start, end, plot, ::basalY), linePaint)
             linePaint.strokeWidth = 1f.dp
             linePaint.pathEffect = DashPathEffect(floatArrayOf(1f.dp, 2f.dp), 0f)
-            drawPath(stepPath(base, start, end, plot, ::basalY), linePaint)
+            this@GlucoseDashboardChart.drawChromaticPath(this, stepPath(base, start, end, plot, ::basalY), linePaint)
             linePaint.pathEffect = null
         }
     }
@@ -878,7 +878,7 @@ internal class GlucoseDashboardChart @JvmOverloads constructor(
         linePaint.pathEffect =
             null
 
-        canvas.drawPath(
+        drawChromaticPath(canvas,
             smoothValuePath(
                 smoothedActual,
                 start,
@@ -901,7 +901,7 @@ internal class GlucoseDashboardChart @JvmOverloads constructor(
                     0f,
                 )
 
-            canvas.drawPath(
+            drawChromaticPath(canvas,
                 smoothValuePath(
                     smoothedFuture,
                     start,
@@ -955,9 +955,9 @@ internal class GlucoseDashboardChart @JvmOverloads constructor(
             if (x > plot.right) return@forEach
             val y = mapGlucoseY(point.valueMgDl, plot)
             fillPaint.color = withAlpha(SugarliciousColors.argb(SugarliciousColorRole.GRAPH_CURRENT_OUTLINE), 190)
-            canvas.drawCircle(x, y, 2.45f.dp, fillPaint)
+            drawChromaticCircle(canvas, x, y, 2.45f.dp, fillPaint)
             fillPaint.color = color
-            canvas.drawCircle(x, y, 1.75f.dp, fillPaint)
+            drawChromaticCircle(canvas, x, y, 1.75f.dp, fillPaint)
         }
     }
 
@@ -980,7 +980,15 @@ internal class GlucoseDashboardChart @JvmOverloads constructor(
     } else valueMgDl.toInt().toString()
 
     private fun drawTargetLabel(canvas: Canvas, value: String, x: Float, y: Float) =
-        drawText(canvas, value, x, y, 9f, Color.WHITE, Paint.Align.RIGHT)
+        drawText(
+            canvas,
+            value,
+            x,
+            y,
+            9f,
+            SugarliciousColors.argb(SugarliciousColorRole.TARGET_VALUE),
+            Paint.Align.RIGHT,
+        )
 
     private val Float.dp get() = this * density
 }
@@ -1155,7 +1163,7 @@ internal class MetabolicDashboardChart @JvmOverloads constructor(
                         index /
                         3f
 
-                canvas.drawLine(
+                drawChromaticLine(canvas,
                     lane.left,
                     y,
                     lane.right,
@@ -1189,7 +1197,7 @@ internal class MetabolicDashboardChart @JvmOverloads constructor(
                 x >= iob.left &&
                 x <= iob.right
             ) {
-                canvas.drawLine(
+                drawChromaticLine(canvas,
                     x,
                     iob.top,
                     x,
@@ -1214,7 +1222,7 @@ internal class MetabolicDashboardChart @JvmOverloads constructor(
         linePaint.strokeWidth =
             0.7f.dp
 
-        canvas.drawLine(
+        drawChromaticLine(canvas,
             iob.left,
             iob.bottom +
                 (
@@ -1263,7 +1271,7 @@ internal class MetabolicDashboardChart @JvmOverloads constructor(
                     x,
                     cob.bottom - 7f.dp,
                     8.5f,
-                    Color.WHITE,
+                    SugarliciousColors.argb(SugarliciousColorRole.GRAPH_LABEL),
                     Paint.Align.CENTER,
                 )
             }
@@ -1304,13 +1312,13 @@ internal class MetabolicDashboardChart @JvmOverloads constructor(
             withAlpha(color, 7),
             Shader.TileMode.CLAMP,
         )
-        canvas.drawPath(area, fillPaint)
+        drawChromaticPath(canvas, area, fillPaint)
         fillPaint.shader = null
 
         linePaint.color = withAlpha(SugarliciousColors.argb(SugarliciousColorRole.GRAPH_MUTED), 150)
         linePaint.strokeWidth = 0.8f.dp
         linePaint.pathEffect = null
-        canvas.drawLine(plot.left, zeroY, plot.right, zeroY, linePaint)
+        drawChromaticLine(canvas, plot.left, zeroY, plot.right, zeroY, linePaint)
         linePaint.color =
             color
         linePaint.strokeWidth =
@@ -1318,7 +1326,7 @@ internal class MetabolicDashboardChart @JvmOverloads constructor(
         linePaint.pathEffect =
             null
 
-        canvas.drawPath(
+        drawChromaticPath(canvas,
             valuePath(
                 actual,
                 start,
@@ -1459,7 +1467,7 @@ internal class MetabolicDashboardChart @JvmOverloads constructor(
         linePaint.pathEffect =
             null
 
-        canvas.drawPath(
+        drawChromaticPath(canvas,
             smoothValuePath(
                 smoothed,
                 start,
@@ -1512,7 +1520,7 @@ internal class MetabolicDashboardChart @JvmOverloads constructor(
                 0f,
             )
 
-        canvas.drawPath(
+        drawChromaticPath(canvas,
             smoothValuePath(
                 values,
                 start,
@@ -1543,7 +1551,7 @@ internal class MetabolicDashboardChart @JvmOverloads constructor(
             val markerHeight = side * (sqrt(3.0).toFloat() / 2f)
             val x = mapX(time, start, end, plot).coerceIn(plot.left + halfWidth, plot.right - halfWidth)
             val baseY = (zeroY + markerHeight).coerceAtMost(plot.bottom - 1f.dp)
-            canvas.drawPath(roundedUpTriangle(x, baseY, halfWidth, markerHeight, 1.6f.dp), fillPaint)
+            drawChromaticPath(canvas, roundedUpTriangle(x, baseY, halfWidth, markerHeight, 1.6f.dp), fillPaint)
         }
     }
 
@@ -2276,5 +2284,101 @@ private fun View.drawText(canvas: Canvas, value: String, x: Float, y: Float, siz
         this.color = color
         textAlign = align
     }
+    if (SugarliciousColors.shouldOutlineChromatic(color)) {
+        val outline = Paint(paint).apply {
+            style = Paint.Style.STROKE
+            strokeWidth = 0.9f * resources.displayMetrics.density
+            this.color = SugarliciousColors.ChromaticOutlineArgb
+        }
+        canvas.drawText(value, x, y, outline)
+    }
     canvas.drawText(value, x, y, paint)
+}
+
+private fun View.drawChromaticLine(
+    canvas: Canvas,
+    startX: Float,
+    startY: Float,
+    stopX: Float,
+    stopY: Float,
+    paint: Paint,
+) {
+    if (SugarliciousColors.shouldOutlineChromatic(paint.color)) {
+        val outline = Paint(paint).apply {
+            color = SugarliciousColors.ChromaticOutlineArgb
+            strokeWidth = paint.strokeWidth + 1.2f * resources.displayMetrics.density
+        }
+        canvas.drawLine(startX, startY, stopX, stopY, outline)
+    }
+    canvas.drawLine(startX, startY, stopX, stopY, paint)
+}
+
+private fun View.drawChromaticCircle(
+    canvas: Canvas,
+    centerX: Float,
+    centerY: Float,
+    radius: Float,
+    paint: Paint,
+) {
+    if (SugarliciousColors.shouldOutlineChromatic(paint.color)) {
+        val outlineWidth = 0.6f * resources.displayMetrics.density
+        val outline = Paint(paint).apply {
+            color = SugarliciousColors.ChromaticOutlineArgb
+            shader = null
+        }
+        if (paint.style == Paint.Style.FILL) {
+            canvas.drawCircle(centerX, centerY, radius + outlineWidth, outline)
+        } else {
+            outline.strokeWidth = paint.strokeWidth + outlineWidth * 2f
+            canvas.drawCircle(centerX, centerY, radius, outline)
+        }
+    }
+    canvas.drawCircle(centerX, centerY, radius, paint)
+}
+
+private fun View.drawChromaticPath(canvas: Canvas, path: Path, paint: Paint) {
+    if (SugarliciousColors.shouldOutlineChromatic(paint.color)) {
+        val outlineWidth = 0.6f * resources.displayMetrics.density
+        val outline = Paint(paint).apply {
+            color = SugarliciousColors.ChromaticOutlineArgb
+            shader = null
+            if (paint.style == Paint.Style.FILL) {
+                style = Paint.Style.STROKE
+                strokeWidth = outlineWidth * 2f
+            } else {
+                strokeWidth = paint.strokeWidth + outlineWidth * 2f
+            }
+        }
+        canvas.drawPath(path, outline)
+    }
+    canvas.drawPath(path, paint)
+}
+
+private fun View.drawChromaticRect(
+    canvas: Canvas,
+    left: Float,
+    top: Float,
+    right: Float,
+    bottom: Float,
+    paint: Paint,
+) {
+    if (SugarliciousColors.shouldOutlineChromatic(paint.color)) {
+        val outlineWidth = 0.6f * resources.displayMetrics.density
+        val outline = Paint(paint).apply {
+            color = SugarliciousColors.ChromaticOutlineArgb
+            shader = null
+            if (paint.style == Paint.Style.FILL) {
+                style = Paint.Style.STROKE
+                strokeWidth = outlineWidth * 2f
+            } else {
+                strokeWidth = paint.strokeWidth + outlineWidth * 2f
+            }
+        }
+        canvas.drawRect(left, top, right, bottom, outline)
+    }
+    canvas.drawRect(left, top, right, bottom, paint)
+}
+
+private fun View.drawChromaticRect(canvas: Canvas, rect: RectF, paint: Paint) {
+    drawChromaticRect(canvas, rect.left, rect.top, rect.right, rect.bottom, paint)
 }

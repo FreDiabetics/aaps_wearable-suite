@@ -75,6 +75,14 @@ internal fun SugarliciousColorSettingsPanel(
     var editingRole by remember {
         mutableStateOf<SugarliciousColorRole?>(null)
     }
+    var lightChromaticOutlineEnabled by remember {
+        mutableStateOf(
+            preferences.getBoolean(
+                SugarliciousColorStore.PREFERENCE_LIGHT_CHROMATIC_OUTLINE,
+                true,
+            ),
+        )
+    }
     var cgmDotRadiusDp by remember(showCgmGraph) {
         mutableFloatStateOf(preferences.getFloat("cgm.dotRadiusDp", 2.4f).coerceIn(1.5f, 6.0f))
     }
@@ -138,6 +146,31 @@ internal fun SugarliciousColorSettingsPanel(
                     fontWeight = FontWeight.Bold,
                 )
             }
+        }
+
+        if (palette.isLight) {
+            Text(
+                text = "LIGHT MODE",
+                color = SugarliciousColors.TextSecondary,
+                fontSize = 10.sp,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(top = 6.dp),
+            )
+            GraphSettingSwitch(
+                title = "Farbkonturen",
+                description = "Farbig codierte Elemente erhalten eine feine dunkle Kontur; Grau, Weiß und Schwarz bleiben unverändert",
+                checked = lightChromaticOutlineEnabled,
+                onCheckedChange = { enabled ->
+                    lightChromaticOutlineEnabled = enabled
+                    preferences.edit()
+                        .putBoolean(
+                            SugarliciousColorStore.PREFERENCE_LIGHT_CHROMATIC_OUTLINE,
+                            enabled,
+                        )
+                        .apply()
+                    reload()
+                },
+            )
         }
 
         if (showCgmGraph) {
@@ -256,6 +289,7 @@ private val cgmGraphColorRoles =
         SugarliciousColorRole.CGM_DOT_LOW,
         SugarliciousColorRole.CGM_DOT_IN_RANGE,
         SugarliciousColorRole.CGM_DOT_HIGH,
+        SugarliciousColorRole.TARGET_VALUE,
         SugarliciousColorRole.GRAPH_DIVIDER,
     )
 
@@ -543,7 +577,8 @@ private fun ColorRoleExample(
             SugarliciousColorRole.RANGE_HIGH,
             SugarliciousColorRole.CGM_DOT_LOW,
             SugarliciousColorRole.CGM_DOT_IN_RANGE,
-            SugarliciousColorRole.CGM_DOT_HIGH
+            SugarliciousColorRole.CGM_DOT_HIGH,
+            SugarliciousColorRole.TARGET_VALUE
             -> {
                 Text(
                     text = "123",
