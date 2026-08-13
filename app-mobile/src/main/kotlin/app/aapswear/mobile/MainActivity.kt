@@ -133,6 +133,22 @@ class MainActivity : ComponentActivity() {
             setShowMetabolicGraph = { uiPreferences.edit { putBoolean("showMetabolicGraph", it) } },
             setCompact = { uiPreferences.edit { putBoolean("compact", it) } },
             setLiveNotification = ::setLiveNotification,
+            setNotificationGraphEnabled = { enabled ->
+                uiPreferences.edit {
+                    putBoolean(
+                        PersistentBridgeService.PREFERENCE_NOTIFICATION_GRAPH_ENABLED,
+                        enabled,
+                    )
+                }
+            },
+            setNotificationGraphHours = { hours ->
+                uiPreferences.edit {
+                    putInt(
+                        PersistentBridgeService.PREFERENCE_NOTIFICATION_GRAPH_HOURS,
+                        hours.coerceIn(1, 3),
+                    )
+                }
+            },
             setWatchFaceIndex = {
                 uiPreferences.edit {
                     putInt(

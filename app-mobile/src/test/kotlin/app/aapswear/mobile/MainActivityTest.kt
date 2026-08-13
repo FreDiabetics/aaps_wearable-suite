@@ -121,6 +121,23 @@ class MainActivityTest {
         assertEquals(1.75f, ui.cgmDotOutlineWidthDp, 0.001f)
     }
 
+    @Test fun `notification graph defaults are independent from dashboard graph`() {
+        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+        val preferences = context.getSharedPreferences("dashboard_ui", android.content.Context.MODE_PRIVATE)
+        preferences.edit()
+            .clear()
+            .putInt("graphHours", 24)
+            .putBoolean(PersistentBridgeService.PREFERENCE_NOTIFICATION_GRAPH_ENABLED, false)
+            .putInt(PersistentBridgeService.PREFERENCE_NOTIFICATION_GRAPH_HOURS, 2)
+            .commit()
+
+        val ui = DashboardUiPreferences.read(preferences)
+
+        assertEquals(24, ui.graphHours)
+        assertFalse(ui.notificationGraphEnabled)
+        assertEquals(2, ui.notificationGraphHours)
+    }
+
     @Test fun `fresh install uses requested overview and CGM defaults`() {
         val context = ApplicationProvider.getApplicationContext<android.content.Context>()
         val preferences = context.getSharedPreferences("dashboard_ui", android.content.Context.MODE_PRIVATE)
@@ -136,6 +153,8 @@ class MainActivityTest {
         assertFalse(ui.showCgmActivity)
         assertFalse(ui.anyCgmPredictionEnabled)
         assertFalse(ui.showMetabolicGraph)
+        assertTrue(ui.notificationGraphEnabled)
+        assertEquals(3, ui.notificationGraphHours)
 
         controller.pause().stop().destroy()
     }

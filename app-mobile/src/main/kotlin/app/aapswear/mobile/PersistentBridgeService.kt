@@ -18,6 +18,7 @@ import android.graphics.drawable.Icon
 import android.os.Build
 import android.os.Bundle
 import android.os.IBinder
+import android.view.View
 import android.widget.RemoteViews
 import androidx.core.content.edit
 import androidx.core.graphics.createBitmap
@@ -118,21 +119,37 @@ class PersistentBridgeService : Service(), SharedPreferences.OnSharedPreferenceC
                     PendingIntent.FLAG_IMMUTABLE,
             )
 
+        val notificationGraphEnabled =
+            uiPreferences.getBoolean(
+                PREFERENCE_NOTIFICATION_GRAPH_ENABLED,
+                true,
+            )
         val display =
-            notificationDisplay(latestState)
+            notificationDisplay(
+                state = latestState,
+                graphEnabled = notificationGraphEnabled,
+            )
 
         val collapsedGraph =
-            NotificationGraphRenderer.renderCollapsed(
-                context = this,
-                state = latestState,
-                preferences = uiPreferences,
-            )
+            if (notificationGraphEnabled) {
+                NotificationGraphRenderer.renderCollapsed(
+                    context = this,
+                    state = latestState,
+                    preferences = uiPreferences,
+                )
+            } else {
+                null
+            }
         val expandedGraph =
-            NotificationGraphRenderer.renderExpanded(
-                context = this,
-                state = latestState,
-                preferences = uiPreferences,
-            )
+            if (notificationGraphEnabled) {
+                NotificationGraphRenderer.renderExpanded(
+                    context = this,
+                    state = latestState,
+                    preferences = uiPreferences,
+                )
+            } else {
+                null
+            }
 
         val collapsedView =
             notificationRemoteView(
@@ -229,7 +246,7 @@ class PersistentBridgeService : Service(), SharedPreferences.OnSharedPreferenceC
     private fun notificationRemoteView(
         layoutId: Int,
         display: NotificationDisplay,
-        graph: Bitmap,
+        graph: Bitmap?,
     ): RemoteViews {
         val palette =
             SugarliciousColorStore.load(
@@ -264,14 +281,28 @@ class PersistentBridgeService : Service(), SharedPreferences.OnSharedPreferenceC
                 R.id.notification_meta,
                 textSecondary,
             )
-            setImageViewBitmap(
-                R.id.notification_graph,
-                graph,
-            )
+            if (graph != null) {
+                setViewVisibility(
+                    R.id.notification_graph,
+                    View.VISIBLE,
+                )
+                setImageViewBitmap(
+                    R.id.notification_graph,
+                    graph,
+                )
+            } else {
+                setViewVisibility(
+                    R.id.notification_graph,
+                    View.GONE,
+                )
+            }
         }
     }
 
-    private fun notificationDisplay(state: TherapyDisplayState?): NotificationDisplay {
+    private fun notificationDisplay(
+        state: TherapyDisplayState?,
+        graphEnabled: Boolean,
+    ): NotificationDisplay {
         val glucose = state?.glucose
         val freshness = FreshnessPolicy.classify(glucose?.measuredAtEpochMs, System.currentTimeMillis())
         if (glucose == null || freshness == Freshness.STALE || freshness == Freshness.NO_DATA) {
@@ -288,7 +319,13 @@ class PersistentBridgeService : Service(), SharedPreferences.OnSharedPreferenceC
             )
         val age = ((System.currentTimeMillis() - glucose.measuredAtEpochMs).coerceAtLeast(0L) / 60_000L)
         val prefix = if (freshness == Freshness.DELAYED) "Verzögert · " else ""
-        return NotificationDisplay("$value $trend", "$prefix$unit · $age min alt")
+        val subtitle =
+            if (graphEnabled) {
+                "$prefix$unit · $age min alt"
+            } else {
+                "$prefix$age min"
+            }
+        return NotificationDisplay("$value $trend", subtitle)
     }
 
     private fun createNotificationChannel() {
@@ -305,6 +342,8 @@ class PersistentBridgeService : Service(), SharedPreferences.OnSharedPreferenceC
 
     companion object {
         const val PREFERENCE_LIVE_NOTIFICATION = "liveNotification"
+        const val PREFERENCE_NOTIFICATION_GRAPH_ENABLED = "notification.graphEnabled"
+        const val PREFERENCE_NOTIFICATION_GRAPH_HOURS = "notification.graphHours"
         const val EXTRA_REQUEST_PROMOTED_ONGOING = "android.requestPromotedOngoing"
         const val CHANNEL_ID = "sugarlicious_background"
         const val NOTIFICATION_ID = 4101
@@ -348,7 +387,7 @@ internal object NotificationGraphRenderer {
             height = COLLAPSED_HEIGHT,
             displayHeightDp =
                 COLLAPSED_DISPLAY_HEIGHT_DP,
-            graphHoursOverride = 3,
+            graphHoursOverride = notificationGraphHours(preferences),
         )
 
     fun renderExpanded(
@@ -364,7 +403,19 @@ internal object NotificationGraphRenderer {
             height = EXPANDED_HEIGHT,
             displayHeightDp =
                 EXPANDED_DISPLAY_HEIGHT_DP,
+            graphHoursOverride = notificationGraphHours(preferences),
         )
+
+    internal fun notificationGraphHours(
+        preferences: SharedPreferences,
+    ): Int =
+        preferences
+            .getInt(
+                PersistentBridgeService.PREFERENCE_NOTIFICATION_GRAPH_HOURS,
+                3,
+            )
+            .takeIf { it in 1..3 }
+            ?: 3
 
     fun render(
         context: Context,

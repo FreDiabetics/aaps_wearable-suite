@@ -42,6 +42,8 @@ data class DashboardUiPreferences(
     val compact: Boolean = true,
     val graphHours: Int = 3,
     val liveNotification: Boolean = false,
+    val notificationGraphEnabled: Boolean = true,
+    val notificationGraphHours: Int = 3,
     val watchFaceIndex: Int = 1,
     val dataSource: DataSourcePreference = DataSourcePreference.AUTOMATIC,
     val themeMode: DashboardThemeMode = DashboardThemeMode.SYSTEM,
@@ -154,6 +156,19 @@ data class DashboardUiPreferences(
                         PersistentBridgeService.PREFERENCE_LIVE_NOTIFICATION,
                         false,
                     ),
+                notificationGraphEnabled =
+                    preferences.getBoolean(
+                        PersistentBridgeService.PREFERENCE_NOTIFICATION_GRAPH_ENABLED,
+                        true,
+                    ),
+                notificationGraphHours =
+                    preferences
+                        .getInt(
+                            PersistentBridgeService.PREFERENCE_NOTIFICATION_GRAPH_HOURS,
+                            3,
+                        )
+                        .takeIf { it in 1..3 }
+                        ?: 3,
                 watchFaceIndex =
                     preferences
                         .getInt(
@@ -247,6 +262,8 @@ data class DashboardCallbacks(
     val setShowMetabolicGraph: (Boolean) -> Unit,
     val setCompact: (Boolean) -> Unit,
     val setLiveNotification: (Boolean) -> Unit,
+    val setNotificationGraphEnabled: (Boolean) -> Unit,
+    val setNotificationGraphHours: (Int) -> Unit,
     val setWatchFaceIndex: (Int) -> Unit,
     val syncNow: () -> Unit,
     val openContactEmail: () -> Unit,
@@ -673,6 +690,34 @@ class DashboardViewFactory(
                         callbacks.setLiveNotification,
                     ),
                 )
+                addView(divider())
+                addView(
+                    switchRowCompact(
+                        "Graph anzeigen",
+                        preferences.notificationGraphEnabled,
+                        View.generateViewId(),
+                        callbacks.setNotificationGraphEnabled,
+                    ),
+                )
+                if (preferences.notificationGraphEnabled) {
+                    addView(divider())
+                    addView(
+                        choiceRow(
+                            "Graph-Zeitraum",
+                            listOf(
+                                Triple("1 h", preferences.notificationGraphHours == 1) {
+                                    callbacks.setNotificationGraphHours(1)
+                                },
+                                Triple("2 h", preferences.notificationGraphHours == 2) {
+                                    callbacks.setNotificationGraphHours(2)
+                                },
+                                Triple("3 h", preferences.notificationGraphHours == 3) {
+                                    callbacks.setNotificationGraphHours(3)
+                                },
+                            ),
+                        ),
+                    )
+                }
             },
             cardParams(top = 4),
         )

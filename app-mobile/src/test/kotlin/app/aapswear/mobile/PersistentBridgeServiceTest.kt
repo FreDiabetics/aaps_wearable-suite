@@ -144,6 +144,25 @@ class PersistentBridgeServiceTest {
 
     @Test
     @Config(sdk = [35])
+    fun `notification graph accepts only one two or three hours`() {
+        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+        val preferences = context.getSharedPreferences("dashboard_ui", android.content.Context.MODE_PRIVATE)
+
+        preferences.edit().clear().putInt(PersistentBridgeService.PREFERENCE_NOTIFICATION_GRAPH_HOURS, 1).commit()
+        assertEquals(1, NotificationGraphRenderer.notificationGraphHours(preferences))
+
+        preferences.edit().putInt(PersistentBridgeService.PREFERENCE_NOTIFICATION_GRAPH_HOURS, 2).commit()
+        assertEquals(2, NotificationGraphRenderer.notificationGraphHours(preferences))
+
+        preferences.edit().putInt(PersistentBridgeService.PREFERENCE_NOTIFICATION_GRAPH_HOURS, 3).commit()
+        assertEquals(3, NotificationGraphRenderer.notificationGraphHours(preferences))
+
+        preferences.edit().putInt(PersistentBridgeService.PREFERENCE_NOTIFICATION_GRAPH_HOURS, 6).commit()
+        assertEquals(3, NotificationGraphRenderer.notificationGraphHours(preferences))
+    }
+
+    @Test
+    @Config(sdk = [35])
     fun `boot receiver requests persistent service restart`() {
         val context = ApplicationProvider.getApplicationContext<android.app.Application>()
         val shadowContext = shadowOf(context)
