@@ -2,6 +2,21 @@
 <!-- Original Sugarlicious design. Independent baton-hand geometry; no Apple assets. AGPL-3.0-or-later. -->
 <WatchFace width="450" height="450" clipShape="CIRCLE">
     <Metadata key="CLOCK_TYPE" value="ANALOG"/><Metadata key="PREVIEW_TIME" value="10:09:30"/>
+    <UserConfigurations>
+        <ColorConfiguration id="materialAccent" displayName="material_color_label" defaultValue="0">
+            <ColorOption id="0" displayName="material_green" colors="#FF4CAF50" />
+            <ColorOption id="1" displayName="material_blue" colors="#FF2196F3" />
+            <ColorOption id="2" displayName="material_purple" colors="#FF6750A4" />
+            <ColorOption id="3" displayName="material_teal" colors="#FF009688" />
+            <ColorOption id="4" displayName="material_orange" colors="#FFFF9800" />
+            <ColorOption id="5" displayName="material_red" colors="#FFF44336" />
+        </ColorConfiguration>
+        <ListConfiguration id="handStyle" displayName="hand_style_label" defaultValue="0">
+            <ListOption id="0" displayName="hand_style_standard" />
+            <ListOption id="1" displayName="hand_style_classic" />
+            <ListOption id="2" displayName="hand_style_minimal" />
+        </ListConfiguration>
+    </UserConfigurations>
     <Scene backgroundColor="#FF050505">
         <PartDraw x="0" y="0" width="450" height="450"><Arc centerX="225" centerY="225" width="424" height="424" startAngle="0" endAngle="360"><Stroke color="#FF222222" cap="ROUND" thickness="8"/></Arc><Arc centerX="225" centerY="225" width="398" height="398" startAngle="210" endAngle="330"><Stroke color="#FFFF8B60" cap="ROUND" thickness="11"/></Arc><Arc centerX="225" centerY="225" width="374" height="374" startAngle="30" endAngle="150"><Stroke color="#FF19D7E8" cap="ROUND" thickness="8"/></Arc></PartDraw>
         <ComplicationSlot slotId="0" displayName="Glucose circular progress" isCustomizable="TRUE" supportedTypes="RANGED_VALUE SHORT_TEXT EMPTY" x="145" y="260" width="160" height="160"><DefaultProviderPolicy primaryProvider="app.aapswear/app.aapswear.complications.GlucoseTrendComplication" primaryProviderType="RANGED_VALUE" defaultSystemProvider="EMPTY" defaultSystemProviderType="EMPTY"/><BoundingOval x="0" y="0" width="160" height="160"/><Complication type="RANGED_VALUE"><PartDraw x="0" y="0" width="160" height="160"><Arc centerX="80" centerY="80" width="140" height="140" startAngle="-145" endAngle="145"><Stroke color="#FF333333" cap="ROUND" thickness="21"/></Arc><Arc centerX="80" centerY="80" width="140" height="140" startAngle="-145" endAngle="145"><Transform target="endAngle" value="-145 + (((clamp([COMPLICATION.RANGED_VALUE_VALUE], [COMPLICATION.RANGED_VALUE_MIN], [COMPLICATION.RANGED_VALUE_MAX]) - [COMPLICATION.RANGED_VALUE_MIN]) / ([COMPLICATION.RANGED_VALUE_MAX] - [COMPLICATION.RANGED_VALUE_MIN])) * 290)"/><Stroke color="#FFFF8B60" cap="ROUND" thickness="21"/></Arc></PartDraw><PartText x="19" y="52" width="122" height="46"><Text align="CENTER" ellipsis="TRUE"><Font family="SYNC_TO_DEVICE" size="35" weight="BOLD" color="#FFF5F5F5"><Template>%s<Parameter expression="[COMPLICATION.TEXT]"/></Template></Font></Text></PartText><PartText x="19" y="88" width="122" height="36"><Text align="CENTER" ellipsis="TRUE"><Font family="SYNC_TO_DEVICE" size="30" weight="BOLD" color="#FFF5F5F5"><Template>%s<Parameter expression="[COMPLICATION.TITLE]"/></Template></Font></Text></PartText></Complication><Complication type="SHORT_TEXT"><PartText x="18" y="50" width="124" height="55"><Text align="CENTER" ellipsis="TRUE"><Font family="SYNC_TO_DEVICE" size="34" weight="BOLD" color="#FFF5F5F5"><Template>%s<Parameter expression="[COMPLICATION.TEXT]"/></Template></Font></Text></PartText></Complication><Complication type="EMPTY"/></ComplicationSlot>

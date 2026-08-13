@@ -91,29 +91,26 @@ class StateDataLayerService : WearableListenerService() {
         }
     }
     private fun persistComplicationPreset(event: DataEvent) {
-        val ids =
-            runCatching {
-                DataMapItem
-                    .fromDataItem(event.dataItem)
-                    .dataMap
-                    .getIntegerArrayList("ids")
-            }
-                .getOrNull()
-                .orEmpty()
-                .filter { it in 1..28 }
-                .distinct()
-                .take(MAX_PRESET_ITEMS)
-
-        getSharedPreferences(
-            COMPLICATION_SETUP_PREFS,
-            Context.MODE_PRIVATE,
-        )
+        val dataMap = runCatching {
+            DataMapItem.fromDataItem(event.dataItem).dataMap
+        }.getOrNull() ?: return
+        val ids = dataMap.getIntegerArrayList("ids").orEmpty()
+            .filter { it in 1..34 }
+            .distinct()
+            .take(MAX_PRESET_ITEMS)
+        val graphHours = dataMap.getInt("graphHours", 3)
+            .takeIf { it in listOf(1, 2, 6, 12, 24) }
+            ?: 3
+        getSharedPreferences(COMPLICATION_SETUP_PREFS, Context.MODE_PRIVATE)
             .edit()
-            .putString(
-                COMPLICATION_PRESET_KEY,
-                ids.joinToString(","),
-            )
+            .putString(COMPLICATION_PRESET_KEY, ids.joinToString(","))
+            .putInt(COMPLICATION_GRAPH_HOURS_KEY, graphHours)
             .apply()
+        getSharedPreferences(WearDisplayPreferences.PREFS, Context.MODE_PRIVATE)
+            .edit()
+            .putInt("complication_graph_hours", graphHours)
+            .apply()
+        requestAllComplicationUpdates()
     }
 
     private fun persistWatchConfig(event: DataEvent) {
@@ -223,6 +220,8 @@ class StateDataLayerService : WearableListenerService() {
             "complication_setup"
         private const val COMPLICATION_PRESET_KEY =
             "selected_ids"
+        private const val COMPLICATION_GRAPH_HOURS_KEY =
+            "graph_hours"
         private const val MAX_PRESET_ITEMS = 4
     }
 }

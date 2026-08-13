@@ -10,8 +10,13 @@ import android.graphics.DashPathEffect
 import android.graphics.Paint
 import android.graphics.Typeface
 import android.graphics.drawable.Icon
+import android.os.Build
 import androidx.wear.watchface.complications.data.ComplicationData
 import androidx.wear.watchface.complications.data.ComplicationType
+import androidx.wear.watchface.complications.data.GoalProgressComplicationData
+import androidx.wear.watchface.complications.data.MonochromaticImage
+import androidx.wear.watchface.complications.data.MonochromaticImageComplicationData
+import androidx.wear.watchface.complications.data.WeightedElementsComplicationData
 import androidx.wear.watchface.complications.data.LongTextComplicationData
 import androidx.wear.watchface.complications.data.PhotoImageComplicationData
 import androidx.wear.watchface.complications.data.PlainComplicationText
@@ -47,6 +52,11 @@ import kotlinx.coroutines.flow.first
 
 enum class ProviderKind {
     GLUCOSE,
+    GLUCOSE_PLUS_DELTA,
+    GLUCOSE_TREND_DELTA_AGE,
+    GLUCOSE_TREND_AGE,
+    SENSOR_AGE,
+    TIR,
     GLUCOSE_TREND,
     GLUCOSE_DELTA,
     GLUCOSE_TREND_DELTA,
@@ -61,6 +71,7 @@ enum class ProviderKind {
     BASAL_IOB,
     COB,
     IOB_COB,
+    IOB_COB_BASAL,
     BASAL,
     TEMP_BASAL,
     TEMP_TARGET,
@@ -119,14 +130,29 @@ abstract class TherapyComplicationService(
             ProviderKind.GLUCOSE ->
                 glucoseText to "Glucose"
 
+            ProviderKind.GLUCOSE_PLUS_DELTA ->
+                "$glucoseText ${deltaText.ifBlank { DASH }}" to "Glucose + Delta"
+
+            ProviderKind.GLUCOSE_TREND_DELTA_AGE ->
+                "$glucoseText$trendText ${deltaText.ifBlank { DASH }} $ageText" to "Glucose + Trend + Delta + Zeit"
+
+            ProviderKind.GLUCOSE_TREND_AGE ->
+                "$glucoseText$trendText $ageText" to "Glucose + Trend + Zeit"
+
+            ProviderKind.SENSOR_AGE ->
+                DASH to "Sensoralter"
+
+            ProviderKind.TIR ->
+                tirText(state, now) to "TIR 70–180"
+
             ProviderKind.GLUCOSE_TREND ->
                 "$glucoseText$trendText" to "Glucose"
 
             ProviderKind.GLUCOSE_DELTA ->
-                "${deltaText.ifBlank { DASH }} · $ageText" to "Delta and age"
+                "$ageText · ${deltaText.ifBlank { DASH }}" to "Zeit + Delta"
 
             ProviderKind.GLUCOSE_TREND_DELTA ->
-                "$glucoseText$trendText" to deltaText.ifBlank { DASH }
+                "$glucoseText$trendText ${deltaText.ifBlank { DASH }}" to "Glucose + Trend + Delta"
 
             ProviderKind.GLUCOSE_AGE ->
                 ageText to freshnessLabel(freshness)
@@ -149,6 +175,10 @@ abstract class TherapyComplicationService(
             ProviderKind.IOB_COB ->
                 "${units(therapyState?.insulin?.totalIob, "U", 1)} " +
                     units(therapyState?.carbs?.cobGrams, "g", 0) to "IOB · COB"
+
+            ProviderKind.IOB_COB_BASAL ->
+                "${units(therapyState?.insulin?.totalIob, "U", 1)} · ${units(therapyState?.carbs?.cobGrams, "g", 0)}" to
+                    "Basal ${units(therapyState?.basal?.currentUnitsPerHour, "U/h", 2)}"
 
             ProviderKind.BASAL ->
                 units(therapyState?.basal?.currentUnitsPerHour, "U/h", 2) to "Basal"
@@ -180,7 +210,7 @@ abstract class TherapyComplicationService(
                 (therapyState?.profile?.name ?: DASH) to "Profile"
 
             ProviderKind.RESERVOIR ->
-                units(therapyState?.pump?.reservoirUnits, "U", 0) to "Reservoir"
+                units(therapyState?.pump?.reservoirUnits, "U", 0) to "Pumpe ${therapyState?.pump?.status ?: DASH}"
 
             ProviderKind.PUMP_BATTERY ->
                 percent(therapyState?.pump?.batteryPercent) to "Pump battery"
@@ -222,6 +252,40 @@ abstract class TherapyComplicationService(
             packageManager.getLaunchIntentForPackage(packageName) ?: Intent(),
             PendingIntent.FLAG_IMMUTABLE,
         )
+
+        if (kind == ProviderKind.LOOP && type == ComplicationType.MONOCHROMATIC_IMAGE) {
+            val image = MonochromaticImage.Builder(
+                Icon.createWithResource(this, android.R.drawable.stat_notify_sync_noanim),
+            ).build()
+            return MonochromaticImageComplicationData.Builder(image, description)
+                .setTapAction(tap)
+                .build()
+        }
+
+        if (kind == ProviderKind.TIR && Build.VERSION.SDK_INT >= 33) {
+            val stats = tirStats(state, now)
+            if (type == ComplicationType.GOAL_PROGRESS) {
+                return GoalProgressComplicationData.Builder(
+                    stats.inRangePercent,
+                    TIR_GOAL_PERCENT,
+                    description,
+                ).setText(PlainComplicationText.Builder(stats.text).build())
+                    .setTapAction(tap)
+                    .build()
+            }
+            if (type == ComplicationType.WEIGHTED_ELEMENTS) {
+                val elements = buildList {
+                    if (stats.lowPercent > 0f) add(WeightedElementsComplicationData.Element(stats.lowPercent, Color.rgb(244, 67, 54)))
+                    if (stats.inRangePercent > 0f) add(WeightedElementsComplicationData.Element(stats.inRangePercent, Color.rgb(76, 175, 80)))
+                    if (stats.highPercent > 0f) add(WeightedElementsComplicationData.Element(stats.highPercent, Color.rgb(255, 152, 0)))
+                    if (isEmpty()) add(WeightedElementsComplicationData.Element(1f, Color.GRAY))
+                }
+                return WeightedElementsComplicationData.Builder(elements, description)
+                    .setText(PlainComplicationText.Builder(stats.text).build())
+                    .setTapAction(tap)
+                    .build()
+            }
+        }
 
         if (
             kind == ProviderKind.GLUCOSE_IMAGE ||
@@ -301,6 +365,20 @@ abstract class TherapyComplicationService(
                 }
 
 
+
+                ProviderKind.IOB,
+                ProviderKind.COB,
+                ProviderKind.SENSOR_AGE -> {
+                    val triple = when (kind) {
+                        ProviderKind.IOB -> Triple(therapyState?.insulin?.totalIob?.toFloat()?.coerceIn(0f, IOB_GAUGE_MAX) ?: 0f, 0f, IOB_GAUGE_MAX)
+                        ProviderKind.COB -> Triple(therapyState?.carbs?.cobGrams?.toFloat()?.coerceIn(0f, COB_GAUGE_MAX) ?: 0f, 0f, COB_GAUGE_MAX)
+                        else -> Triple(0f, 0f, SENSOR_AGE_GAUGE_MAX_DAYS)
+                    }
+                    return RangedValueComplicationData.Builder(triple.first, triple.second, triple.third, description)
+                        .setText(PlainComplicationText.Builder(pair.first).build())
+                        .setTapAction(tap)
+                        .build()
+                }
 
                 ProviderKind.RESERVOIR -> {
                     val value =
@@ -385,14 +463,14 @@ abstract class TherapyComplicationService(
                 .build()
         }
 
-        return ShortTextComplicationData.Builder(
-            PlainComplicationText.Builder(
-                pair.first.take(24),
-            ).build(),
+        val shortBuilder = ShortTextComplicationData.Builder(
+            PlainComplicationText.Builder(pair.first.take(24)).build(),
             description,
-        )
-            .setTapAction(tap)
-            .build()
+        ).setTapAction(tap)
+        if (kind == ProviderKind.IOB_COB_BASAL || kind == ProviderKind.RESERVOIR) {
+            shortBuilder.setTitle(PlainComplicationText.Builder(pair.second.take(24)).build())
+        }
+        return shortBuilder.build()
     }
     @SuppressLint("UseKtx")
     private fun renderImage(
@@ -415,7 +493,7 @@ abstract class TherapyComplicationService(
 
         val windowMs =
             if (kind == ProviderKind.GRAPH_LARGE) GRAPH_LARGE_WINDOW_MS
-            else GRAPH_WINDOW_MS
+            else readComplicationGraphHours() * 60L * 60_000L
 
         drawGraphImage(
             canvas = canvas,
@@ -577,6 +655,12 @@ abstract class TherapyComplicationService(
         canvas.drawRoundRect(plotLeft, plotTop, plotRight, plotBottom, 22f, 22f, borderPaint)
     }
 
+    private fun readComplicationGraphHours(): Int =
+        getSharedPreferences("watch_display", Context.MODE_PRIVATE)
+            .getInt("complication_graph_hours", 3)
+            .takeIf { it in listOf(1, 2, 6, 12, 24) }
+            ?: 3
+
     private fun readGraphColors(): WatchGraphColors {
         val defaults = WatchGraphColors()
         val preferences = getSharedPreferences("watch_display", Context.MODE_PRIVATE)
@@ -631,6 +715,28 @@ abstract class TherapyComplicationService(
 
             else -> Color.rgb(255, 92, 105)
         }
+
+    private data class TirStats(
+        val lowPercent: Float,
+        val inRangePercent: Float,
+        val highPercent: Float,
+        val hasData: Boolean,
+    ) {
+        val text: String get() = if (hasData) "${inRangePercent.toInt()}%" else DASH
+    }
+
+    private fun tirStats(state: TherapyDisplayState?, now: Long): TirStats {
+        val samples = state?.glucoseHistory.orEmpty().filter {
+            it.measuredAtEpochMs in (now - TIR_WINDOW_MS)..(now + FUTURE_TOLERANCE_MS)
+        }
+        if (samples.isEmpty()) return TirStats(0f, 0f, 0f, false)
+        val total = samples.size.toFloat()
+        val low = samples.count { it.valueMgDl < TIR_LOW_MGDL } * 100f / total
+        val high = samples.count { it.valueMgDl > TIR_HIGH_MGDL } * 100f / total
+        return TirStats(low, (100f - low - high).coerceIn(0f, 100f), high, true)
+    }
+
+    private fun tirText(state: TherapyDisplayState?, now: Long): String = tirStats(state, now).text
 
     private fun compactTherapyStatus(
         state: TherapyDisplayState?,
@@ -764,6 +870,13 @@ abstract class TherapyComplicationService(
 
         private const val GLUCOSE_GAUGE_MIN = 40f
         private const val GLUCOSE_GAUGE_MAX = 260f
+        private const val IOB_GAUGE_MAX = 10f
+        private const val COB_GAUGE_MAX = 150f
+        private const val SENSOR_AGE_GAUGE_MAX_DAYS = 14f
+        private const val TIR_LOW_MGDL = 70.0
+        private const val TIR_HIGH_MGDL = 180.0
+        private const val TIR_GOAL_PERCENT = 70f
+        private const val TIR_WINDOW_MS = 24 * 60 * 60_000L
 
         private const val GRAPH_MIN_MGDL = 40.0
         private const val GRAPH_MAX_MGDL = 260.0
@@ -775,6 +888,17 @@ abstract class TherapyComplicationService(
 
 class GlucoseComplication :
     TherapyComplicationService(ProviderKind.GLUCOSE)
+
+class GlucosePlusDeltaComplication :
+    TherapyComplicationService(ProviderKind.GLUCOSE_PLUS_DELTA)
+class GlucoseTrendDeltaAgeComplication :
+    TherapyComplicationService(ProviderKind.GLUCOSE_TREND_DELTA_AGE)
+class GlucoseTrendAgeComplication :
+    TherapyComplicationService(ProviderKind.GLUCOSE_TREND_AGE)
+class SensorAgeComplication :
+    TherapyComplicationService(ProviderKind.SENSOR_AGE)
+class TirComplication :
+    TherapyComplicationService(ProviderKind.TIR)
 
 class GlucoseTrendComplication :
     TherapyComplicationService(ProviderKind.GLUCOSE_TREND)
@@ -820,6 +944,9 @@ class CobComplication :
 class IobCobComplication :
     TherapyComplicationService(ProviderKind.IOB_COB)
 
+class IobCobBasalComplication :
+    TherapyComplicationService(ProviderKind.IOB_COB_BASAL)
+
 class BasalComplication :
     TherapyComplicationService(ProviderKind.BASAL)
 
@@ -859,6 +986,11 @@ class LongStatusComplication :
 object AllProviders {
     val classes = listOf(
         GlucoseComplication::class.java,
+        GlucosePlusDeltaComplication::class.java,
+        GlucoseTrendDeltaAgeComplication::class.java,
+        GlucoseTrendAgeComplication::class.java,
+        SensorAgeComplication::class.java,
+        TirComplication::class.java,
         GlucoseTrendComplication::class.java,
         GlucoseTrendTextComplication::class.java,
         GlucoseDeltaComplication::class.java,
@@ -874,6 +1006,7 @@ object AllProviders {
         BasalIobComplication::class.java,
         CobComplication::class.java,
         IobCobComplication::class.java,
+        IobCobBasalComplication::class.java,
         BasalComplication::class.java,
         TempBasalComplication::class.java,
         TempTargetComplication::class.java,
