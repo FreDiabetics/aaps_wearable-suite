@@ -98,16 +98,8 @@ class DashboardChartsTest {
             ),
         )
 
-        val iob = buildIobProjection(
-            history,
-            now,
-            now + 10 * 60_000L,
-        )
-        val cob = buildCobProjection(
-            history,
-            now,
-            now + 10 * 60_000L,
-        )
+        val iob = buildIobProjection(history, now, now + 10 * 60_000L)
+        val cob = buildCobProjection(history, now, now + 10 * 60_000L)
 
         assertEquals(3, iob.size)
         assertEquals(0.8, iob[0].second, 0.0001)
@@ -136,38 +128,35 @@ class DashboardChartsTest {
     }
 
     @Test fun `glucose chart compresses sub target range and keeps zero above edge`() {
-        val zero =
-            glucoseLogRatio(
-                0.0,
-            )
-        val low =
-            glucoseLogRatio(
-                80.0,
-            )
-        val targetHigh =
-            glucoseLogRatio(
-                160.0,
-            )
-        val maximum =
-            glucoseLogRatio(
-                400.0,
-            )
+        val zero = glucoseLogRatio(0.0)
+        val low = glucoseLogRatio(80.0)
+        val targetHigh = glucoseLogRatio(160.0)
+        val maximum = glucoseLogRatio(400.0)
 
-        assertTrue(
-            "zero=$zero",
-            zero > 0.0,
-        )
+        assertTrue("zero=$zero", zero > 0.0)
         assertTrue(
             "subTarget=${low - zero}",
-            low -
-                zero <
-                targetHigh -
-                    low,
+            low - zero < targetHigh - low,
         )
+        assertEquals(1.0, maximum, 0.0001)
+    }
+
+    @Test fun `viewport cannot pan beyond configured future edge`() {
+        val viewport = ChartViewport(6)
+        val now = 10_000_000L
+
+        viewport.pan(-420f, 420f)
+
+        assertEquals(0L, viewport.panMs)
+        assertEquals(now, viewport.endEpochMs(now))
+
+        viewport.setFutureWindow(60L * 60_000L)
+        viewport.pan(-420f, 420f)
+
+        assertEquals(0L, viewport.panMs)
         assertEquals(
-            1.0,
-            maximum,
-            0.0001,
+            now + 60L * 60_000L,
+            viewport.endEpochMs(now),
         )
     }
 
