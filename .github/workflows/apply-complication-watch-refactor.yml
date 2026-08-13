@@ -15,36 +15,39 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '21'
-
       - uses: android-actions/setup-android@v3
-
       - name: Install Android SDK
         run: sdkmanager "platforms;android-36" "build-tools;36.0.0"
-
-      - name: Reassemble and apply exact source pass
+      - name: Apply exact source pass
         run: |
           cat tools/refactor_payload/part_* > tools/apply_refactor_v3.py
           python tools/apply_refactor_v3.py
-          test -f core-model/src/main/kotlin/app/aapswear/model/ComplicationPresentation.kt
-          test -f app-wear/src/main/kotlin/app/aapswear/wear/WearSettingsActivity.kt
-          git status --short
-          git diff --stat
-
-      - name: Stage and guard source integration
+      - name: Stage exact source files
         run: |
-          git add -f app-mobile app-wear complications core-model wear-protocol design-assets
+          python - <<'PY'
+          from pathlib import Path
+          import base64, gzip, json, re, subprocess
+          text = Path('tools/apply_refactor_v3.py').read_text()
+          match = re.search(r"DATA='([^']+)'", text)
+          payload = json.loads(gzip.decompress(base64.b64decode(match.group(1))).decode())
+          if len(payload) != 45:
+              raise SystemExit(f'expected 45 source files, got {len(payload)}')
+          for path in sorted(payload):
+              subprocess.run(['git', 'add', '-f', '--', path], check=True)
+          staged = subprocess.check_output(['git', 'diff', '--cached', '--name-only'], text=True).splitlines()
+          expected = sorted(payload)
+          if sorted(staged) != expected:
+              missing = sorted(set(expected) - set(staged))
+              extra = sorted(set(staged) - set(expected))
+              raise SystemExit(f'staging mismatch; missing={missing}; extra={extra}')
+          print('\n'.join(staged))
+          PY
           git diff --cached --check
           git diff --cached --stat
-          git diff --cached --name-only | tee /tmp/staged-files.txt
-          grep -Fxq 'core-model/src/main/kotlin/app/aapswear/model/ComplicationPresentation.kt' /tmp/staged-files.txt
-          grep -Fxq 'app-wear/src/main/kotlin/app/aapswear/wear/WearSettingsActivity.kt' /tmp/staged-files.txt
-          grep -Fxq 'complications/src/main/kotlin/app/aapswear/complications/ActiveComplicationRegistry.kt' /tmp/staged-files.txt
-
       - name: Test and build affected modules
         run: >-
           ./gradlew
@@ -54,14 +57,12 @@ jobs:
           :app-mobile:assembleDebug
           :app-wear:testDebugUnitTest
           :app-wear:assembleDebug
-
       - name: Commit verified source integration
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git commit -m "Refactor complications, watch UI and shared graph presentation"
           git push origin HEAD:agent/complication-watch-refactor-v6
-
       - name: Remove temporary integration assets
         run: |
           rm -rf tools/refactor_payload
