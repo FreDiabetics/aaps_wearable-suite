@@ -3,6 +3,21 @@
 <WatchFace width="450" height="450">
     <Metadata key="CLOCK_TYPE" value="ANALOG" />
     <Metadata key="PREVIEW_TIME" value="10:09:30" />
+    <UserConfigurations>
+        <ColorConfiguration id="materialAccent" displayName="material_color_label" defaultValue="0">
+            <ColorOption id="0" displayName="material_green" colors="#FF4CAF50" />
+            <ColorOption id="1" displayName="material_blue" colors="#FF2196F3" />
+            <ColorOption id="2" displayName="material_purple" colors="#FF6750A4" />
+            <ColorOption id="3" displayName="material_teal" colors="#FF009688" />
+            <ColorOption id="4" displayName="material_orange" colors="#FFFF9800" />
+            <ColorOption id="5" displayName="material_red" colors="#FFF44336" />
+        </ColorConfiguration>
+        <ListConfiguration id="handStyle" displayName="hand_style_label" defaultValue="0">
+            <ListOption id="0" displayName="hand_style_standard" />
+            <ListOption id="1" displayName="hand_style_classic" />
+            <ListOption id="2" displayName="hand_style_minimal" />
+        </ListConfiguration>
+    </UserConfigurations>
     <Scene backgroundColor="#050B10">
         <PartDraw x="0" y="0" width="450" height="450">
             <Line startX="225" startY="18" endX="225" endY="42"><Stroke color="#FF68757C" cap="ROUND" thickness="4" /></Line>
