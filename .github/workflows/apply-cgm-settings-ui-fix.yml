@@ -1,0 +1,661 @@
+name: apply-cgm-settings-ui-fix
+
+on:
+  push:
+    branches:
+      - agent/cgm-settings-target-light-outline
+
+permissions:
+  contents: write
+
+jobs:
+  patch-test-publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/cgm-settings-target-light-outline
+          fetch-depth: 0
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK
+        run: sdkmanager "platforms;android-36" "build-tools;36.0.0"
+
+      - name: Apply settings and graph fixes
+        shell: python
+        run: |
+          from pathlib import Path
+          from textwrap import dedent
+
+          def block(value: str) -> str:
+              return dedent(value).strip("\n")
+
+          def replace_once(text: str, old: str, new: str, label: str) -> str:
+              count = text.count(old)
+              if count != 1:
+                  raise RuntimeError(f"{label}: expected exactly 1 match, got {count}")
+              return text.replace(old, new, 1)
+
+          def replace_all(text: str, old: str, new: str, label: str, minimum: int = 1) -> str:
+              count = text.count(old)
+              if count < minimum:
+                  raise RuntimeError(f"{label}: expected at least {minimum} matches, got {count}")
+              return text.replace(old, new)
+
+          # 1) Keep Settings accordions open across preference-triggered rerenders.
+          p = Path("app-mobile/src/main/kotlin/app/aapswear/mobile/DashboardViews.kt")
+          text = p.read_text(encoding="utf-8")
+          text = replace_once(
+              text,
+              block("""
+                  class DashboardViewFactory(
+                      private val context: Context,
+                      private val callbacks: DashboardCallbacks,
+                  ) {
+                      private data class ComposeRenderState(
+              """),
+              block("""
+                  class DashboardViewFactory(
+                      private val context: Context,
+                      private val callbacks: DashboardCallbacks,
+                  ) {
+                      private enum class SettingsPanel {
+                          COLORS,
+                          CGM_PREDICTIONS,
+                      }
+
+                      private val expandedSettingsPanels = mutableSetOf<SettingsPanel>()
+
+                      private fun settingsPanelVisibility(panel: SettingsPanel): Int =
+                          if (panel in expandedSettingsPanels) View.VISIBLE else View.GONE
+
+                      private fun toggleSettingsPanel(panel: SettingsPanel): Int {
+                          if (!expandedSettingsPanels.add(panel)) {
+                              expandedSettingsPanels.remove(panel)
+                          }
+                          return settingsPanelVisibility(panel)
+                      }
+
+                      private data class ComposeRenderState(
+              """),
+              "DashboardViewFactory expandable panel state",
+          )
+          text = replace_once(
+              text,
+              block("""
+                          val colorContainer =
+                              LinearLayout(context).apply {
+                                  orientation = LinearLayout.VERTICAL
+                                  visibility = View.GONE
+              """),
+              block("""
+                          val colorContainer =
+                              LinearLayout(context).apply {
+                                  orientation = LinearLayout.VERTICAL
+                                  visibility = settingsPanelVisibility(SettingsPanel.COLORS)
+              """),
+              "color panel initial visibility",
+          )
+          text = replace_once(
+              text,
+              block("""
+                                      colorContainer.visibility =
+                                          if (colorContainer.visibility == View.VISIBLE) View.GONE else View.VISIBLE
+              """),
+              block("""
+                                      colorContainer.visibility =
+                                          toggleSettingsPanel(SettingsPanel.COLORS)
+              """),
+              "color panel toggle",
+          )
+          text = replace_once(
+              text,
+              block("""
+                          val predictionContainer =
+                              LinearLayout(context).apply {
+                                  orientation = LinearLayout.VERTICAL
+                                  visibility = View.GONE
+              """),
+              block("""
+                          val predictionContainer =
+                              LinearLayout(context).apply {
+                                  orientation = LinearLayout.VERTICAL
+                                  visibility = settingsPanelVisibility(SettingsPanel.CGM_PREDICTIONS)
+              """),
+              "prediction panel initial visibility",
+          )
+          text = replace_once(
+              text,
+              block("""
+                                          predictionContainer.visibility =
+                                              if (predictionContainer.visibility == View.VISIBLE) View.GONE else View.VISIBLE
+              """),
+              block("""
+                                          predictionContainer.visibility =
+                                              toggleSettingsPanel(SettingsPanel.CGM_PREDICTIONS)
+              """),
+              "prediction panel toggle",
+          )
+          text = replace_once(
+              text,
+              block("""
+                              setTextColor(accent)
+                              typeface = Typeface.create("sans", Typeface.BOLD)
+              """),
+              block("""
+                              setTextColor(accent)
+                              applyChromaticOutline(accent)
+                              typeface = Typeface.create("sans", Typeface.BOLD)
+              """),
+              "settings group label outline",
+          )
+          text = replace_once(
+              text,
+              block("""
+                              setTextColor(
+                                  if (selected) {
+                                      accent
+                                  } else {
+                                      secondary
+                                  },
+                              )
+                              background =
+              """),
+              block("""
+                              val chipTextColor =
+                                  if (selected) {
+                                      accent
+                                  } else {
+                                      secondary
+                                  }
+                              setTextColor(chipTextColor)
+                              applyChromaticOutline(chipTextColor)
+                              background =
+              """),
+              "chip text outline",
+          )
+          text = replace_once(
+              text,
+              block("""
+                              setTextColor(
+                                  color,
+                              )
+                              typeface =
+              """),
+              block("""
+                              setTextColor(
+                                  color,
+                              )
+                              applyChromaticOutline(color)
+                              typeface =
+              """),
+              "value text outline",
+          )
+          text = replace_once(
+              text,
+              block("""
+                              setTextColor(
+                                  color,
+                              )
+                              this.maxLines =
+              """),
+              block("""
+                              setTextColor(
+                                  color,
+                              )
+                              applyChromaticOutline(color)
+                              this.maxLines =
+              """),
+              "helper text outline",
+          )
+          text = replace_once(
+              text,
+              "    private fun fullWidth() =",
+              block("""
+                      private fun TextView.applyChromaticOutline(color: Int) {
+                          if (SugarliciousColors.shouldOutlineChromatic(color)) {
+                              setShadowLayer(
+                                  0.65f * density,
+                                  0f,
+                                  0f,
+                                  SugarliciousColors.ChromaticOutlineArgb,
+                              )
+                          } else {
+                              clearShadowLayer()
+                          }
+                      }
+
+                      private fun fullWidth() =
+              """),
+              "TextView chromatic outline helper",
+          )
+          p.write_text(text, encoding="utf-8")
+
+          # 2) Add configurable target-value color and Light-Mode outline preference.
+          p = Path("app-mobile/src/main/kotlin/app/aapswear/mobile/ui/theme/SugarliciousColors.kt")
+          text = p.read_text(encoding="utf-8")
+          text = replace_once(
+              text,
+              '    TARGET_BAND("target_band", "Zielbereich im Graph", SugarliciousColorGroup.GLUCOSE, 0xFF0A391C.toInt()),',
+              block("""
+                      TARGET_BAND("target_band", "Zielbereich im Graph", SugarliciousColorGroup.GLUCOSE, 0xFF0A391C.toInt()),
+                      TARGET_VALUE("target_value", "Zielwert im Graph", SugarliciousColorGroup.GLUCOSE, 0xFFF5F5F5.toInt(), 0xFF252525.toInt(), true),
+              """),
+              "target value color role",
+          )
+          text = replace_once(
+              text,
+              block("""
+                  data class SugarliciousPalette(
+                      private val values: Map<SugarliciousColorRole, Int>,
+                      val isLight: Boolean = false,
+                  ) {
+              """),
+              block("""
+                  data class SugarliciousPalette(
+                      private val values: Map<SugarliciousColorRole, Int>,
+                      val isLight: Boolean = false,
+                      val lightChromaticOutlineEnabled: Boolean = false,
+                  ) {
+              """),
+              "palette outline property",
+          )
+          text = replace_once(
+              text,
+              block("""
+                  object SugarliciousColorStore {
+                      private const val LEGACY_PREFIX = "color."
+              """),
+              block("""
+                  object SugarliciousColorStore {
+                      const val PREFERENCE_LIGHT_CHROMATIC_OUTLINE = "light.chromaticOutlineEnabled"
+                      private const val LEGACY_PREFIX = "color."
+              """),
+              "outline preference key",
+          )
+          text = replace_once(
+              text,
+              block("""
+                          isLight = light,
+                      )
+              """),
+              block("""
+                          isLight = light,
+                          lightChromaticOutlineEnabled =
+                              light &&
+                                  preferences.getBoolean(
+                                      PREFERENCE_LIGHT_CHROMATIC_OUTLINE,
+                                      true,
+                                  ),
+                      )
+              """),
+              "load outline preference",
+          )
+          text = replace_once(
+              text,
+              block("""
+                      fun resetAll(preferences: SharedPreferences) {
+                          preferences.edit {
+                              SugarliciousColorRole.entries.forEach { role ->
+              """),
+              block("""
+                      fun resetAll(preferences: SharedPreferences) {
+                          preferences.edit {
+                              remove(PREFERENCE_LIGHT_CHROMATIC_OUTLINE)
+                              SugarliciousColorRole.entries.forEach { role ->
+              """),
+              "reset outline preference",
+          )
+          text = replace_once(
+              text,
+              block("""
+                      fun color(role: SugarliciousColorRole): Color =
+                          palette.compose(role)
+
+                      val Primary get() = color(SugarliciousColorRole.PRIMARY)
+              """),
+              block("""
+                      fun color(role: SugarliciousColorRole): Color =
+                          palette.compose(role)
+
+                      fun shouldOutlineChromatic(argb: Int): Boolean {
+                          if (!palette.isLight || !palette.lightChromaticOutlineEnabled) return false
+                          val red = (argb shr 16) and 0xFF
+                          val green = (argb shr 8) and 0xFF
+                          val blue = argb and 0xFF
+                          return maxOf(red, green, blue) - minOf(red, green, blue) >= 18
+                      }
+
+                      val ChromaticOutlineArgb: Int
+                          get() = 0x78000000
+
+                      val Primary get() = color(SugarliciousColorRole.PRIMARY)
+              """),
+              "chromatic outline helpers",
+          )
+          text = replace_once(
+              text,
+              block("""
+                      val TargetBand get() = color(SugarliciousColorRole.TARGET_BAND)
+
+                      val Green get() = color(SugarliciousColorRole.GREEN)
+              """),
+              block("""
+                      val TargetBand get() = color(SugarliciousColorRole.TARGET_BAND)
+                      val TargetValue get() = color(SugarliciousColorRole.TARGET_VALUE)
+
+                      val Green get() = color(SugarliciousColorRole.GREEN)
+              """),
+              "target value getter",
+          )
+          p.write_text(text, encoding="utf-8")
+
+          # 3) Expose both options in the color settings panel.
+          p = Path("app-mobile/src/main/kotlin/app/aapswear/mobile/SugarliciousColorSettingsPanel.kt")
+          text = p.read_text(encoding="utf-8")
+          text = replace_once(
+              text,
+              block("""
+                      var cgmDotRadiusDp by remember(showCgmGraph) {
+                          mutableFloatStateOf(preferences.getFloat("cgm.dotRadiusDp", 2.4f).coerceIn(1.5f, 6.0f))
+                      }
+              """),
+              block("""
+                      var lightChromaticOutlineEnabled by remember {
+                          mutableStateOf(
+                              preferences.getBoolean(
+                                  SugarliciousColorStore.PREFERENCE_LIGHT_CHROMATIC_OUTLINE,
+                                  true,
+                              ),
+                          )
+                      }
+                      var cgmDotRadiusDp by remember(showCgmGraph) {
+                          mutableFloatStateOf(preferences.getFloat("cgm.dotRadiusDp", 2.4f).coerceIn(1.5f, 6.0f))
+                      }
+              """),
+              "outline toggle state",
+          )
+          text = replace_once(
+              text,
+              block("""
+                          if (showCgmGraph) {
+                              Text(
+                                  text = "CGM-PUNKTE",
+              """),
+              block("""
+                          if (palette.isLight) {
+                              Text(
+                                  text = "LIGHT MODE",
+                                  color = SugarliciousColors.TextSecondary,
+                                  fontSize = 10.sp,
+                                  fontWeight = FontWeight.Bold,
+                                  modifier = Modifier.padding(top = 6.dp),
+                              )
+                              GraphSettingSwitch(
+                                  title = "Farbkonturen",
+                                  description = "Farbig codierte Elemente erhalten eine feine dunkle Kontur; Grau, Weiß und Schwarz bleiben unverändert",
+                                  checked = lightChromaticOutlineEnabled,
+                                  onCheckedChange = { enabled ->
+                                      lightChromaticOutlineEnabled = enabled
+                                      preferences.edit()
+                                          .putBoolean(
+                                              SugarliciousColorStore.PREFERENCE_LIGHT_CHROMATIC_OUTLINE,
+                                              enabled,
+                                          )
+                                          .apply()
+                                      reload()
+                                  },
+                              )
+                          }
+
+                          if (showCgmGraph) {
+                              Text(
+                                  text = "CGM-PUNKTE",
+              """),
+              "outline toggle UI",
+          )
+          text = replace_once(
+              text,
+              block("""
+                          SugarliciousColorRole.CGM_DOT_HIGH,
+                          SugarliciousColorRole.GRAPH_DIVIDER,
+              """),
+              block("""
+                          SugarliciousColorRole.CGM_DOT_HIGH,
+                          SugarliciousColorRole.TARGET_VALUE,
+                          SugarliciousColorRole.GRAPH_DIVIDER,
+              """),
+              "target value visibility",
+          )
+          text = replace_once(
+              text,
+              block("""
+                              SugarliciousColorRole.CGM_DOT_HIGH
+                              -> {
+              """),
+              block("""
+                              SugarliciousColorRole.CGM_DOT_HIGH,
+                              SugarliciousColorRole.TARGET_VALUE
+                              -> {
+              """),
+              "target value preview",
+          )
+          p.write_text(text, encoding="utf-8")
+
+          # 4) Use the target-value role and outline-aware graph primitives.
+          p = Path("app-mobile/src/main/kotlin/app/aapswear/mobile/DashboardCharts.kt")
+          text = p.read_text(encoding="utf-8")
+          text = replace_once(
+              text,
+              block("""
+                      private fun drawTargetLabel(canvas: Canvas, value: String, x: Float, y: Float) =
+                          drawText(canvas, value, x, y, 9f, Color.WHITE, Paint.Align.RIGHT)
+              """),
+              block("""
+                      private fun drawTargetLabel(canvas: Canvas, value: String, x: Float, y: Float) =
+                          drawText(
+                              canvas,
+                              value,
+                              x,
+                              y,
+                              9f,
+                              SugarliciousColors.argb(SugarliciousColorRole.TARGET_VALUE),
+                              Paint.Align.RIGHT,
+                          )
+              """),
+              "target label palette color",
+          )
+          text = replace_all(
+              text,
+              block("""
+                                      8.5f,
+                                      Color.WHITE,
+                                      Paint.Align.CENTER,
+              """),
+              block("""
+                                      8.5f,
+                                      SugarliciousColors.argb(SugarliciousColorRole.GRAPH_LABEL),
+                                      Paint.Align.CENTER,
+              """),
+              "time-label graph color",
+          )
+
+          # Do these replacements before inserting the wrappers so their internal Canvas calls stay native.
+          text = replace_all(text, "canvas.drawLine(", "drawChromaticLine(canvas, ", "graph lines")
+          text = replace_all(text, "canvas.drawCircle(", "drawChromaticCircle(canvas, ", "graph circles")
+          text = replace_all(text, "canvas.drawPath(", "drawChromaticPath(canvas, ", "graph paths")
+          text = replace_all(text, "canvas.drawRect(", "drawChromaticRect(canvas, ", "graph rectangles")
+
+          # Canvas.withClip changes the implicit receiver, so cover the basal calls explicitly.
+          text = text.replace(
+              "            drawPath(area, fillPaint)",
+              "            this@GlucoseDashboardChart.drawChromaticPath(this, area, fillPaint)",
+          )
+          text = text.replace(
+              "            drawPath(stepPath(effective, start, end, plot, ::basalY), linePaint)",
+              "            this@GlucoseDashboardChart.drawChromaticPath(this, stepPath(effective, start, end, plot, ::basalY), linePaint)",
+          )
+          text = text.replace(
+              "            drawPath(stepPath(base, start, end, plot, ::basalY), linePaint)",
+              "            this@GlucoseDashboardChart.drawChromaticPath(this, stepPath(base, start, end, plot, ::basalY), linePaint)",
+          )
+
+          text = replace_once(
+              text,
+              block("""
+                  private fun View.drawText(canvas: Canvas, value: String, x: Float, y: Float, sizeSp: Float, color: Int, align: Paint.Align) {
+                      val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                          textSize = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, sizeSp, resources.displayMetrics)
+                          this.color = color
+                          textAlign = align
+                      }
+                      canvas.drawText(value, x, y, paint)
+                  }
+              """),
+              block("""
+                  private fun View.drawText(canvas: Canvas, value: String, x: Float, y: Float, sizeSp: Float, color: Int, align: Paint.Align) {
+                      val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                          textSize = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, sizeSp, resources.displayMetrics)
+                          this.color = color
+                          textAlign = align
+                      }
+                      if (SugarliciousColors.shouldOutlineChromatic(color)) {
+                          val outline = Paint(paint).apply {
+                              style = Paint.Style.STROKE
+                              strokeWidth = 0.9f * resources.displayMetrics.density
+                              this.color = SugarliciousColors.ChromaticOutlineArgb
+                          }
+                          canvas.drawText(value, x, y, outline)
+                      }
+                      canvas.drawText(value, x, y, paint)
+                  }
+
+                  private fun View.drawChromaticLine(
+                      canvas: Canvas,
+                      startX: Float,
+                      startY: Float,
+                      stopX: Float,
+                      stopY: Float,
+                      paint: Paint,
+                  ) {
+                      if (SugarliciousColors.shouldOutlineChromatic(paint.color)) {
+                          val outline = Paint(paint).apply {
+                              color = SugarliciousColors.ChromaticOutlineArgb
+                              strokeWidth = paint.strokeWidth + 1.2f * resources.displayMetrics.density
+                          }
+                          canvas.drawLine(startX, startY, stopX, stopY, outline)
+                      }
+                      canvas.drawLine(startX, startY, stopX, stopY, paint)
+                  }
+
+                  private fun View.drawChromaticCircle(
+                      canvas: Canvas,
+                      centerX: Float,
+                      centerY: Float,
+                      radius: Float,
+                      paint: Paint,
+                  ) {
+                      if (SugarliciousColors.shouldOutlineChromatic(paint.color)) {
+                          val outlineWidth = 0.6f * resources.displayMetrics.density
+                          val outline = Paint(paint).apply {
+                              color = SugarliciousColors.ChromaticOutlineArgb
+                              shader = null
+                          }
+                          if (paint.style == Paint.Style.FILL) {
+                              canvas.drawCircle(centerX, centerY, radius + outlineWidth, outline)
+                          } else {
+                              outline.strokeWidth = paint.strokeWidth + outlineWidth * 2f
+                              canvas.drawCircle(centerX, centerY, radius, outline)
+                          }
+                      }
+                      canvas.drawCircle(centerX, centerY, radius, paint)
+                  }
+
+                  private fun View.drawChromaticPath(
+                      canvas: Canvas,
+                      path: Path,
+                      paint: Paint,
+                  ) {
+                      if (SugarliciousColors.shouldOutlineChromatic(paint.color)) {
+                          val outlineWidth = 0.6f * resources.displayMetrics.density
+                          val outline = Paint(paint).apply {
+                              color = SugarliciousColors.ChromaticOutlineArgb
+                              shader = null
+                              if (paint.style == Paint.Style.FILL) {
+                                  style = Paint.Style.STROKE
+                                  strokeWidth = outlineWidth * 2f
+                              } else {
+                                  strokeWidth = paint.strokeWidth + outlineWidth * 2f
+                              }
+                          }
+                          canvas.drawPath(path, outline)
+                      }
+                      canvas.drawPath(path, paint)
+                  }
+
+                  private fun View.drawChromaticRect(
+                      canvas: Canvas,
+                      left: Float,
+                      top: Float,
+                      right: Float,
+                      bottom: Float,
+                      paint: Paint,
+                  ) {
+                      if (SugarliciousColors.shouldOutlineChromatic(paint.color)) {
+                          val outlineWidth = 0.6f * resources.displayMetrics.density
+                          val outline = Paint(paint).apply {
+                              color = SugarliciousColors.ChromaticOutlineArgb
+                              shader = null
+                              if (paint.style == Paint.Style.FILL) {
+                                  style = Paint.Style.STROKE
+                                  strokeWidth = outlineWidth * 2f
+                              } else {
+                                  strokeWidth = paint.strokeWidth + outlineWidth * 2f
+                              }
+                          }
+                          canvas.drawRect(left, top, right, bottom, outline)
+                      }
+                      canvas.drawRect(left, top, right, bottom, paint)
+                  }
+
+                  private fun View.drawChromaticRect(
+                      canvas: Canvas,
+                      rect: RectF,
+                      paint: Paint,
+                  ) {
+                      drawChromaticRect(canvas, rect.left, rect.top, rect.right, rect.bottom, paint)
+                  }
+              """),
+              "outline-aware graph drawing helpers",
+          )
+          p.write_text(text, encoding="utf-8")
+
+      - name: Verify patch diff
+        run: |
+          git diff --check
+          git diff -- app-mobile/src/main/kotlin/app/aapswear/mobile/DashboardViews.kt \
+            app-mobile/src/main/kotlin/app/aapswear/mobile/SugarliciousColorSettingsPanel.kt \
+            app-mobile/src/main/kotlin/app/aapswear/mobile/ui/theme/SugarliciousColors.kt \
+            app-mobile/src/main/kotlin/app/aapswear/mobile/DashboardCharts.kt
+
+      - name: Test and build mobile app
+        run: ./gradlew :app-mobile:test :app-mobile:assembleDebug
+
+      - name: Commit tested fix
+        run: |
+          rm .github/workflows/apply-cgm-settings-ui-fix.yml
+          git config user.name "OpenAI Agent"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app-mobile/src/main/kotlin/app/aapswear/mobile/DashboardViews.kt \
+            app-mobile/src/main/kotlin/app/aapswear/mobile/SugarliciousColorSettingsPanel.kt \
+            app-mobile/src/main/kotlin/app/aapswear/mobile/ui/theme/SugarliciousColors.kt \
+            app-mobile/src/main/kotlin/app/aapswear/mobile/DashboardCharts.kt \
+            .github/workflows/apply-cgm-settings-ui-fix.yml
+          git commit -m "Fix CGM settings expansion and light-mode readability"
+          git push origin HEAD:agent/cgm-settings-target-light-outline
