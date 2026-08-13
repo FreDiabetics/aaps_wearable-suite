@@ -49,6 +49,11 @@ jobs:
           ]
           for path in paths:
               text = path.read_text(encoding="utf-8")
+              if path.name == "DashboardViews.kt":
+                  text = text.replace(
+                      "            clearShadowLayer()",
+                      "            setShadowLayer(0f, 0f, 0f, 0)",
+                  )
               cleaned = "\n".join(line.rstrip() for line in text.splitlines()) + "\n"
               path.write_text(cleaned, encoding="utf-8")
 
