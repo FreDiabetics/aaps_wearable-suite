@@ -95,6 +95,23 @@ class MainActivity : ComponentActivity() {
                 putBoolean("cgmDotsOnlyDefaultMigratedV1", true)
             }
         }
+        if (!uiPreferences.getBoolean("overviewDefaultsMigratedV2", false)) {
+            uiPreferences.edit {
+                putBoolean("showCgmGraph", true)
+                putBoolean("showDetails", true)
+                putBoolean("showMetabolicGraph", false)
+                putBoolean("showPredictions", false)
+                putBoolean("cgm.targetRange", true)
+                putBoolean("cgm.targetValue", false)
+                putBoolean("cgm.basal", false)
+                putBoolean("cgm.activity", false)
+                putBoolean("cgm.prediction.iob", false)
+                putBoolean("cgm.prediction.cob", false)
+                putBoolean("cgm.prediction.uam", false)
+                putBoolean("cgm.prediction.zeroTemp", false)
+                putBoolean("overviewDefaultsMigratedV2", true)
+            }
+        }
         content = findViewById(R.id.dashboard_content)
         scroll = findViewById(R.id.dashboard_scroll)
         screen = savedInstanceState?.getString("screen")?.let { runCatching { DashboardScreen.valueOf(it) }.getOrNull() } ?: DashboardScreen.OVERVIEW
@@ -225,28 +242,14 @@ class MainActivity : ComponentActivity() {
         updateNavigation()
     }
 
-
     @Suppress("DEPRECATION")
     private fun applyRuntimeColors() {
-        val backgroundColor =
-            SugarliciousColors.argb(
-                SugarliciousColorRole.BACKGROUND,
-            )
-        val surface =
-            SugarliciousColors.argb(
-                SugarliciousColorRole.SURFACE,
-            )
-        val border =
-            SugarliciousColors.argb(
-                SugarliciousColorRole.BORDER,
-            )
-        val text =
-            SugarliciousColors.argb(
-                SugarliciousColorRole.TEXT_PRIMARY,
-            )
+        val backgroundColor = SugarliciousColors.argb(SugarliciousColorRole.BACKGROUND)
+        val surface = SugarliciousColors.argb(SugarliciousColorRole.SURFACE)
+        val border = SugarliciousColors.argb(SugarliciousColorRole.BORDER)
+        val text = SugarliciousColors.argb(SugarliciousColorRole.TEXT_PRIMARY)
 
-        findViewById<View>(R.id.root)
-            .setBackgroundColor(backgroundColor)
+        findViewById<View>(R.id.root).setBackgroundColor(backgroundColor)
         findViewById<View>(R.id.scroll_fade).background = GradientDrawable(
             GradientDrawable.Orientation.TOP_BOTTOM,
             intArrayOf(Color.TRANSPARENT, backgroundColor),
@@ -266,17 +269,15 @@ class MainActivity : ComponentActivity() {
             window.decorView.systemUiVisibility = flags
         }
 
-        findViewById<TextView>(R.id.app_title)
-            .setTextColor(text)
-
-        findViewById<View>(R.id.bottom_navigation).background =
-            GradientDrawable().apply {
-                cornerRadius = 28.dp.toFloat()
-                setColor(surface)
-                setStroke(1.dp, border)
-            }
-styleTitle()
+        findViewById<TextView>(R.id.app_title).setTextColor(text)
+        findViewById<View>(R.id.bottom_navigation).background = GradientDrawable().apply {
+            cornerRadius = 28.dp.toFloat()
+            setColor(surface)
+            setStroke(1.dp, border)
+        }
+        styleTitle()
     }
+
     private fun bindNavigation() {
         findViewById<View>(R.id.nav_overview).setOnClickListener { navigate(DashboardScreen.OVERVIEW) }
         findViewById<View>(R.id.nav_watch).setOnClickListener { navigate(DashboardScreen.WATCH) }
@@ -300,36 +301,32 @@ styleTitle()
             val (itemId, iconId, labelId) = views
             val selected = screen == target
             val color = SugarliciousColors.argb(if (selected) SugarliciousColorRole.PRIMARY else SugarliciousColorRole.TEXT_SECONDARY)
-            findViewById<View>(itemId).background =
-                GradientDrawable().apply {
-                    cornerRadius = 20.dp.toFloat()
-                    setColor(
-                        if (selected) {
-                            SugarliciousColors.argb(
-                                SugarliciousColorRole.SURFACE_SELECTED,
-                            )
-                        } else {
-                            Color.TRANSPARENT
-                        },
-                    )
-                }
+            findViewById<View>(itemId).background = GradientDrawable().apply {
+                cornerRadius = 20.dp.toFloat()
+                setColor(
+                    if (selected) SugarliciousColors.argb(SugarliciousColorRole.SURFACE_SELECTED)
+                    else Color.TRANSPARENT,
+                )
+            }
             findViewById<ImageView>(iconId).apply {
                 imageTintList = ColorStateList.valueOf(color)
                 alpha = if (selected) 1f else 0.72f
             }
             findViewById<TextView>(labelId).apply {
                 setTextColor(color)
-                setTypeface(
-                    typeface,
-                    if (selected) android.graphics.Typeface.BOLD else android.graphics.Typeface.NORMAL,
-                )
+                setTypeface(typeface, if (selected) android.graphics.Typeface.BOLD else android.graphics.Typeface.NORMAL)
             }
         }
     }
 
     private fun styleTitle() {
         val value = SpannableString(getString(R.string.app_name))
-        value.setSpan(ForegroundColorSpan(SugarliciousColors.argb(SugarliciousColorRole.PRIMARY)), 5, value.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+        value.setSpan(
+            ForegroundColorSpan(SugarliciousColors.argb(SugarliciousColorRole.PRIMARY)),
+            5,
+            value.length,
+            Spanned.SPAN_EXCLUSIVE_EXCLUSIVE,
+        )
         findViewById<TextView>(R.id.app_title).text = value
     }
 
@@ -343,11 +340,18 @@ styleTitle()
         scope.launch {
             runCatching { withTimeout(4.seconds) { publishState(applicationContext, latest) } }
                 .onSuccess {
-                    diagnostics.edit { putLong("lastSyncAt", System.currentTimeMillis()); putString("lastSyncStatus", "ok"); remove("lastSyncError") }
+                    diagnostics.edit {
+                        putLong("lastSyncAt", System.currentTimeMillis())
+                        putString("lastSyncStatus", "ok")
+                        remove("lastSyncError")
+                    }
                     Toast.makeText(this@MainActivity, "An Watch übertragen", Toast.LENGTH_SHORT).show()
                 }
                 .onFailure { error ->
-                    diagnostics.edit { putString("lastSyncStatus", "unavailable"); putString("lastSyncError", error.javaClass.simpleName) }
+                    diagnostics.edit {
+                        putString("lastSyncStatus", "unavailable")
+                        putString("lastSyncError", error.javaClass.simpleName)
+                    }
                     Toast.makeText(this@MainActivity, "Keine Watch erreichbar", Toast.LENGTH_SHORT).show()
                 }
         }
@@ -372,7 +376,6 @@ styleTitle()
             requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), NOTIFICATION_PERMISSION_REQUEST)
         }
     }
-
 
     private fun openContactEmail() {
         val intent = Intent(Intent.ACTION_SENDTO, Uri.fromParts("mailto", getString(R.string.contact_email), null))
