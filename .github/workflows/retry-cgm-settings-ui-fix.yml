@@ -58,7 +58,7 @@ jobs:
           git diff --stat
 
       - name: Test and build mobile app
-        run: ./gradlew :app-mobile:test :app-mobile:assembleDebug
+        run: bash ./gradlew :app-mobile:test :app-mobile:assembleDebug
 
       - name: Commit tested fix
         run: |
