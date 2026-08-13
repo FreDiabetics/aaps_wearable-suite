@@ -31,6 +31,9 @@ jobs:
       - name: Verify whitespace
         run: git diff --check
 
+      - name: Enable Gradle wrapper
+        run: chmod +x gradlew
+
       - name: Test and build affected modules
         run: ./gradlew :app-mobile:testDebugUnitTest :app-mobile:assembleDebug :app-wear:testDebugUnitTest :app-wear:assembleDebug :complications:testDebugUnitTest
 
