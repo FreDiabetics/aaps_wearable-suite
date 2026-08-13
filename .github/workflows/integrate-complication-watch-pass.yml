@@ -1,4 +1,4 @@
-name: Integrate complication and watch customization
+name: Promote complication watch source
 
 on:
   push:
@@ -6,80 +6,32 @@ on:
       - agent/complication-watch-menu-pass
 
 jobs:
-  integrate:
+  promote:
     if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
     permissions:
       contents: write
 
     steps:
-      - name: Checkout
+      - name: Checkout integration source
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Set up JDK 21
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: '21'
-
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
-
-      - name: Apply complication core changes
-        run: python tools/complication-pass.py
-
-      - name: Apply complication constants
-        run: python tools/complication-constants-fix.py
-
-      - name: Apply provider manifest changes
-        run: python tools/complication-manifest-fix.py
-
-      - name: Apply mobile and watchface UI changes
-        run: python tools/ui-watchface-pass.py
-
-      - name: Update regression tests
-        run: python tools/complication-tests-fix.py
-
-      - name: Update delta regression expectation
-        run: python tools/complication-test-expectation-fix.py
-
-      - name: Verify diff
-        run: git diff --check
-
-      - name: Enable Gradle wrapper
-        run: chmod +x gradlew
-
-      - name: Test and build affected applications
-        run: >-
-          ./gradlew
-          :complications:testDebugUnitTest
-          :app-mobile:testDebugUnitTest
-          :app-mobile:assembleDebug
-          :app-wear:testDebugUnitTest
-          :app-wear:assembleDebug
-          :watchfaces:sugarlicious-analog:assembleDebug
-          :watchfaces:sugarlicious-orbit:assembleDebug
-          :watchfaces:sugarlicious-rings:assembleDebug
-          :watchfaces:sugarlicious-graph:assembleDebug
-
-      - name: Validate Watch Face Format XML
-        shell: pwsh
-        run: ./tools/wff-validator/validate.ps1
-
-      - name: Commit integrated source
+      - name: Promote validated source only
         shell: bash
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add \
-            complications/src/main/kotlin/app/aapswear/complications/TherapyComplications.kt \
-            complications/src/test/kotlin/app/aapswear/complications/TherapyComplicationsTest.kt \
+          git fetch origin agent/complication-watch-final agent/complication-watch-menu-pass
+          git checkout -B agent/complication-watch-final origin/agent/complication-watch-final
+          git checkout origin/agent/complication-watch-menu-pass -- \
             app-mobile/src/main/kotlin/app/aapswear/mobile/ComplicationCatalog.kt \
             app-wear/src/main/AndroidManifest.xml \
             app-wear/src/main/kotlin/app/aapswear/wear/StateDataLayerService.kt \
             app-wear/src/main/res/layout/activity_wear.xml \
+            complications/src/main/kotlin/app/aapswear/complications/TherapyComplications.kt \
+            complications/src/test/kotlin/app/aapswear/complications/TherapyComplicationsTest.kt \
             watchfaces/sugarlicious-analog/src/main/res/raw/watchface.xml \
             watchfaces/sugarlicious-analog/src/main/res/values/strings.xml \
             watchfaces/sugarlicious-orbit/src/main/res/raw/watchface.xml \
@@ -88,21 +40,21 @@ jobs:
             watchfaces/sugarlicious-rings/src/main/res/values/strings.xml \
             watchfaces/sugarlicious-graph/src/main/res/raw/watchface.xml \
             watchfaces/sugarlicious-graph/src/main/res/values/strings.xml
-          if ! git diff --cached --quiet; then
-            git commit -m "Restructure complications and watch customization"
-            git push
-          fi
-
-      - name: Remove temporary integration tooling
-        shell: bash
-        run: |
-          git rm \
-            .github/workflows/integrate-complication-watch-pass.yml \
-            tools/complication-constants-fix.py \
-            tools/complication-manifest-fix.py \
-            tools/complication-pass.py \
-            tools/complication-test-expectation-fix.py \
-            tools/complication-tests-fix.py \
-            tools/ui-watchface-pass.py
-          git commit -m "Remove temporary complication integration tooling"
-          git push
+          git add \
+            app-mobile/src/main/kotlin/app/aapswear/mobile/ComplicationCatalog.kt \
+            app-wear/src/main/AndroidManifest.xml \
+            app-wear/src/main/kotlin/app/aapswear/wear/StateDataLayerService.kt \
+            app-wear/src/main/res/layout/activity_wear.xml \
+            complications/src/main/kotlin/app/aapswear/complications/TherapyComplications.kt \
+            complications/src/test/kotlin/app/aapswear/complications/TherapyComplicationsTest.kt \
+            watchfaces/sugarlicious-analog/src/main/res/raw/watchface.xml \
+            watchfaces/sugarlicious-analog/src/main/res/values/strings.xml \
+            watchfaces/sugarlicious-orbit/src/main/res/raw/watchface.xml \
+            watchfaces/sugarlicious-orbit/src/main/res/values/strings.xml \
+            watchfaces/sugarlicious-rings/src/main/res/raw/watchface.xml \
+            watchfaces/sugarlicious-rings/src/main/res/values/strings.xml \
+            watchfaces/sugarlicious-graph/src/main/res/raw/watchface.xml \
+            watchfaces/sugarlicious-graph/src/main/res/values/strings.xml
+          git diff --cached --check
+          git commit -m "Restructure complications and watch customization"
+          git push origin HEAD:agent/complication-watch-final
