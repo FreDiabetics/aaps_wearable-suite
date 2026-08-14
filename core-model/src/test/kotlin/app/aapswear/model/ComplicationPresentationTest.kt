@@ -1,9 +1,8 @@
 package app.aapswear.model
 
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNotNull
-import org.junit.Assert.assertNull
-import org.junit.Test
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertNull
 
 class ComplicationPresentationTest {
     private val now = 1_700_000_000_000L
