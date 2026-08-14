@@ -13,91 +13,67 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Inspect recovered payload around JSON corruption
+      - name: Identify corrupted payload entry
         run: |
           python - <<'PY'
           from pathlib import Path
-          import base64, gzip, json, zlib
+          import base64, json, re, zlib
 
           parts = sorted(Path('tools/refactor_payload').glob('part_*'))
           first = parts[0].read_text()
           encoded = first.split("DATA='", 1)[1] + ''.join(p.read_text() for p in parts[1:])
-          encoded = ''.join(encoded.split())
-          packed = base64.b64decode(encoded, validate=True)
-          try:
-              raw = gzip.decompress(packed)
-          except Exception as exc:
-              print('gzip:', repr(exc))
-              raw = zlib.decompress(packed[10:], -zlib.MAX_WBITS)
+          packed = base64.b64decode(''.join(encoded.split()), validate=True)
+          text = zlib.decompress(packed[10:], -zlib.MAX_WBITS).decode('utf-8')
+          print('decoded_length=', len(text))
 
-          text = raw.decode('utf-8')
-          print('decoded_length:', len(text))
-          try:
-              obj = json.loads(text)
-              print('JSON_OK files=', len(obj))
-              raise SystemExit(0)
-          except json.JSONDecodeError as exc:
-              pos = exc.pos
-              print('json_error:', exc.msg, 'pos=', pos, 'line=', exc.lineno, 'col=', exc.colno)
-              print('context_start')
-              print(repr(text[max(0,pos-1200):min(len(text),pos+1200)]))
-              print('context_end')
-
-          # Parse the top-level path->content object incrementally so the exact
-          # source entry containing the corruption is identified without guessing.
+          # Incrementally parse all entries that are intact before the corruption.
           dec = json.JSONDecoder()
-          i = 0
+          i = 1
           n = len(text)
+          parsed = []
           def ws(j):
-              while j < n and text[j].isspace():
-                  j += 1
+              while j < n and text[j].isspace(): j += 1
               return j
-
-          i = ws(i)
-          if i >= n or text[i] != '{':
-              raise SystemExit('top-level payload is not an object')
-          i += 1
-          count = 0
-          last_key = None
           while True:
               i = ws(i)
-              if i < n and text[i] == '}':
-                  print('incremental_parse_complete entries=', count)
-                  break
               try:
                   key, end = dec.raw_decode(text, i)
-              except json.JSONDecodeError as exc:
-                  print('key_parse_failed after=', last_key, 'at=', i, 'error=', repr(exc))
-                  break
-              if not isinstance(key, str):
-                  print('non_string_key at=', i, 'value=', repr(key))
+              except Exception as exc:
+                  print('KEY_PARSE_FAIL after=', parsed[-1] if parsed else None, 'at=', i, repr(exc))
                   break
               i = ws(end)
               if i >= n or text[i] != ':':
-                  print('colon_missing_for_key=', key, 'at=', i, 'near=', repr(text[max(0,i-250):min(n,i+250)]))
+                  print('COLON_FAIL after=', parsed[-1] if parsed else None)
+                  print('MALFORMED_KEY=', repr(key))
+                  print('AT=', i)
                   break
               i = ws(i + 1)
               try:
                   value, end = dec.raw_decode(text, i)
-              except json.JSONDecodeError as exc:
-                  print('value_parse_failed_for_key=', key)
-                  print('value_start=', i, 'error_pos=', exc.pos, 'error=', repr(exc))
-                  print('value_context=', repr(text[max(i,exc.pos-1000):min(n,exc.pos+1000)]))
+              except Exception as exc:
+                  print('VALUE_PARSE_FAIL key=', key, 'at=', i, repr(exc))
                   break
-              if not isinstance(value, str):
-                  print('non_string_value_for_key=', key, 'type=', type(value).__name__)
-                  break
-              count += 1
-              last_key = key
-              if count <= 5 or count % 5 == 0:
-                  print('parsed_entry', count, key, 'chars=', len(value))
+              parsed.append(key)
+              print(f'OK[{len(parsed):02d}] {key} chars={len(value)} end={end}')
               i = ws(end)
               if i < n and text[i] == ',':
                   i += 1
                   continue
-              if i < n and text[i] == '}':
-                  print('incremental_parse_complete entries=', count)
-                  break
-              print('separator_missing_after_key=', key, 'at=', i, 'near=', repr(text[max(0,i-250):min(n,i+250)]))
+              print('SEPARATOR_FAIL key=', key, 'at=', i)
               break
+
+          # Find every syntactically recognizable path key anywhere in the recovered text.
+          path_re = re.compile(r'"((?:core-model|wear-protocol|complications|app-mobile|app-wear)/[^"\\]+)"\s*:')
+          hits = [(m.start(), m.group(1)) for m in path_re.finditer(text)]
+          print('RECOGNIZABLE_PATH_KEYS=', len(hits))
+          for pos, path in hits:
+              if pos > 245000 or path not in parsed:
+                  print('PATH', pos, path)
+
+          err = 264736
+          before = [x for x in hits if x[0] < err]
+          after = [x for x in hits if x[0] > err]
+          print('NEAREST_BEFORE=', before[-5:])
+          print('NEAREST_AFTER=', after[:8])
+          print('CORRUPT_REGION=', repr(text[260000:269000]))
           PY
