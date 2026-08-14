@@ -11,7 +11,7 @@
         android:layout_alignParentEnd="true"
         android:layout_centerVertical="true"
         android:contentDescription="@null"
-        android:scaleType="centerCrop" />
+        android:scaleType="fitXY" />
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -23,7 +23,7 @@
 
         <LinearLayout
             android:layout_width="match_parent"
-            android:layout_height="24dp"
+            android:layout_height="27dp"
             android:gravity="center_vertical"
             android:orientation="horizontal">
 
@@ -34,7 +34,7 @@
                 android:ellipsize="end"
                 android:fontFamily="sans-serif-medium"
                 android:maxLines="1"
-                android:textSize="18sp"
+                android:textSize="22sp"
                 tools:text="123" />
 
             <ImageView
@@ -54,6 +54,6 @@
             android:ellipsize="end"
             android:maxLines="1"
             android:textSize="9sp"
-            tools:text="mg/dL · 2 min alt" />
+            tools:text="+5 · 2 min alt" />
     </LinearLayout>
 </RelativeLayout>
