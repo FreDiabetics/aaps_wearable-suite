@@ -63,17 +63,11 @@ internal fun SugarliciousOverviewScreen(
         LocalWindowInfo.current.containerSize.height.toDp().value.roundToInt()
     }
     val metrics = DashboardLayoutMetrics.forScreenHeight(screenHeightDp)
-    val fullyLoadedOverview = preferences.showDetails && preferences.showCgmGraph && preferences.showMetabolicGraph
-    val gap = if (preferences.compact || fullyLoadedOverview) 5.dp else 9.dp
-    val compactGraphHeightDp = if (fullyLoadedOverview) {
-        when {
-            screenHeightDp >= 900 -> 104
-            screenHeightDp >= 820 -> 92
-            else -> 82
-        }
-    } else {
-        maxOf(metrics.metabolicChartHeight - 18, 96)
-    }
+    val gap = if (preferences.compact) 6.dp else 9.dp
+    val graphHeightDp = maxOf(
+        metrics.metabolicChartHeight - 18,
+        96,
+    )
 
     val cgmChartViewport =
         remember {
@@ -186,31 +180,35 @@ internal fun SugarliciousOverviewScreen(
                 .padding(horizontal = 2.dp, vertical = 2.dp),
         verticalArrangement = Arrangement.spacedBy(gap),
     ) {
-        GlucoseHeroCard(
-            glucoseText = glucoseText,
-            glucoseColor = glucoseColor,
-            trend = if (displayable) glucose?.trend ?: Trend.UNKNOWN else Trend.UNKNOWN,
-            delta = delta,
-            
-            deltaMgDl = glucose?.deltaMgDl,age = age,
-            unitLabel = unitLabel(unit),
-            tirStats = tirStats,
-            heightDp = if (fullyLoadedOverview) maxOf(metrics.summaryTileHeight, 88) else maxOf(metrics.summaryTileHeight + 18, 108),
-        )
-
-        OverviewInlineHeader(onSettings = { callbacks.navigate(DashboardScreen.SETTINGS) })
-
         OverviewWatchFaceTile(
             state = state,
             diagnostics = diagnostics,
             selectedFaceIndex = preferences.watchFaceIndex,
             onSelectedFace = callbacks.setWatchFaceIndex,
             onEdit = { callbacks.navigate(DashboardScreen.WATCH) },
-            compactLayout = fullyLoadedOverview,
+        )
+
+        Spacer(Modifier.height(8.dp))
+
+        OverviewInlineHeader(onSettings = { callbacks.navigate(DashboardScreen.SETTINGS) })
+
+        GlucoseHeroCard(
+            glucoseText = glucoseText,
+            glucoseColor = glucoseColor,
+            trend = if (displayable) glucose?.trend ?: Trend.UNKNOWN else Trend.UNKNOWN,
+            delta = delta,
+            deltaMgDl = glucose?.deltaMgDl,
+            age = age,
+            unitLabel = unitLabel(unit),
+            tirStats = tirStats,
+            heightDp = maxOf(metrics.summaryTileHeight + 18, 108),
         )
 
         if (preferences.showDetails) {
-            QuickStatsRow(state = state.takeIf { displayable }, heightDp = if (fullyLoadedOverview) minOf(metrics.statTileHeight, 60) else metrics.statTileHeight)
+            QuickStatsRow(
+                state = state.takeIf { displayable },
+                heightDp = metrics.statTileHeight,
+            )
         }
 
         if (preferences.showCgmGraph) {
@@ -218,7 +216,7 @@ internal fun SugarliciousOverviewScreen(
                 state = state,
                 preferences = preferences,
                 viewport = cgmChartViewport,
-                chartHeightDp = compactGraphHeightDp,
+                chartHeightDp = graphHeightDp,
             )
         }
 
@@ -227,7 +225,7 @@ internal fun SugarliciousOverviewScreen(
                 state = state,
                 preferences = preferences,
                 viewport = metabolicChartViewport,
-                chartHeightDp = compactGraphHeightDp,
+                chartHeightDp = graphHeightDp,
             )
         }
     }
