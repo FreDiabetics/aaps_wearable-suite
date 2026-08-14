@@ -20,20 +20,29 @@
             android:layout_height="wrap_content"
             android:fontFamily="sans-serif-medium"
             android:maxLines="1"
-            tools:text="123 →"
-            android:textSize="22sp" />
+            android:textSize="22sp"
+            tools:text="123" />
+
+        <ImageView
+            android:id="@+id/notification_trend"
+            android:layout_width="28dp"
+            android:layout_height="28dp"
+            android:layout_marginStart="4dp"
+            android:contentDescription="@null"
+            android:scaleType="fitCenter"
+            android:visibility="gone" />
 
         <TextView
             android:id="@+id/notification_meta"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_marginStart="10dp"
+            android:layout_marginStart="8dp"
             android:layout_weight="1"
             android:ellipsize="end"
             android:gravity="end"
             android:maxLines="1"
-            tools:text="mg/dL · 2 min alt"
-            android:textSize="11sp" />
+            android:textSize="11sp"
+            tools:text="mg/dL · 2 min alt" />
     </LinearLayout>
 
     <ImageView
