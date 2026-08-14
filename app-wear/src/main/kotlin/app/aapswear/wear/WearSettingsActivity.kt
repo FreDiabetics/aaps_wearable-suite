@@ -18,10 +18,12 @@ import android.widget.TextView
 import app.aapswear.protocol.WatchGlucoseUnit
 import app.aapswear.protocol.WatchGraphColors
 import app.aapswear.protocol.WatchGraphStyle
+import app.aapswear.protocol.WatchUiColors
 import kotlin.math.roundToInt
 
 class WearSettingsActivity : Activity() {
     private lateinit var root: LinearLayout
+    private lateinit var scrollView: ScrollView
     private var current = WearDisplayPreferences()
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -31,12 +33,15 @@ class WearSettingsActivity : Activity() {
     }
 
     private fun buildUi() {
+        val restoreScrollY =
+            if (::scrollView.isInitialized) scrollView.scrollY else 0
         current = WearDisplayPreferences.read(this)
         val ui = current.uiColors
         val scroll = ScrollView(this).apply {
             isFillViewport = true
             setBackgroundColor(ui.background)
         }
+        scrollView = scroll
         root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER_HORIZONTAL
@@ -194,12 +199,57 @@ class WearSettingsActivity : Activity() {
             cardParams(),
         )
 
+        section("APP & TILES")
+        colorRow("App Hintergrund", current.uiColors.background) {
+            updateUiColors { colors -> colors.copy(background = it) }
+        }
+        colorRow("Tile Hintergrund", current.uiColors.tileBackground) {
+            updateUiColors { colors -> colors.copy(tileBackground = it) }
+        }
+        colorRow("Tile Kontur", current.uiColors.tileBorder) {
+            updateUiColors { colors -> colors.copy(tileBorder = it) }
+        }
+        colorRow("Haupttext", current.uiColors.textPrimary) {
+            updateUiColors { colors -> colors.copy(textPrimary = it) }
+        }
+        colorRow("Sekundärtext", current.uiColors.textSecondary) {
+            updateUiColors { colors -> colors.copy(textSecondary = it) }
+        }
+        colorRow("Akzent", current.uiColors.accent) {
+            updateUiColors { colors -> colors.copy(accent = it) }
+        }
+
+        section("GLUKOSE FARBEN")
+        colorRow("Zuckerwert niedrig", current.uiColors.glucoseLow) {
+            updateUiColors { colors -> colors.copy(glucoseLow = it) }
+        }
+        colorRow("Zuckerwert im Ziel", current.uiColors.glucoseInRange) {
+            updateUiColors { colors -> colors.copy(glucoseInRange = it) }
+        }
+        colorRow("Zuckerwert hoch", current.uiColors.glucoseHigh) {
+            updateUiColors { colors -> colors.copy(glucoseHigh = it) }
+        }
+
+        section("THERAPIE FARBEN")
+        colorRow("IOB", current.uiColors.iob) {
+            updateUiColors { colors -> colors.copy(iob = it) }
+        }
+        colorRow("COB", current.uiColors.cob) {
+            updateUiColors { colors -> colors.copy(cob = it) }
+        }
+
         section("GRAPH FARBEN")
         colorRow("Graph Hintergrund", current.graphColors.graphBackground) {
             updateGraphColors { colors -> colors.copy(graphBackground = it) }
         }
-        colorRow("Zielbereich", current.graphColors.rangeInRange) {
+        colorRow("Bereich niedrig", current.graphColors.rangeLow) {
+            updateGraphColors { colors -> colors.copy(rangeLow = it) }
+        }
+        colorRow("Bereich im Ziel", current.graphColors.rangeInRange) {
             updateGraphColors { colors -> colors.copy(rangeInRange = it) }
+        }
+        colorRow("Bereich hoch", current.graphColors.rangeHigh) {
+            updateGraphColors { colors -> colors.copy(rangeHigh = it) }
         }
         colorRow("CGM niedrig", current.graphColors.cgmLow) {
             updateGraphColors { colors -> colors.copy(cgmLow = it) }
@@ -217,13 +267,31 @@ class WearSettingsActivity : Activity() {
             updateGraphColors { colors -> colors.copy(outline = it) }
         }
 
+        section("PROGNOSE FARBEN")
+        colorRow("IOB Prognose", current.graphColors.predictionIob) {
+            updateGraphColors { colors -> colors.copy(predictionIob = it) }
+        }
+        colorRow("COB Prognose", current.graphColors.predictionCob) {
+            updateGraphColors { colors -> colors.copy(predictionCob = it) }
+        }
+        colorRow("UAM Prognose", current.graphColors.predictionUam) {
+            updateGraphColors { colors -> colors.copy(predictionUam = it) }
+        }
+        colorRow("ZeroTemp Prognose", current.graphColors.predictionZeroTemp) {
+            updateGraphColors { colors -> colors.copy(predictionZeroTemp = it) }
+        }
+
         TextView(this).apply {
-            text = "Die Watch übernimmt beim nächsten Sync weiterhin die in Sugarlicious gespeicherten Theme- und Graph-Einstellungen."
+            text = "Watch-Einstellungen werden lokal gespeichert. Die Standardfarben entsprechen der Mobile App."
             textSize = 8f
             setTextColor(ui.textSecondary)
             gravity = Gravity.CENTER
             setPadding(6.dp, 12.dp, 6.dp, 0)
             root.addView(this, fullWidth())
+        }
+
+        scroll.post {
+            scroll.scrollTo(0, restoreScrollY)
         }
     }
 
@@ -233,6 +301,16 @@ class WearSettingsActivity : Activity() {
         save(
             current.copy(
                 graphColors = transform(current.graphColors),
+            ),
+        )
+    }
+
+    private fun updateUiColors(
+        transform: (WatchUiColors) -> WatchUiColors,
+    ) {
+        save(
+            current.copy(
+                uiColors = transform(current.uiColors),
             ),
         )
     }
@@ -419,10 +497,6 @@ class WearSettingsActivity : Activity() {
             grid.addView(
                 View(this).apply {
                     background = colorCircle(color, color == selected)
-                    setOnClickListener {
-                        changed(color)
-                        (parent?.parent as? AlertDialog)?.dismiss()
-                    }
                 },
                 GridLayout.LayoutParams().apply {
                     width = 42.dp
@@ -498,17 +572,26 @@ class WearSettingsActivity : Activity() {
         private val COLOR_CHOICES =
             intArrayOf(
                 0xFF181818.toInt(),
+                0xFF202020.toInt(),
                 0xFF242424.toInt(),
+                0xFF404040.toInt(),
                 0xFFF5F5F5.toInt(),
+                0xFFB5B5B5.toInt(),
                 0xFF6DE892.toInt(),
                 0xFF54DF30.toInt(),
                 0xFF19D7E8.toInt(),
                 0xFF52C1FF.toInt(),
+                0xFF64BFFF.toInt(),
                 0xFF9575CD.toInt(),
+                0xFFD69AFF.toInt(),
                 0xFFFF5C69.toInt(),
                 0xFFFF9D18.toInt(),
+                0xFFFFAE1F.toInt(),
                 0xFFFFD040.toInt(),
+                0xFFF4DE00.toInt(),
+                0xFF30DBDE.toInt(),
                 0xFF969696.toInt(),
+                0xFF000000.toInt(),
             )
     }
 }
