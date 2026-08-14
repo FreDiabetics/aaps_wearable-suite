@@ -1,0 +1,83 @@
+name: Apply final small patches
+
+on:
+  push:
+    branches: [agent/complication-watch-refactor-final]
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: ${{ !contains(github.event.head_commit.message, '[small-patches-done]') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Apply deterministic final patches
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          p = Path('app-mobile/src/main/kotlin/app/aapswear/mobile/DashboardViews.kt')
+          s = p.read_text()
+          old = '''    private var colorSettingsExpanded = false
+    private var predictionSettingsExpanded = false
+    private var notificationGraphSettingsExpanded = false
+'''
+          new = '''    private val settingsUiPreferences =
+        context.getSharedPreferences("dashboard_settings_ui", Context.MODE_PRIVATE)
+    private var colorSettingsExpanded =
+        settingsUiPreferences.getBoolean("colors_expanded", false)
+    private var predictionSettingsExpanded =
+        settingsUiPreferences.getBoolean("predictions_expanded", false)
+    private var notificationGraphSettingsExpanded =
+        settingsUiPreferences.getBoolean("notification_graph_expanded", false)
+'''
+          if old not in s:
+              raise SystemExit('settings state anchor missing')
+          s = s.replace(old, new, 1)
+          s = s.replace('''                        colorSettingsExpanded = !colorSettingsExpanded
+                        colorContainer.visibility = if (colorSettingsExpanded) View.VISIBLE else View.GONE
+''', '''                        colorSettingsExpanded = !colorSettingsExpanded
+                        settingsUiPreferences.edit().putBoolean("colors_expanded", colorSettingsExpanded).apply()
+                        colorContainer.visibility = if (colorSettingsExpanded) View.VISIBLE else View.GONE
+''', 1)
+          s = s.replace('''                            predictionSettingsExpanded = !predictionSettingsExpanded
+                            predictionContainer.visibility = if (predictionSettingsExpanded) View.VISIBLE else View.GONE
+''', '''                            predictionSettingsExpanded = !predictionSettingsExpanded
+                            settingsUiPreferences.edit().putBoolean("predictions_expanded", predictionSettingsExpanded).apply()
+                            predictionContainer.visibility = if (predictionSettingsExpanded) View.VISIBLE else View.GONE
+''', 1)
+          s = s.replace('''                            notificationGraphSettingsExpanded = !notificationGraphSettingsExpanded
+                            notificationGraphCustomization.visibility = if (notificationGraphSettingsExpanded) View.VISIBLE else View.GONE
+''', '''                            notificationGraphSettingsExpanded = !notificationGraphSettingsExpanded
+                            settingsUiPreferences.edit().putBoolean("notification_graph_expanded", notificationGraphSettingsExpanded).apply()
+                            notificationGraphCustomization.visibility = if (notificationGraphSettingsExpanded) View.VISIBLE else View.GONE
+''', 1)
+          p.write_text(s)
+
+          p = Path('app-mobile/src/main/kotlin/app/aapswear/mobile/OverviewWatchFaceTile.kt')
+          s = p.read_text()
+          if 'activeComplicationIds.take(3)' not in s:
+              raise SystemExit('watchface preview anchor missing')
+          p.write_text(s.replace('activeComplicationIds.take(3)', 'activeComplicationIds.take(8)', 1))
+
+          p = Path('app-wear/src/main/res/layout/activity_wear.xml')
+          s = p.read_text()
+          s = s.replace('android:layout_height="36dp"\n                        android:layout_marginStart="5dp"', 'android:layout_height="44dp"\n                        android:layout_marginStart="5dp"', 1)
+          s = s.replace('android:layout_width="27dp"\n                            android:layout_height="27dp"', 'android:layout_width="25dp"\n                            android:layout_height="25dp"', 2)
+          p.write_text(s)
+          PY
+          git diff --check
+      - name: Commit and remove helper workflow
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app-mobile/src/main/kotlin/app/aapswear/mobile/DashboardViews.kt app-mobile/src/main/kotlin/app/aapswear/mobile/OverviewWatchFaceTile.kt app-wear/src/main/res/layout/activity_wear.xml
+          git commit -m "Persist settings state and align preview geometry [small-patches-done]"
+          rm -f .github/workflows/apply-final-small-patches.yml
+          git add -A
+          git commit -m "Remove temporary final patch workflow [small-patches-done]"
+          git push origin HEAD:agent/complication-watch-refactor-final
