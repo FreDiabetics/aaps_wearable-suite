@@ -1,6 +1,7 @@
 package app.aapswear.mobile
 
 import android.content.Context
+import android.content.SharedPreferences
 import app.aapswear.protocol.WatchRuntimeStatus
 
 internal object WatchRuntimeStatusStore {
@@ -26,5 +27,21 @@ internal object WatchRuntimeStatusStore {
         val face = if (prefs.contains(FACE)) prefs.getInt(FACE, 0).coerceIn(0, 3) else null
         val ids = prefs.getString(IDS, "").orEmpty().split(',').mapNotNull(String::toIntOrNull).distinct()
         return WatchRuntimeStatus(face, ids, prefs.getLong(SENT, 0L))
+    }
+
+    fun registerListener(
+        context: Context,
+        listener: SharedPreferences.OnSharedPreferenceChangeListener,
+    ) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .registerOnSharedPreferenceChangeListener(listener)
+    }
+
+    fun unregisterListener(
+        context: Context,
+        listener: SharedPreferences.OnSharedPreferenceChangeListener,
+    ) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .unregisterOnSharedPreferenceChangeListener(listener)
     }
 }
