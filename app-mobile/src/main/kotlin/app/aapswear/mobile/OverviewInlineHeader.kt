@@ -2,7 +2,6 @@ package app.aapswear.mobile
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.padding
@@ -14,12 +13,15 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.aapswear.mobile.ui.theme.SugarliciousColors
+
+private val SettingsButtonBackground = Color(0xFF4A4A4A)
 
 @Composable
 internal fun OverviewInlineHeader(onSettings: () -> Unit) {
@@ -44,13 +46,13 @@ internal fun OverviewInlineHeader(onSettings: () -> Unit) {
         Surface(
             modifier = Modifier.size(38.dp).clickable(onClick = onSettings),
             shape = RoundedCornerShape(13.dp),
-            color = SugarliciousColors.SurfaceHigh.copy(alpha = 0.96f),
+            color = SettingsButtonBackground,
         ) {
             Image(
                 painter = painterResource(R.drawable.ic_settings),
                 contentDescription = "Einstellungen",
                 modifier = Modifier.padding(9.dp),
-                colorFilter = ColorFilter.tint(SugarliciousColors.TextPrimary),
+                colorFilter = ColorFilter.tint(Color.White),
             )
         }
     }
