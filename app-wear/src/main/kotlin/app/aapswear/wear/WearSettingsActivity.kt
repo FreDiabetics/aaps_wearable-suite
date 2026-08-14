@@ -462,8 +462,8 @@ class WearSettingsActivity : Activity() {
     private fun cardBackground(): GradientDrawable =
         GradientDrawable().apply {
             cornerRadius = 16.dp.toFloat()
-            setColor(current.uiColors.tileBackground)
-            setStroke(1.dp, current.uiColors.tileBorder)
+            setColor(this@WearSettingsActivity.current.uiColors.tileBackground)
+            setStroke(1.dp, this@WearSettingsActivity.current.uiColors.tileBorder)
         }
 
     private fun colorCircle(
@@ -475,7 +475,7 @@ class WearSettingsActivity : Activity() {
             setColor(color)
             setStroke(
                 if (selected) 3.dp else 1.dp,
-                if (selected) current.uiColors.accent else current.uiColors.tileBorder,
+                if (selected) this@WearSettingsActivity.current.uiColors.accent else this@WearSettingsActivity.current.uiColors.tileBorder,
             )
         }
 
