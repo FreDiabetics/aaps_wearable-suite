@@ -31,12 +31,12 @@ import app.aapswear.model.TherapyDisplayState
 import kotlin.math.cos
 import kotlin.math.sin
 
-/** Product-fixed preview time: hour at 10, minute at 2, second at 6. */
+/** Product-fixed preview hands: hour at 10, minute at 10:07, second at 10:07:32. */
 internal val fixedWatchPreviewHandAngles =
     WatchPreviewHandAngles(
         hour = 300f,
-        minute = 60f,
-        second = 180f,
+        minute = 42f,
+        second = 192f,
     )
 
 @Composable
@@ -258,8 +258,8 @@ private fun PreviewComplication(
         Text(
             text = presentation.text,
             color = Color.White,
-            fontSize = if (id == SugarliciousComplicationIds.GLUCOSE) 12.sp else 7.5.sp,
-            lineHeight = if (id == SugarliciousComplicationIds.GLUCOSE) 12.sp else 8.sp,
+            fontSize = 8.5.sp,
+            lineHeight = 9.sp,
             fontWeight = FontWeight.Bold,
             maxLines = 1,
             textAlign = TextAlign.Center,

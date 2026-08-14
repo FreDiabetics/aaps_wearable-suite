@@ -16,6 +16,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -138,16 +139,18 @@ internal fun SugarliciousWatchScreen(
         }
 
         key(editingFaceIndex) {
-            ComplicationStudio(
-                state = state,
-                onPresetChanged = { updated ->
-                    WatchFacePresetStore.save(appContext, editingFaceIndex, updated)
-                    facePresets =
-                        facePresets.toMutableList().also { presets ->
-                            presets[editingFaceIndex] = updated
-                        }
-                },
-            )
+            CompositionLocalProvider(LocalSugarliciousTrendArrowMaxSize provides 8.dp) {
+                ComplicationStudio(
+                    state = state,
+                    onPresetChanged = { updated ->
+                        WatchFacePresetStore.save(appContext, editingFaceIndex, updated)
+                        facePresets =
+                            facePresets.toMutableList().also { presets ->
+                                presets[editingFaceIndex] = updated
+                            }
+                    },
+                )
+            }
         }
     }
 }

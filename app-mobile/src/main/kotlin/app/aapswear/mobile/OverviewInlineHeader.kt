@@ -2,9 +2,11 @@ package app.aapswear.mobile
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Text
@@ -27,16 +29,21 @@ private val SettingsIconGray = Color(0xFF4A4A4A)
 @Composable
 internal fun OverviewInlineHeader(onSettings: () -> Unit) {
     Row(
-        modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp),
+        modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Image(
-            painter = painterResource(R.drawable.ic_foreground),
-            contentDescription = null,
-            modifier = Modifier.size(32.dp),
-        )
+        Box(
+            modifier = Modifier.size(width = 26.dp, height = 38.dp),
+            contentAlignment = Alignment.CenterStart,
+        ) {
+            Image(
+                painter = painterResource(R.drawable.ic_foreground),
+                contentDescription = null,
+                modifier = Modifier.size(42.dp).offset(x = (-9).dp),
+            )
+        }
 
-        Spacer(Modifier.width(7.dp))
+        Spacer(Modifier.width(5.dp))
 
         Text(
             text = buildAnnotatedString {
@@ -53,15 +60,16 @@ internal fun OverviewInlineHeader(onSettings: () -> Unit) {
 
         Spacer(Modifier.weight(1f))
 
-        Image(
-            painter = painterResource(R.drawable.ic_settings),
-            contentDescription = "Einstellungen",
-            modifier =
-                Modifier
-                    .size(38.dp)
-                    .clickable(onClick = onSettings)
-                    .padding(7.dp),
-            colorFilter = ColorFilter.tint(SettingsIconGray),
-        )
+        Box(
+            modifier = Modifier.size(38.dp).clickable(onClick = onSettings),
+            contentAlignment = Alignment.Center,
+        ) {
+            Image(
+                painter = painterResource(R.drawable.ic_settings),
+                contentDescription = "Einstellungen",
+                modifier = Modifier.size(36.dp).offset(x = 7.25.dp),
+                colorFilter = ColorFilter.tint(SettingsIconGray),
+            )
+        }
     }
 }
