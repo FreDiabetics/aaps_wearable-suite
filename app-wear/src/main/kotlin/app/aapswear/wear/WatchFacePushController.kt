@@ -11,10 +11,8 @@ internal object SugarliciousWatchFacePush {
     const val ACTIVE_PERMISSION =
         "com.google.wear.permission.SET_PUSHED_WATCH_FACE_AS_ACTIVE"
 
-    private const val PREFS = "watchface_push"
-    private const val KEY_ACTIVE_ATTEMPT_USED = "active_attempt_used"
-
     private data class FaceSpec(
+        val packageName: String,
         val apkAsset: String,
         val tokenAsset: String,
     )
@@ -22,18 +20,22 @@ internal object SugarliciousWatchFacePush {
     private val faces =
         listOf(
             FaceSpec(
+                "app.aapswear.watchfacepush.analog",
                 "watchfaces/sugarlicious_analog.apk",
                 "watchfaces/sugarlicious_analog_token.txt",
             ),
             FaceSpec(
+                "app.aapswear.watchfacepush.orbit",
                 "watchfaces/sugarlicious_orbit.apk",
                 "watchfaces/sugarlicious_orbit_token.txt",
             ),
             FaceSpec(
+                "app.aapswear.watchfacepush.rings",
                 "watchfaces/sugarlicious_rings.apk",
                 "watchfaces/sugarlicious_rings_token.txt",
             ),
             FaceSpec(
+                "app.aapswear.watchfacepush.graph",
                 "watchfaces/sugarlicious_graph.apk",
                 "watchfaces/sugarlicious_graph_token.txt",
             ),
@@ -47,6 +49,24 @@ internal object SugarliciousWatchFacePush {
     fun hasActivationPermission(context: Context): Boolean =
         context.checkSelfPermission(ACTIVE_PERMISSION) ==
             PackageManager.PERMISSION_GRANTED
+
+    suspend fun activeFaceIndex(context: Context): Int? {
+        if (!isSupported()) return null
+        return runCatching {
+            val manager =
+                WatchFacePushManagerFactory
+                    .createWatchFacePushManager(context)
+            val installed =
+                manager.listWatchFaces()
+                    .installedWatchFaceDetails
+            faces.indexOfFirst { face ->
+                installed.any { details ->
+                    details.packageName == face.packageName &&
+                        manager.isWatchFaceActive(details.packageName)
+                }
+            }.takeIf { it >= 0 }
+        }.getOrNull()
+    }
 
     suspend fun apply(
         context: Context,
@@ -88,16 +108,12 @@ internal object SugarliciousWatchFacePush {
             val manager =
                 WatchFacePushManagerFactory
                     .createWatchFacePushManager(context)
-            val response = manager.listWatchFaces()
             val installed =
-                response.installedWatchFaceDetails
-            val hadActive =
-                installed.any { details ->
-                    runCatching {
-                        manager.isWatchFaceActive(
-                            details.packageName,
-                        )
-                    }.getOrDefault(false)
+                manager.listWatchFaces()
+                    .installedWatchFaceDetails
+            val matching =
+                installed.firstOrNull {
+                    it.packageName == spec.packageName
                 }
 
             val details =
@@ -105,36 +121,38 @@ internal object SugarliciousWatchFacePush {
                     apk,
                     ParcelFileDescriptor.MODE_READ_ONLY,
                 ).use { pfd ->
-                    if (installed.isEmpty()) {
+                    if (matching == null) {
                         manager.addWatchFace(
                             pfd,
                             token,
                         )
                     } else {
                         manager.updateWatchFace(
-                            installed.first().slotId,
+                            matching.slotId,
                             pfd,
                             token,
                         )
                     }
                 }
 
-            when {
-                hadActive ->
+            if (
+                runCatching {
+                    manager.isWatchFaceActive(spec.packageName)
+                }.getOrDefault(false)
+            ) {
+                "Watchface aktiv"
+            } else if (!hasActivationPermission(context)) {
+                "Watchface geladen - Direktwechsel auf der Uhr freigeben"
+            } else {
+                manager.setWatchFaceAsActive(details.slotId)
+                if (
+                    runCatching {
+                        manager.isWatchFaceActive(spec.packageName)
+                    }.getOrDefault(false)
+                ) {
                     "Watchface aktiv"
-
-                !hasActivationPermission(context) ->
-                    "Watchface geladen - Direktwechsel auf der Uhr freigeben"
-
-                activationAttemptUsed(context) ->
-                    "Watchface geladen - bitte auf der Uhr manuell aktivieren"
-
-                else -> {
-                    manager.setWatchFaceAsActive(
-                        details.slotId,
-                    )
-                    markActivationAttemptUsed(context)
-                    "Watchface aktiv"
+                } else {
+                    "Watchface geladen - Aktivierung wurde nicht bestätigt"
                 }
             }
         } catch (cancelled: CancellationException) {
@@ -144,35 +162,6 @@ internal object SugarliciousWatchFacePush {
         } finally {
             apk.delete()
         }
-    }
-
-    private fun activationAttemptUsed(
-        context: Context,
-    ): Boolean =
-        context
-            .getSharedPreferences(
-                PREFS,
-                Context.MODE_PRIVATE,
-            )
-            .getBoolean(
-                KEY_ACTIVE_ATTEMPT_USED,
-                false,
-            )
-
-    private fun markActivationAttemptUsed(
-        context: Context,
-    ) {
-        context
-            .getSharedPreferences(
-                PREFS,
-                Context.MODE_PRIVATE,
-            )
-            .edit()
-            .putBoolean(
-                KEY_ACTIVE_ATTEMPT_USED,
-                true,
-            )
-            .apply()
     }
 
     private fun copyAssetToCache(
