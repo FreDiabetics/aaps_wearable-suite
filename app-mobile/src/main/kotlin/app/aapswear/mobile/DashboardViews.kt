@@ -551,7 +551,7 @@ class DashboardViewFactory(
                 addView(divider())
                 addView(
                     switchRowCompact(
-                        "Kompakte \u00dcbersicht",
+                        "Kompakte Übersicht",
                         preferences.compact,
                         R.id.dashboard_compact_switch,
                         callbacks.setCompact,
@@ -652,7 +652,7 @@ class DashboardViewFactory(
                     addView(divider())
                     addView(
                         switchRowCompact(
-                            "Insulinaktivit\u00e4t",
+                            "Insulinaktivität",
                             preferences.showCgmActivity,
                             View.generateViewId(),
                         ) { callbacks.setCgmStream("cgm.activity", it) },
@@ -690,19 +690,20 @@ class DashboardViewFactory(
         )
 
         parent.addView(settingsGroupLabel("BENACHRICHTIGUNG"), fullWidth())
-        val notificationGraphCustomization = LinearLayout(context).apply {
-            orientation = LinearLayout.VERTICAL
-            visibility = if (notificationGraphSettingsExpanded) View.VISIBLE else View.GONE
-            addView(
-                androidx.compose.ui.platform.ComposeView(context).apply {
-                    setViewCompositionStrategy(
-                        androidx.compose.ui.platform.ViewCompositionStrategy.DisposeOnDetachedFromWindow,
-                    )
-                    setContent { SugarliciousTheme { NotificationGraphSettingsPanel() } }
-                },
-                fullWidth(),
-            )
-        }
+        val notificationGraphCustomization =
+            LinearLayout(context).apply {
+                orientation = LinearLayout.VERTICAL
+                visibility = if (notificationGraphSettingsExpanded) View.VISIBLE else View.GONE
+                addView(
+                    androidx.compose.ui.platform.ComposeView(context).apply {
+                        setViewCompositionStrategy(
+                            androidx.compose.ui.platform.ViewCompositionStrategy.DisposeOnDetachedFromWindow,
+                        )
+                        setContent { SugarliciousTheme { NotificationGraphSettingsPanel() } }
+                    },
+                    fullWidth(),
+                )
+            }
         parent.addView(
             tile(null).apply {
                 addView(
@@ -759,7 +760,7 @@ class DashboardViewFactory(
         parent.addView(
             tile(null).apply {
                 addView(
-                    actionRow("Watchfaces", "Ausw\u00e4hlen") {
+                    actionRow("Watchfaces", "Auswählen") {
                         callbacks.navigate(DashboardScreen.WATCH)
                     },
                 )
@@ -770,6 +771,7 @@ class DashboardViewFactory(
         parent.addView(settingsGroupLabel("INFO & SUPPORT"), fullWidth())
         parent.addView(aboutCard(), cardParams(top = 4, bottom = 10))
     }
+
     private fun aboutCard(): View =
         tile(null).apply {
             val header =
@@ -781,8 +783,8 @@ class DashboardViewFactory(
 
             header.addView(
                 ImageView(context).apply {
-                    setImageResource(R.drawable.ic_monochrome_outlined)
-                    imageTintList = ColorStateList.valueOf(text)
+                    setImageResource(R.drawable.ic_foreground)
+                    imageTintList = null
                     contentDescription = context.getString(R.string.brand_logo)
                     scaleType = ImageView.ScaleType.FIT_CENTER
                 },
@@ -937,29 +939,15 @@ class DashboardViewFactory(
         }
 
     private fun chipRow(
-        items:
-            List<
-                Triple<
-                    String,
-                    Boolean,
-                    () -> Unit,
-                >,
-            >,
+        items: List<Triple<String, Boolean, () -> Unit>>,
     ) =
         LinearLayout(context).apply {
-            orientation =
-                LinearLayout.HORIZONTAL
-            gravity =
-                Gravity.START
-            setPadding(
-                0,
-                7.dp,
-                0,
-                4.dp,
-            )
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.START
+            setPadding(0, 7.dp, 0, 4.dp)
 
             items.forEach { (label, selected, click) ->
-addView(
+                addView(
                     chip(
                         label,
                         selected,
@@ -969,8 +957,7 @@ addView(
                         ViewGroup.LayoutParams.WRAP_CONTENT,
                         ViewGroup.LayoutParams.WRAP_CONTENT,
                     ).apply {
-                        marginEnd =
-                            7.dp
+                        marginEnd = 7.dp
                     },
                 )
             }
@@ -982,12 +969,9 @@ addView(
         click: () -> Unit,
     ) =
         TextView(context).apply {
-            text =
-                label
-            textSize =
-                11f
-            minHeight =
-                36.dp
+            text = label
+            textSize = 11f
+            minHeight = 36.dp
             setTextColor(
                 if (selected) {
                     accent
@@ -1015,35 +999,19 @@ addView(
                     },
                     999,
                 )
-            gravity =
-                Gravity.CENTER
-            isClickable =
-                true
-            isFocusable =
-                true
-            setPadding(
-                12.dp,
-                0,
-                12.dp,
-                0,
-            )
-            setOnClickListener {
-                click()
-            }
+            gravity = Gravity.CENTER
+            isClickable = true
+            isFocusable = true
+            setPadding(12.dp, 0, 12.dp, 0)
+            setOnClickListener { click() }
         }
 
     private fun tile(
         title: String?,
     ): LinearLayout =
         LinearLayout(context).apply {
-            orientation =
-                LinearLayout.VERTICAL
-            setPadding(
-                12.dp,
-                11.dp,
-                12.dp,
-                11.dp,
-            )
+            orientation = LinearLayout.VERTICAL
+            setPadding(12.dp, 11.dp, 12.dp, 11.dp)
             background =
                 roundedBackground(
                     SugarliciousColors.argb(
@@ -1054,13 +1022,10 @@ addView(
                     ),
                     22,
                 )
-            clipToOutline =
-                true
+            clipToOutline = true
 
             title?.let {
-                addView(
-                    sectionLabel(it),
-                )
+                addView(sectionLabel(it))
             }
         }
 
@@ -1070,17 +1035,10 @@ addView(
         radiusDp: Int,
     ): GradientDrawable =
         GradientDrawable().apply {
-            shape =
-                GradientDrawable.RECTANGLE
-            cornerRadius =
-                radiusDp.dp.toFloat()
-            setColor(
-                fillColor,
-            )
-            setStroke(
-                1.dp,
-                strokeColor,
-            )
+            shape = GradientDrawable.RECTANGLE
+            cornerRadius = radiusDp.dp.toFloat()
+            setColor(fillColor)
+            setStroke(1.dp, strokeColor)
         }
 
     private fun screenTitle() =
@@ -1096,24 +1054,16 @@ addView(
                 ),
             )
         }
+
     private fun sectionLabel(
         label: String,
     ) =
         TextView(context).apply {
-            text =
-                label
-            textSize =
-                12f
-            setTextColor(
-                this@DashboardViewFactory.text,
-            )
-            typeface =
-                Typeface.create(
-                    "sans",
-                    Typeface.NORMAL,
-                )
-            letterSpacing =
-                0.03f
+            text = label
+            textSize = 12f
+            setTextColor(this@DashboardViewFactory.text)
+            typeface = Typeface.create("sans", Typeface.NORMAL)
+            letterSpacing = 0.03f
         }
 
     private fun value(
@@ -1123,24 +1073,14 @@ addView(
         maxLines: Int = 2,
     ) =
         TextView(context).apply {
-            text =
-                value
-            textSize =
-                size
-            setTextColor(
-                color,
-            )
-            typeface =
-                Typeface.create(
-                    "sans",
-                    Typeface.NORMAL,
-                )
-            this.maxLines =
-                maxLines
+            text = value
+            textSize = size
+            setTextColor(color)
+            typeface = Typeface.create("sans", Typeface.NORMAL)
+            this.maxLines = maxLines
 
             if (maxLines == 1) {
-                ellipsize =
-                    TextUtils.TruncateAt.END
+                ellipsize = TextUtils.TruncateAt.END
             }
         }
 
@@ -1150,15 +1090,10 @@ addView(
         color: Int = secondary,
     ) =
         TextView(context).apply {
-            text =
-                value
-            textSize =
-                11f
-            setTextColor(
-                color,
-            )
-            this.maxLines =
-                maxLines
+            text = value
+            textSize = 11f
+            setTextColor(color)
+            this.maxLines = maxLines
         }
 
     private fun fullWidth() =
@@ -1175,13 +1110,10 @@ addView(
             ViewGroup.LayoutParams.MATCH_PARENT,
             ViewGroup.LayoutParams.WRAP_CONTENT,
         ).apply {
-            topMargin =
-                top.dp
-            bottomMargin =
-                bottom.dp
+            topMargin = top.dp
+            bottomMargin = bottom.dp
         }
 
     private val Int.dp: Int
-        get() =
-            (this * density).toInt()
+        get() = (this * density).toInt()
 }
