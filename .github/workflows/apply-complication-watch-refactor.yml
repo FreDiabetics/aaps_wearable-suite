@@ -1,4 +1,4 @@
-name: Diagnose complication watch refactor payload
+name: Recover verified refactor sources
 
 on:
   push:
@@ -6,74 +6,80 @@ on:
       - agent/complication-watch-refactor-v6
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
-  diagnose:
+  recover:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Identify corrupted payload entry
+        with:
+          fetch-depth: 0
+      - name: Recover 23 verified source entries
         run: |
           python - <<'PY'
           from pathlib import Path
-          import base64, json, re, zlib
+          import base64, json, zlib
 
           parts = sorted(Path('tools/refactor_payload').glob('part_*'))
           first = parts[0].read_text()
           encoded = first.split("DATA='", 1)[1] + ''.join(p.read_text() for p in parts[1:])
           packed = base64.b64decode(''.join(encoded.split()), validate=True)
           text = zlib.decompress(packed[10:], -zlib.MAX_WBITS).decode('utf-8')
-          print('decoded_length=', len(text))
 
-          # Incrementally parse all entries that are intact before the corruption.
+          expected_last = 'app-mobile/src/main/res/drawable-anydpi/ic_notification_outlined.xml'
           dec = json.JSONDecoder()
           i = 1
           n = len(text)
-          parsed = []
+          recovered = {}
           def ws(j):
               while j < n and text[j].isspace(): j += 1
               return j
-          while True:
+
+          while len(recovered) < 23:
               i = ws(i)
-              try:
-                  key, end = dec.raw_decode(text, i)
-              except Exception as exc:
-                  print('KEY_PARSE_FAIL after=', parsed[-1] if parsed else None, 'at=', i, repr(exc))
-                  break
+              key, end = dec.raw_decode(text, i)
+              if not isinstance(key, str):
+                  raise SystemExit(f'non-string key at entry {len(recovered)+1}')
               i = ws(end)
               if i >= n or text[i] != ':':
-                  print('COLON_FAIL after=', parsed[-1] if parsed else None)
-                  print('MALFORMED_KEY=', repr(key))
-                  print('AT=', i)
-                  break
+                  raise SystemExit(f'missing colon for {key}')
               i = ws(i + 1)
-              try:
-                  value, end = dec.raw_decode(text, i)
-              except Exception as exc:
-                  print('VALUE_PARSE_FAIL key=', key, 'at=', i, repr(exc))
-                  break
-              parsed.append(key)
-              print(f'OK[{len(parsed):02d}] {key} chars={len(value)} end={end}')
+              value, end = dec.raw_decode(text, i)
+              if not isinstance(value, str):
+                  raise SystemExit(f'non-string content for {key}')
+              recovered[key] = value
               i = ws(end)
-              if i < n and text[i] == ',':
+              if len(recovered) < 23:
+                  if i >= n or text[i] != ',':
+                      raise SystemExit(f'missing separator after {key}')
                   i += 1
-                  continue
-              print('SEPARATOR_FAIL key=', key, 'at=', i)
-              break
 
-          # Find every syntactically recognizable path key anywhere in the recovered text.
-          path_re = re.compile(r'"((?:core-model|wear-protocol|complications|app-mobile|app-wear)/[^"\\]+)"\s*:')
-          hits = [(m.start(), m.group(1)) for m in path_re.finditer(text)]
-          print('RECOGNIZABLE_PATH_KEYS=', len(hits))
-          for pos, path in hits:
-              if pos > 245000 or path not in parsed:
-                  print('PATH', pos, path)
+          keys = list(recovered)
+          if len(keys) != 23 or keys[-1] != expected_last:
+              raise SystemExit(f'unexpected verified prefix: count={len(keys)} last={keys[-1] if keys else None}')
 
-          err = 264736
-          before = [x for x in hits if x[0] < err]
-          after = [x for x in hits if x[0] > err]
-          print('NEAREST_BEFORE=', before[-5:])
-          print('NEAREST_AFTER=', after[:8])
-          print('CORRUPT_REGION=', repr(text[260000:269000]))
+          for path, content in recovered.items():
+              target = Path(path)
+              target.parent.mkdir(parents=True, exist_ok=True)
+              target.write_text(content)
+          Path('tools/verified_refactor_paths.txt').write_text('\n'.join(keys) + '\n')
+          print('\n'.join(keys))
           PY
+      - name: Stage verified sources and remove broken transport
+        run: |
+          while IFS= read -r path; do
+            git add -f -- "$path"
+          done < tools/verified_refactor_paths.txt
+          rm -rf tools/refactor_payload
+          rm -f tools/apply_refactor_v3.py tools/verified_refactor_paths.txt
+          rm -f .github/workflows/apply-complication-watch-refactor.yml
+          git add -A
+          git diff --cached --check
+          git diff --cached --stat
+      - name: Commit recovered source base
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "Recover verified complication and mobile refactor sources"
+          git push origin HEAD:agent/complication-watch-refactor-v6
