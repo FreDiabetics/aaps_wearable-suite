@@ -11,6 +11,11 @@ internal object SugarliciousWatchFacePush {
     const val ACTIVE_PERMISSION =
         "com.google.wear.permission.SET_PUSHED_WATCH_FACE_AS_ACTIVE"
 
+    private const val PREFS = "sugarlicious_watchface_push"
+    private const val LAST_APPLIED_FACE = "last_applied_face"
+    private const val LAST_APPLIED_AT = "last_applied_at"
+    private const val SETTLING_WINDOW_MS = 15_000L
+
     private data class FaceSpec(
         val packageName: String,
         val apkAsset: String,
@@ -52,20 +57,37 @@ internal object SugarliciousWatchFacePush {
 
     suspend fun activeFaceIndex(context: Context): Int? {
         if (!isSupported()) return null
-        return runCatching {
-            val manager =
-                WatchFacePushManagerFactory
-                    .createWatchFacePushManager(context)
-            val installed =
-                manager.listWatchFaces()
-                    .installedWatchFaceDetails
-            faces.indexOfFirst { face ->
-                installed.any { details ->
-                    details.packageName == face.packageName &&
-                        manager.isWatchFaceActive(details.packageName)
-                }
-            }.takeIf { it >= 0 }
-        }.getOrNull()
+
+        val detected =
+            runCatching {
+                val manager =
+                    WatchFacePushManagerFactory
+                        .createWatchFacePushManager(context)
+                val installed =
+                    manager.listWatchFaces()
+                        .installedWatchFaceDetails
+
+                faces.indexOfFirst { face ->
+                    installed.any { details ->
+                        details.packageName == face.packageName &&
+                            runCatching {
+                                manager.isWatchFaceActive(details.packageName)
+                            }.getOrDefault(false)
+                    }
+                }.takeIf { it >= 0 }
+            }.getOrNull()
+
+        if (detected != null) return detected
+
+        // Watch Face Push swaps settle asynchronously. During that short interval the platform can
+        // report neither the old nor the new package as active. Preserve the face we just applied
+        // only for that settling window; afterwards platform state is authoritative again.
+        val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        val appliedAt = prefs.getLong(LAST_APPLIED_AT, 0L)
+        if (System.currentTimeMillis() - appliedAt !in 0..SETTLING_WINDOW_MS) return null
+        return prefs
+            .getInt(LAST_APPLIED_FACE, -1)
+            .takeIf { it in faces.indices }
     }
 
     suspend fun apply(
@@ -111,48 +133,69 @@ internal object SugarliciousWatchFacePush {
             val installed =
                 manager.listWatchFaces()
                     .installedWatchFaceDetails
-            val matching =
-                installed.firstOrNull {
-                    it.packageName == spec.packageName
+
+            val managed =
+                installed.filter { details ->
+                    faces.any { face -> face.packageName == details.packageName }
                 }
+
+            val matching =
+                managed.firstOrNull { details ->
+                    details.packageName == spec.packageName
+                }
+
+            val activeManaged =
+                managed.firstOrNull { details ->
+                    runCatching {
+                        manager.isWatchFaceActive(details.packageName)
+                    }.getOrDefault(false)
+                }
+
+            // Reuse an existing Sugarlicious slot whenever possible. The Push API has a finite
+            // slot limit; creating one slot per Sugarlicious variant eventually causes
+            // AddWatchFaceException. If the requested package already has a slot, update it. If it
+            // does not, replace the currently active Sugarlicious slot (or another managed slot)
+            // instead of allocating a fifth/new slot.
+            val target = matching ?: activeManaged ?: managed.firstOrNull()
+            val targetWasActive =
+                target != null &&
+                    activeManaged?.slotId == target.slotId
 
             val details =
                 ParcelFileDescriptor.open(
                     apk,
                     ParcelFileDescriptor.MODE_READ_ONLY,
                 ).use { pfd ->
-                    if (matching == null) {
+                    if (target == null) {
                         manager.addWatchFace(
                             pfd,
                             token,
                         )
                     } else {
                         manager.updateWatchFace(
-                            matching.slotId,
+                            target.slotId,
                             pfd,
                             token,
                         )
                     }
                 }
 
-            if (
-                runCatching {
-                    manager.isWatchFaceActive(spec.packageName)
-                }.getOrDefault(false)
-            ) {
-                "Watchface aktiv"
-            } else if (!hasActivationPermission(context)) {
-                "Watchface geladen - Direktwechsel auf der Uhr freigeben"
-            } else {
-                manager.setWatchFaceAsActive(details.slotId)
-                if (
-                    runCatching {
-                        manager.isWatchFaceActive(spec.packageName)
-                    }.getOrDefault(false)
-                ) {
+            when {
+                // An update of the active slot stays active after the asynchronous package swap.
+                // Do not call isWatchFaceActive()/setWatchFaceAsActive immediately afterwards;
+                // Android's Watch Face Push contract explicitly allows the swap to settle later.
+                targetWasActive -> {
+                    rememberApplied(context, index)
                     "Watchface aktiv"
-                } else {
-                    "Watchface geladen - Aktivierung wurde nicht bestätigt"
+                }
+
+                !hasActivationPermission(context) ->
+                    "Watchface geladen - Direktwechsel auf der Uhr freigeben"
+
+                else -> {
+                    manager.setWatchFaceAsActive(details.slotId)
+                    rememberApplied(context, index)
+                    "Watchface aktiv"
                 }
             }
         } catch (cancelled: CancellationException) {
@@ -162,6 +205,17 @@ internal object SugarliciousWatchFacePush {
         } finally {
             apk.delete()
         }
+    }
+
+    private fun rememberApplied(
+        context: Context,
+        index: Int,
+    ) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .edit()
+            .putInt(LAST_APPLIED_FACE, index)
+            .putLong(LAST_APPLIED_AT, System.currentTimeMillis())
+            .apply()
     }
 
     private fun copyAssetToCache(
