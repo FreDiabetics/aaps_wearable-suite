@@ -22,22 +22,46 @@ jobs:
       - uses: android-actions/setup-android@v3
       - name: Install Android SDK
         run: sdkmanager "platforms;android-36" "build-tools;36.0.0"
-      - name: Apply exact source pass
+      - name: Reassemble and apply exact source pass
         run: |
-          cat tools/refactor_payload/part_* > tools/apply_refactor_v3.py
+          python - <<'PY'
+          from pathlib import Path
+
+          parts = sorted(Path('tools/refactor_payload').glob('part_*'))
+          if not parts:
+              raise SystemExit('no refactor payload parts found')
+
+          # GitHub's Contents API stored every fixed-size payload chunk as a text file
+          # with a trailing newline. Remove only that transport newline from each part
+          # before joining so boundaries inside the DATA string are restored exactly.
+          source = ''.join(part.read_text().rstrip('\r\n') for part in parts)
+          target = Path('tools/apply_refactor_v3.py')
+          target.write_text(source)
+          print(f'reassembled {len(parts)} parts into {target} ({len(source)} chars)')
+          PY
           python tools/apply_refactor_v3.py
+          test -f core-model/src/main/kotlin/app/aapswear/model/ComplicationPresentation.kt
+          test -f app-wear/src/main/kotlin/app/aapswear/wear/WearSettingsActivity.kt
+          test -f complications/src/main/kotlin/app/aapswear/complications/ActiveComplicationRegistry.kt
       - name: Stage exact source files
         run: |
           python - <<'PY'
           from pathlib import Path
           import base64, gzip, json, re, subprocess
+
           text = Path('tools/apply_refactor_v3.py').read_text()
           match = re.search(r"DATA='([^']+)'", text)
+          if not match:
+              raise SystemExit('DATA payload not found after reassembly')
           payload = json.loads(gzip.decompress(base64.b64decode(match.group(1))).decode())
           if len(payload) != 45:
               raise SystemExit(f'expected 45 source files, got {len(payload)}')
+
           for path in sorted(payload):
+              if not Path(path).exists():
+                  raise SystemExit(f'generated source file missing: {path}')
               subprocess.run(['git', 'add', '-f', '--', path], check=True)
+
           staged = subprocess.check_output(['git', 'diff', '--cached', '--name-only'], text=True).splitlines()
           expected = sorted(payload)
           if sorted(staged) != expected:
