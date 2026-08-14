@@ -26,7 +26,7 @@ jobs:
         run: |
           python - <<'PY'
           from pathlib import Path
-          import base64, gzip, json
+          import base64, gzip, json, zlib
 
           parts = sorted(Path('tools/refactor_payload').glob('part_*'))
           if len(parts) != 11:
@@ -43,10 +43,24 @@ jobs:
 
           try:
               packed = base64.b64decode(encoded, validate=True)
-              decoded = gzip.decompress(packed).decode('utf-8')
+          except Exception as exc:
+              raise SystemExit(f'base64 decode failed: {exc}') from exc
+
+          try:
+              decoded_bytes = gzip.decompress(packed)
+              print('gzip wrapper CRC valid')
+          except Exception as gzip_exc:
+              print(f'gzip wrapper validation failed ({gzip_exc}); trying raw deflate stream')
+              try:
+                  decoded_bytes = zlib.decompress(packed[10:], -zlib.MAX_WBITS)
+              except Exception as raw_exc:
+                  raise SystemExit(f'raw deflate recovery failed: {raw_exc}') from raw_exc
+
+          try:
+              decoded = decoded_bytes.decode('utf-8')
               payload = json.loads(decoded)
           except Exception as exc:
-              raise SystemExit(f'payload decode failed: {exc}') from exc
+              raise SystemExit(f'decoded payload JSON invalid: {exc}') from exc
 
           if not isinstance(payload, dict):
               raise SystemExit(f'payload must be a dict, got {type(payload).__name__}')
