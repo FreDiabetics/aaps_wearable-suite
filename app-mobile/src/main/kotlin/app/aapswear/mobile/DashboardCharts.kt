@@ -497,7 +497,7 @@ internal class GlucoseDashboardChart @JvmOverloads constructor(
             ) {
                 fillPaint.color =
                     SugarliciousColors.argb(
-                        SugarliciousColorRole.RANGE_IN_RANGE,
+                        SugarliciousColorRole.TARGET_BAND,
                     )
                 canvas.drawRect(
                     plot.left,

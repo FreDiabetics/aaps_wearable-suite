@@ -3,6 +3,7 @@ package app.aapswear.mobile
 import android.content.SharedPreferences
 import android.widget.Toast
 import androidx.compose.foundation.border
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -12,9 +13,13 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
@@ -28,6 +33,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -69,7 +75,41 @@ internal val sugarliciousWatchFaceCards =
             slots = 4,
             features = listOf("Großer Graph", "AOD"),
         ),
+        SugarliciousWatchFaceCard(
+            name = "Sugarlicious Digital",
+            style = "Digital",
+            slots = 1,
+            features = listOf("Glukose", "AOD"),
+        ),
     )
+
+internal data class LegacyWatchFaceCard(val name: String, val previewRes: Int)
+
+internal val legacyWatchFaceCards = listOf(
+    LegacyWatchFaceCard("AAPS BigChart", R.drawable.legacy_aaps_big_chart),
+    LegacyWatchFaceCard("AAPS Circle", R.drawable.legacy_aaps_circle),
+    LegacyWatchFaceCard("AAPS Cockpit", R.drawable.legacy_aaps_cockpit),
+    LegacyWatchFaceCard("AAPS Community", R.drawable.legacy_aaps_community),
+    LegacyWatchFaceCard("AAPS Digital Style", R.drawable.legacy_aaps_digital_style),
+    LegacyWatchFaceCard("AAPS Large", R.drawable.legacy_aaps_large),
+    LegacyWatchFaceCard("AAPS NoChart", R.drawable.legacy_aaps_no_chart),
+    LegacyWatchFaceCard("AAPS Standard", R.drawable.legacy_aaps_standard),
+    LegacyWatchFaceCard("AAPS V2", R.drawable.legacy_aaps_v2),
+    LegacyWatchFaceCard("AAPS V2 TT DarkOnly", R.drawable.legacy_aaps_v2_tt_dark),
+    LegacyWatchFaceCard("AAPS V4", R.drawable.legacy_aaps_v4),
+    LegacyWatchFaceCard("AIMICO", R.drawable.legacy_aimico),
+    LegacyWatchFaceCard("Analog G-Watch", R.drawable.legacy_analog_g_watch),
+    LegacyWatchFaceCard("Blue Ring", R.drawable.legacy_blue_ring),
+    LegacyWatchFaceCard("Digital Big Graph", R.drawable.legacy_digital_big_graph),
+    LegacyWatchFaceCard("Digital G-Watch", R.drawable.legacy_digital_g_watch),
+    LegacyWatchFaceCard("Gears", R.drawable.legacy_gears),
+    LegacyWatchFaceCard("Gota", R.drawable.legacy_gota),
+    LegacyWatchFaceCard("LuckyLoopKoeln", R.drawable.legacy_lucky_loop_koeln),
+    LegacyWatchFaceCard("P-Zero", R.drawable.legacy_p_zero),
+    LegacyWatchFaceCard("Robby", R.drawable.legacy_robby),
+    LegacyWatchFaceCard("Simple Digital", R.drawable.legacy_simple_digital),
+    LegacyWatchFaceCard("AAPS SteamPunk", R.drawable.legacy_steam_punk),
+)
 
 @Composable
 internal fun SugarliciousWatchScreen(
@@ -80,6 +120,7 @@ internal fun SugarliciousWatchScreen(
 ) {
     val context = LocalContext.current
     val appContext = context.applicationContext
+    val scope = rememberCoroutineScope()
     var runtimeStatus by remember { mutableStateOf(WatchRuntimeStatusStore.read(appContext)) }
     var activeFaceIndex by remember {
         mutableStateOf<Int?>(runtimeStatus.activeSugarliciousFaceIndex ?: preferences.watchFaceIndex)
@@ -88,6 +129,7 @@ internal fun SugarliciousWatchScreen(
         mutableStateOf(runtimeStatus.activeSugarliciousFaceIndex ?: preferences.watchFaceIndex)
     }
     var facePresets by remember { mutableStateOf(WatchFacePresetStore.readAll(appContext)) }
+    var showLegacyFaces by remember { mutableStateOf(false) }
 
     DisposableEffect(appContext) {
         val listener =
@@ -110,6 +152,16 @@ internal fun SugarliciousWatchScreen(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 2.dp, vertical = 4.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
+        OverviewInlineHeader(onSettings = { onNavigate(DashboardScreen.SETTINGS) })
+
+        Text(
+            text = "Ziffernblätter",
+            modifier = Modifier.fillMaxWidth(),
+            color = SugarliciousColors.TextPrimary,
+            fontSize = 20.sp,
+            fontWeight = FontWeight.Bold,
+            textAlign = TextAlign.Start,
+        )
         sugarliciousWatchFaceCards.indices.chunked(2).forEach { indices ->
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -138,6 +190,20 @@ internal fun SugarliciousWatchScreen(
             }
         }
 
+        TextButton(
+            onClick = { showLegacyFaces = true },
+            modifier = Modifier.fillMaxWidth(),
+        ) { Text("Alte AAPS-Watchfaces anzeigen") }
+
+        Text(
+            text = "Complications",
+            modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+            color = SugarliciousColors.TextPrimary,
+            fontSize = 20.sp,
+            fontWeight = FontWeight.Bold,
+            textAlign = TextAlign.Start,
+        )
+
         key(editingFaceIndex) {
             CompositionLocalProvider(LocalSugarliciousTrendArrowMaxSize provides 8.dp) {
                 ComplicationStudio(
@@ -152,6 +218,47 @@ internal fun SugarliciousWatchScreen(
                 )
             }
         }
+    }
+
+    if (showLegacyFaces) {
+        AlertDialog(
+            onDismissRequest = { showLegacyFaces = false },
+            title = { Text("Alte AAPS-Watchfaces") },
+            text = {
+                LazyColumn(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    itemsIndexed(legacyWatchFaceCards) { index, face ->
+                        Surface(
+                            modifier = Modifier.fillMaxWidth().clickable {
+                                scope.launch {
+                                    val nodes = runCatching { requestWatchFaceApply(appContext, 5 + index) }.getOrDefault(0)
+                                    Toast.makeText(
+                                        context,
+                                        if (nodes > 0) "${face.name} wird an die Watch gesendet" else "Watch nicht erreichbar",
+                                        Toast.LENGTH_SHORT,
+                                    ).show()
+                                }
+                            },
+                            color = SugarliciousColors.SurfaceHigh,
+                            shape = RoundedCornerShape(14.dp),
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth().padding(10.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            ) {
+                                Image(
+                                    painter = painterResource(face.previewRes),
+                                    contentDescription = null,
+                                    modifier = Modifier.size(58.dp),
+                                )
+                                Text(face.name, color = SugarliciousColors.TextPrimary)
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = { TextButton(onClick = { showLegacyFaces = false }) { Text("Schließen") } },
+        )
     }
 }
 

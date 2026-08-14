@@ -125,48 +125,6 @@ internal fun ComplicationStudio(
             .padding(12.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Column(Modifier.weight(1f)) {
-                Text(
-                    "COMPLICATION STUDIO",
-                    color = SugarliciousColors.TextSecondary,
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    letterSpacing = 0.6.sp,
-                )
-                Text(
-                    "Watch-Preset & Live-Vorschau",
-                    color = SugarliciousColors.TextPrimary,
-                    fontSize = 17.sp,
-                    fontWeight = FontWeight.SemiBold,
-                )
-            }
-            Surface(
-                shape = RoundedCornerShape(999.dp),
-                color = SugarliciousColors.SurfaceHigh,
-            ) {
-                Text(
-                    "${selected.size}/4",
-                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                    color = SugarliciousColors.Primary,
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold,
-                )
-            }
-        }
-
-        Text(
-            "Hier stellst du bis zu vier bevorzugte Sugarlicious-Complications zusammen. " +
-                "Das Preset wird zur Watch synchronisiert. Bei fremden Samsung-/Wear-OS-Watchfaces " +
-                "bleibt die einmalige Slot-Zuordnung aus Sicherheitsgründen beim Wear-OS-Picker.",
-            color = SugarliciousColors.TextSecondary,
-            fontSize = 10.sp,
-            lineHeight = 14.sp,
-        )
-
         PresetStrip(selected)
 
         Button(

@@ -4,7 +4,7 @@ android {
     namespace="app.aapswear.watchface.aapsnochart"
     compileSdk=36
     defaultConfig {
-        applicationId="app.aapswear.watchface.aapsnochart"
+        applicationId="app.aapswear.watchfacepush.aapsnochart"
         minSdk=33
         targetSdk=35
         versionCode=3

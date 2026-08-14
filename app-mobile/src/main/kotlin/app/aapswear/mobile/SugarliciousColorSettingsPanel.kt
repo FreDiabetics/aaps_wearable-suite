@@ -253,6 +253,7 @@ private val cgmGraphColorRoles =
         SugarliciousColorRole.RANGE_LOW,
         SugarliciousColorRole.RANGE_IN_RANGE,
         SugarliciousColorRole.RANGE_HIGH,
+        SugarliciousColorRole.TARGET_BAND,
         SugarliciousColorRole.CGM_DOT_LOW,
         SugarliciousColorRole.CGM_DOT_IN_RANGE,
         SugarliciousColorRole.CGM_DOT_HIGH,

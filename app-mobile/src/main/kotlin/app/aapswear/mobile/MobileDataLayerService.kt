@@ -103,7 +103,7 @@ internal fun readWatchConfig(context: Context): WatchConfig {
         graphColors = WatchGraphColors(
             graphBackground = palette.argb(SugarliciousColorRole.GRAPH_BACKGROUND),
             rangeLow = palette.argb(SugarliciousColorRole.RANGE_LOW),
-            rangeInRange = palette.argb(SugarliciousColorRole.RANGE_IN_RANGE),
+            rangeInRange = palette.argb(SugarliciousColorRole.TARGET_BAND),
             rangeHigh = palette.argb(SugarliciousColorRole.RANGE_HIGH),
             cgmLow = palette.argb(SugarliciousColorRole.CGM_DOT_LOW),
             cgmInRange = palette.argb(SugarliciousColorRole.CGM_DOT_IN_RANGE),

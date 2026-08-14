@@ -46,7 +46,7 @@ internal fun SugarliciousFacePreview(
     complicationIds: List<Int>,
     modifier: Modifier = Modifier,
 ) {
-    val faceIndex = index.coerceIn(0, 3)
+    val faceIndex = index.coerceIn(0, 4)
     BoxWithConstraints(
         modifier = modifier.clip(CircleShape).background(Color.Black),
         contentAlignment = Alignment.Center,
@@ -121,7 +121,7 @@ internal fun SugarliciousFacePreview(
                         style = Stroke(3.5.dp.toPx(), cap = StrokeCap.Round),
                     )
                 }
-                else -> {
+                3 -> {
                     drawCircle(Color(0xFF050505), r)
                     drawCircle(Color(0xFF19D7E8), r - 5.dp.toPx(), style = Stroke(2.5.dp.toPx()))
                     drawRoundRect(
@@ -131,6 +131,7 @@ internal fun SugarliciousFacePreview(
                         cornerRadius = androidx.compose.ui.geometry.CornerRadius(size.minDimension * (28f / 450f)),
                     )
                 }
+                else -> drawCircle(Color(0xFF050B10), r)
             }
         }
 
@@ -156,7 +157,7 @@ internal fun SugarliciousFacePreview(
 
             withTransform({ rotate(handAngles.hour, center) }) {
                 drawRoundRect(
-                    Color.White,
+                    Color.Red,
                     Offset(sx(243f), sy(113.57f)),
                     Size(26f * scale, 140f * scale),
                     androidx.compose.ui.geometry.CornerRadius(13f * scale),
@@ -177,7 +178,7 @@ internal fun SugarliciousFacePreview(
                     Offset(sx(254f), sy(6f)),
                     Size(4f * scale, 290f * scale),
                 )
-                drawCircle(Color.White, 8.5f * scale, center)
+                drawCircle(Color.Red, 8.5f * scale, center)
             }
             drawCircle(Color.Black, 4f * scale, center)
         }
@@ -228,12 +229,13 @@ private fun previewSlots(
             slot(282f, 105f, 125f, 72f),
             slot(70f, 188f, 310f, 74f),
         )
-        else -> listOf(
+        3 -> listOf(
             slot(62f, 62f, 326f, 88f),
             slot(30f, 238f, 390f, 150f),
             slot(44f, 170f, 112f, 60f),
             slot(294f, 170f, 112f, 60f),
         )
+        else -> emptyList()
     }
 }
 
