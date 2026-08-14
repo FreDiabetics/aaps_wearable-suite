@@ -22,24 +22,47 @@ jobs:
       - uses: android-actions/setup-android@v3
       - name: Install Android SDK
         run: sdkmanager "platforms;android-36" "build-tools;36.0.0"
-      - name: Reassemble and apply exact source pass
+      - name: Decode and apply exact source pass
         run: |
           python - <<'PY'
           from pathlib import Path
+          import base64, gzip, json
 
           parts = sorted(Path('tools/refactor_payload').glob('part_*'))
-          if not parts:
-              raise SystemExit('no refactor payload parts found')
+          if len(parts) != 11:
+              raise SystemExit(f'expected 11 refactor payload parts, got {len(parts)}')
 
-          # GitHub's Contents API stored every fixed-size payload chunk as a text file
-          # with a trailing newline. Remove only that transport newline from each part
-          # before joining so boundaries inside the DATA string are restored exactly.
-          source = ''.join(part.read_text().rstrip('\r\n') for part in parts)
-          target = Path('tools/apply_refactor_v3.py')
-          target.write_text(source)
-          print(f'reassembled {len(parts)} parts into {target} ({len(source)} chars)')
+          first = parts[0].read_text()
+          marker = "DATA='"
+          if marker not in first:
+              raise SystemExit('DATA marker missing from first payload part')
+
+          encoded = first.split(marker, 1)[1]
+          encoded += ''.join(part.read_text() for part in parts[1:])
+          encoded = ''.join(encoded.split())
+
+          try:
+              packed = base64.b64decode(encoded, validate=True)
+              decoded = gzip.decompress(packed).decode('utf-8')
+              payload = json.loads(decoded)
+          except Exception as exc:
+              raise SystemExit(f'payload decode failed: {exc}') from exc
+
+          if not isinstance(payload, dict):
+              raise SystemExit(f'payload must be a dict, got {type(payload).__name__}')
+          if len(payload) != 45:
+              raise SystemExit(f'expected 45 source files, got {len(payload)}')
+
+          for path, content in payload.items():
+              if not isinstance(path, str) or not isinstance(content, str):
+                  raise SystemExit(f'invalid payload entry for {path!r}')
+              target = Path(path)
+              target.parent.mkdir(parents=True, exist_ok=True)
+              target.write_text(content)
+
+          Path('tools/refactor_payload_paths.txt').write_text('\n'.join(sorted(payload)) + '\n')
+          print(f'decoded and wrote {len(payload)} source files')
           PY
-          python tools/apply_refactor_v3.py
           test -f core-model/src/main/kotlin/app/aapswear/model/ComplicationPresentation.kt
           test -f app-wear/src/main/kotlin/app/aapswear/wear/WearSettingsActivity.kt
           test -f complications/src/main/kotlin/app/aapswear/complications/ActiveComplicationRegistry.kt
@@ -47,24 +70,19 @@ jobs:
         run: |
           python - <<'PY'
           from pathlib import Path
-          import base64, gzip, json, re, subprocess
+          import subprocess
 
-          text = Path('tools/apply_refactor_v3.py').read_text()
-          match = re.search(r"DATA='([^']+)'", text)
-          if not match:
-              raise SystemExit('DATA payload not found after reassembly')
-          payload = json.loads(gzip.decompress(base64.b64decode(match.group(1))).decode())
-          if len(payload) != 45:
-              raise SystemExit(f'expected 45 source files, got {len(payload)}')
+          expected = [line for line in Path('tools/refactor_payload_paths.txt').read_text().splitlines() if line]
+          if len(expected) != 45:
+              raise SystemExit(f'expected 45 paths in manifest, got {len(expected)}')
 
-          for path in sorted(payload):
+          for path in expected:
               if not Path(path).exists():
                   raise SystemExit(f'generated source file missing: {path}')
               subprocess.run(['git', 'add', '-f', '--', path], check=True)
 
           staged = subprocess.check_output(['git', 'diff', '--cached', '--name-only'], text=True).splitlines()
-          expected = sorted(payload)
-          if sorted(staged) != expected:
+          if sorted(staged) != sorted(expected):
               missing = sorted(set(expected) - set(staged))
               extra = sorted(set(staged) - set(expected))
               raise SystemExit(f'staging mismatch; missing={missing}; extra={extra}')
@@ -90,6 +108,7 @@ jobs:
       - name: Remove temporary integration assets
         run: |
           rm -rf tools/refactor_payload
+          rm -f tools/refactor_payload_paths.txt
           rm -f tools/apply_refactor_v3.py
           rm -f .github/workflows/apply-complication-watch-refactor.yml
           git add -A
