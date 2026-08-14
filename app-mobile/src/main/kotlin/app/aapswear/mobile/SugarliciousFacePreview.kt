@@ -143,6 +143,7 @@ internal fun SugarliciousFacePreview(
                 state = state,
                 modifier =
                     Modifier
+                        .align(Alignment.TopStart)
                         .offset(x = slot.x, y = slot.y)
                         .size(width = slot.width, height = slot.height),
             )
