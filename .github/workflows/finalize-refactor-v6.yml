@@ -1,0 +1,112 @@
+name: Finalize complication refactor v6
+
+on:
+  push:
+    branches: [agent/complication-watch-refactor-v6]
+
+permissions:
+  contents: write
+
+jobs:
+  finalize:
+    if: ${{ !contains(github.event.head_commit.message, '[finalize-v6]') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Apply final prompt requirements
+        shell: python
+        run: |
+          from pathlib import Path
+          import re
+
+          catalog = Path('app-mobile/src/main/kotlin/app/aapswear/mobile/ComplicationCatalog.kt')
+          text = catalog.read_text(encoding='utf-8')
+          for entry_id in (35, 36, 5, 2):
+              text = re.sub(rf'^\s*ComplicationCatalogEntry\({entry_id},.*\n', '', text, flags=re.M)
+          catalog.write_text(text, encoding='utf-8')
+
+          presentation = Path('core-model/src/main/kotlin/app/aapswear/model/ComplicationPresentation.kt')
+          text = presentation.read_text(encoding='utf-8')
+          for token in ('TREND_ONLY', 'DELTA_ONLY', 'GLUCOSE_AGE', 'GLUCOSE_TREND'):
+              text = re.sub(rf'^\s*{token},\n', '', text, flags=re.M)
+          presentation.write_text(text, encoding='utf-8')
+
+          settings = Path('app-wear/src/main/kotlin/app/aapswear/wear/WearSettingsActivity.kt')
+          text = settings.read_text(encoding='utf-8')
+          marker = '        TextView(this).apply {\n            text = "Die Watch übernimmt beim nächsten Sync weiterhin die in Sugarlicious gespeicherten Theme- und Graph-Einstellungen."'
+          insert = '        root.addView(WatchFaceDesignSettingsView(this), fullWidth())\n\n'
+          if 'WatchFaceDesignSettingsView(this)' not in text:
+              if marker not in text:
+                  raise SystemExit('Wear settings insertion marker not found')
+              text = text.replace(marker, insert + marker, 1)
+          settings.write_text(text, encoding='utf-8')
+
+          manifest = Path('app-wear/src/main/AndroidManifest.xml')
+          text = manifest.read_text(encoding='utf-8')
+          for provider in ('TrendOnlyComplication', 'DeltaOnlyComplication', 'GlucoseAgeComplication', 'GlucoseTrendComplication'):
+              text = re.sub(rf'^\s*<service android:name="app\.aapswear\.complications\.{provider}".*?</service>\n', '', text, flags=re.M)
+
+          labels = {
+              'GlucoseComplication': '01 Glukose',
+              'GlucosePlusDeltaComplication': '02 Glukose + Delta',
+              'IobComplication': '03 IOB',
+              'CobComplication': '04 COB',
+              'BasalComplication': '05 Basal',
+              'LoopComplication': '06 Loop Status',
+              'ReservoirComplication': '07 Pumpe / Reservoir',
+              'SensorAgeComplication': '08 Sensoralter',
+              'TirComplication': '09 TIR',
+              'GlucoseGraphComplication': '10 CGM Graph',
+              'GlucoseDeltaComplication': '11 Zeit seit letztem Wert + Delta',
+              'GlucoseTrendDeltaAgeComplication': '12 Glukose + Trend + Delta + Zeit',
+              'GlucoseTrendAgeComplication': '13 Glukose + Trend + Zeit',
+              'GlucoseTrendDeltaComplication': '14 Glukose + Trend + Delta',
+              'IobCobBasalComplication': '15 IOB + COB + Basal',
+          }
+          for provider, label in labels.items():
+              pattern = rf'(android:name="app\.aapswear\.complications\.{provider}" android:label=")[^"]+(" )'
+              text, count = re.subn(pattern, rf'\g<1>{label}\g<2>', text)
+              if count != 1:
+                  raise SystemExit(f'Expected one manifest entry for {provider}, got {count}')
+          manifest.write_text(text, encoding='utf-8')
+
+      - name: Verify requested complication surface
+        shell: python
+        run: |
+          from pathlib import Path
+          catalog = Path('app-mobile/src/main/kotlin/app/aapswear/mobile/ComplicationCatalog.kt').read_text(encoding='utf-8')
+          manifest = Path('app-wear/src/main/AndroidManifest.xml').read_text(encoding='utf-8')
+          forbidden = ('TrendOnlyComplication', 'DeltaOnlyComplication', 'GlucoseAgeComplication', 'GlucoseTrendComplication')
+          if any(x in manifest for x in forbidden):
+              raise SystemExit('Removed complications are still exported')
+          if catalog.count('ComplicationCatalogEntry(') != 15:
+              raise SystemExit('Complication Studio must expose exactly 15 requested entries')
+          if 'listOf(1, 2, 6, 12, 24)' not in catalog:
+              raise SystemExit('Requested CGM complication graph scales missing')
+          if 'chunked(3)' not in catalog:
+              raise SystemExit('Complication grid is not 3 columns')
+
+      - name: Test affected modules
+        run: ./gradlew :core-model:test :complications:testDebugUnitTest :app-mobile:testDebugUnitTest :app-wear:testDebugUnitTest --stacktrace
+
+      - name: Build phone and watch
+        run: ./gradlew :app-mobile:assembleDebug :app-wear:assembleDebug --stacktrace
+
+      - name: Commit finalized source
+        run: |
+          if git diff --quiet; then
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app-mobile/src/main/kotlin/app/aapswear/mobile/ComplicationCatalog.kt core-model/src/main/kotlin/app/aapswear/model/ComplicationPresentation.kt app-wear/src/main/AndroidManifest.xml app-wear/src/main/kotlin/app/aapswear/wear/WearSettingsActivity.kt
+          git commit -m "Finalize requested complication and watchface settings surface [finalize-v6]"
+          git push origin HEAD:agent/complication-watch-refactor-v6
