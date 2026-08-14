@@ -24,6 +24,7 @@ internal data class WearDisplayPreferences(
         private const val KEY_GLUCOSE_UNIT = "glucose_unit"
         private const val KEY_SHOW_THERAPY_STATS = "show_therapy_stats"
         private const val KEY_SYNCED_AT = "synced_at"
+        private const val KEY_LOCAL_CUSTOMIZED = "local_customized"
         private const val COLOR_PREFIX = "graph_color_"
         private const val UI_PREFIX = "ui_color_"
         private const val STYLE_DOT_RADIUS = "cgm_dot_radius_dp"
@@ -111,30 +112,63 @@ internal data class WearDisplayPreferences(
             )
         }
 
+        /**
+         * Applies the phone configuration until the user customizes the Watch locally. Once local
+         * settings exist, sync still updates the timestamp but no longer silently overwrites the
+         * Watch color pickers, graph scale or dot style every time the Watch app requests data.
+         */
         fun save(
             context: Context,
             config: WatchConfig,
         ) {
-            saveLocal(
-                context,
-                WearDisplayPreferences(
-                    graphHours = config.graphHours,
-                    showPredictions = config.showPredictions,
-                    glucoseUnit = config.glucoseUnit,
-                    showTherapyStats = config.showTherapyStats,
-                    syncedAtEpochMs =
-                        config.sentAtEpochMs.takeIf { it > 0L }
-                            ?: System.currentTimeMillis(),
-                    graphColors = config.graphColors,
-                    graphStyle = config.graphStyle,
-                    uiColors = config.uiColors,
-                ),
+            val preferences =
+                context.getSharedPreferences(
+                    PREFS,
+                    Context.MODE_PRIVATE,
+                )
+            val syncedAt =
+                config.sentAtEpochMs.takeIf { it > 0L }
+                    ?: System.currentTimeMillis()
+
+            if (preferences.getBoolean(KEY_LOCAL_CUSTOMIZED, false)) {
+                preferences.edit()
+                    .putLong(KEY_SYNCED_AT, syncedAt)
+                    .apply()
+                return
+            }
+
+            write(
+                context = context,
+                value =
+                    WearDisplayPreferences(
+                        graphHours = config.graphHours,
+                        showPredictions = config.showPredictions,
+                        glucoseUnit = config.glucoseUnit,
+                        showTherapyStats = config.showTherapyStats,
+                        syncedAtEpochMs = syncedAt,
+                        graphColors = config.graphColors,
+                        graphStyle = config.graphStyle,
+                        uiColors = config.uiColors,
+                    ),
+                markLocal = false,
             )
         }
 
         fun saveLocal(
             context: Context,
             value: WearDisplayPreferences,
+        ) {
+            write(
+                context = context,
+                value = value,
+                markLocal = true,
+            )
+        }
+
+        private fun write(
+            context: Context,
+            value: WearDisplayPreferences,
+            markLocal: Boolean,
         ) {
             val graphHours =
                 value.graphHours.takeIf { it in allowedGraphHours } ?: 3
@@ -159,6 +193,7 @@ internal data class WearDisplayPreferences(
                     value.syncedAtEpochMs.takeIf { it > 0L }
                         ?: System.currentTimeMillis(),
                 )
+                .putBoolean(KEY_LOCAL_CUSTOMIZED, markLocal)
                 .putInt(COLOR_PREFIX + "background", value.graphColors.graphBackground)
                 .putInt(COLOR_PREFIX + "range_low", value.graphColors.rangeLow)
                 .putInt(COLOR_PREFIX + "range_in", value.graphColors.rangeInRange)
