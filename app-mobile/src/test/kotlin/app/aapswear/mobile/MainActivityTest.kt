@@ -65,7 +65,7 @@ class MainActivityTest {
         shadowOf(android.os.Looper.getMainLooper()).idle()
         val settingsText = textOf(activity.findViewById(R.id.dashboard_content))
         assertTrue(settingsText.contains("Datenquelle"))
-        assertTrue(settingsText.contains("Loop-App"))
+        assertTrue(settingsText.contains("AndroidAPS"))
         controller.pause().stop().destroy()
     }
 
@@ -188,7 +188,6 @@ class MainActivityTest {
         assertFalse(settingsText.contains("FreDiabetics/aaps_wearable-suite"))
         assertTrue(settingsText.contains("Unabhängiges Projekt"))
         assertFalse(settingsText.contains("GITHUB"))
-        assertFalse(settingsText.contains("AndroidAPS"))
 
         activity.findViewById<View>(R.id.dashboard_contact_email).performClick()
         val emailIntent = shadowOf(activity).nextStartedActivity

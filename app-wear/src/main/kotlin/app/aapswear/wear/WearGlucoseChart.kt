@@ -5,18 +5,18 @@ import android.content.Context
 import android.graphics.Canvas
 import android.graphics.DashPathEffect
 import android.graphics.Paint
+import android.graphics.Typeface
 import android.util.AttributeSet
 import android.util.TypedValue
 import android.view.View
+import app.aapswear.model.GlucoseGraphScale
 import app.aapswear.model.GlucosePrediction
 import app.aapswear.model.GlucoseSample
 import app.aapswear.model.PredictionKind
 import app.aapswear.model.TherapyDisplayState
 import app.aapswear.protocol.WatchGraphColors
 import app.aapswear.protocol.WatchGraphStyle
-import kotlin.math.ceil
 import kotlin.math.max
-import kotlin.math.min
 
 @SuppressLint("DrawAllocation")
 class WearGlucoseChart @JvmOverloads constructor(
@@ -31,7 +31,6 @@ class WearGlucoseChart @JvmOverloads constructor(
     }
     private val emptyTextPaint =
         Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = context.getColor(R.color.wear_text_secondary)
             textSize =
                 TypedValue.applyDimension(
                     TypedValue.COMPLEX_UNIT_SP,
@@ -39,6 +38,17 @@ class WearGlucoseChart @JvmOverloads constructor(
                     resources.displayMetrics,
                 )
             textAlign = Paint.Align.CENTER
+        }
+    private val targetLabelPaint =
+        Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            textSize =
+                TypedValue.applyDimension(
+                    TypedValue.COMPLEX_UNIT_SP,
+                    10f,
+                    resources.displayMetrics,
+                )
+            textAlign = Paint.Align.RIGHT
+            typeface = Typeface.DEFAULT_BOLD
         }
 
     private var state: TherapyDisplayState? = null
@@ -55,10 +65,15 @@ class WearGlucoseChart @JvmOverloads constructor(
         style: WatchGraphStyle,
     ) {
         state = newState
-        durationHours = graphHours.takeIf { it in listOf(3, 6, 12, 24) } ?: 3
+        durationHours =
+            graphHours
+                .takeIf { it in WearDisplayPreferences.allowedGraphHours }
+                ?: 3
         this.showPredictions = showPredictions
         this.colors = colors
         graphStyle = style
+        emptyTextPaint.color = colors.divider
+        targetLabelPaint.color = colors.divider
         invalidate()
     }
 
@@ -66,8 +81,45 @@ class WearGlucoseChart @JvmOverloads constructor(
         super.onDraw(canvas)
 
         val now = System.currentTimeMillis()
-        canvas.drawColor(colors.graphBackground)
-        val start = now - durationHours * 60L * 60_000L
+        val outerLeft = 1f.dp
+        val outerTop = 1f.dp
+        val outerRight = width - 1f.dp
+        val outerBottom = height - 1f.dp
+        if (outerRight <= outerLeft || outerBottom <= outerTop) return
+
+        fillPaint.color = colors.graphBackground
+        canvas.drawRoundRect(
+            outerLeft,
+            outerTop,
+            outerRight,
+            outerBottom,
+            14f.dp,
+            14f.dp,
+            fillPaint,
+        )
+
+        val currentMeasurement =
+            state?.glucose?.measuredAtEpochMs
+                ?.coerceAtMost(now + FUTURE_TOLERANCE_MS)
+                ?: now
+        val predictions =
+            if (showPredictions) {
+                state?.glucosePredictions.orEmpty()
+            } else {
+                emptyList()
+            }
+        val predictionEnd =
+            predictions
+                .flatMap { it.samples }
+                .maxOfOrNull { it.measuredAtEpochMs }
+                ?: currentMeasurement
+        val end =
+            if (showPredictions) {
+                max(currentMeasurement, predictionEnd)
+            } else {
+                currentMeasurement
+            }.coerceAtLeast(60_000L)
+        val start = end - durationHours * HOUR_MS
 
         val history =
             buildList {
@@ -83,40 +135,42 @@ class WearGlucoseChart @JvmOverloads constructor(
             }
                 .filter {
                     it.valueMgDl in 20.0..1000.0 &&
-                        it.measuredAtEpochMs >= start &&
-                        it.measuredAtEpochMs <= now + FUTURE_TOLERANCE_MS
+                        it.measuredAtEpochMs in start..end
                 }
                 .associateBy { it.measuredAtEpochMs }
                 .values
                 .sortedBy { it.measuredAtEpochMs }
 
-        val predictions =
-            if (showPredictions) state?.glucosePredictions.orEmpty() else emptyList()
-
-        val predictionEnd =
-            predictions
-                .flatMap { it.samples }
-                .maxOfOrNull { it.measuredAtEpochMs }
-                ?: now
-
-        val end = max(now, predictionEnd).coerceAtLeast(start + 60_000L)
         val visiblePredictions =
             predictions
                 .map { series ->
                     series.copy(
                         samples =
                             series.samples.filter {
-                                it.measuredAtEpochMs in start..end
+                                it.measuredAtEpochMs in currentMeasurement..end
                             },
                     )
                 }
                 .filter { it.samples.isNotEmpty() }
 
-        val left = 7f.dp
-        val right = width - 7f.dp
-        val top = 6f.dp
-        val bottom = height - 6f.dp
+        val left = 6f.dp
+        val right = width - 6f.dp
+        val top = 5f.dp
+        val bottom = height - 5f.dp
         if (right <= left || bottom <= top) return
+
+        linePaint.color = colors.divider
+        linePaint.strokeWidth = 0.8f.dp
+        linePaint.pathEffect = null
+        canvas.drawRoundRect(
+            outerLeft,
+            outerTop,
+            outerRight,
+            outerBottom,
+            14f.dp,
+            14f.dp,
+            linePaint,
+        )
 
         if (history.isEmpty()) {
             canvas.drawText(
@@ -127,15 +181,6 @@ class WearGlucoseChart @JvmOverloads constructor(
             )
             return
         }
-
-        val values =
-            history.map { it.valueMgDl } +
-                visiblePredictions.flatMap { it.samples }.map { it.valueMgDl }
-
-        val minimum = min(40.0, values.minOrNull() ?: 40.0) - 10.0
-        val maximum = max(200.0, values.maxOrNull() ?: 200.0) + 10.0
-        val yMin = (minimum / 20.0).toInt() * 20.0
-        val yMax = ceil(maximum / 20.0) * 20.0
 
         fun xFor(timestamp: Long): Float =
             left +
@@ -149,11 +194,8 @@ class WearGlucoseChart @JvmOverloads constructor(
 
         fun yFor(value: Double): Float =
             bottom -
-                (
-                    (value - yMin) /
-                        (yMax - yMin).coerceAtLeast(1.0)
-                    )
-                    .coerceIn(0.0, 1.0)
+                GlucoseGraphScale
+                    .ratio(value)
                     .toFloat() *
                 (bottom - top)
 
@@ -162,24 +204,48 @@ class WearGlucoseChart @JvmOverloads constructor(
         val targetTop = yFor(targetHigh)
         val targetBottom = yFor(targetLow)
 
-        // Keep the exact ARGB value from the phone, including user-selected alpha.
         fillPaint.color = colors.rangeInRange
         canvas.drawRoundRect(
             left,
             targetTop,
             right,
             targetBottom,
-            6f.dp,
-            6f.dp,
+            5f.dp,
+            5f.dp,
             fillPaint,
         )
 
         linePaint.color = colors.divider
+        linePaint.strokeWidth = 0.55f.dp
+        linePaint.pathEffect =
+            DashPathEffect(
+                floatArrayOf(3f.dp, 3f.dp),
+                0f,
+            )
+        for (index in 1..3) {
+            val y = top + (bottom - top) * index / 4f
+            canvas.drawLine(left, y, right, y, linePaint)
+        }
+        linePaint.pathEffect = null
+
         linePaint.strokeWidth = 0.7f.dp
         canvas.drawLine(left, targetTop, right, targetTop, linePaint)
         canvas.drawLine(left, targetBottom, right, targetBottom, linePaint)
 
-        val dividerX = xFor(now)
+        canvas.drawText(
+            targetHigh.toInt().toString(),
+            right - 1f.dp,
+            targetTop - 2f.dp,
+            targetLabelPaint,
+        )
+        canvas.drawText(
+            targetLow.toInt().toString(),
+            right - 1f.dp,
+            targetBottom - 2f.dp,
+            targetLabelPaint,
+        )
+
+        val dividerX = xFor(currentMeasurement)
         if (visiblePredictions.isNotEmpty()) {
             linePaint.color = colors.divider
             linePaint.strokeWidth = 1f.dp
@@ -201,67 +267,16 @@ class WearGlucoseChart @JvmOverloads constructor(
                 .coerceIn(0.25f, 3.0f)
                 .dp
 
-        history.forEachIndexed { index, point ->
-            val rawX = xFor(point.measuredAtEpochMs)
-            val x =
-                if (visiblePredictions.isNotEmpty() && index == history.lastIndex) {
-                    min(rawX, dividerX - 4f.dp)
-                } else {
-                    rawX
-                }
-            val y = yFor(point.valueMgDl)
-
-            if (graphStyle.cgmDotOutlineEnabled) {
-                fillPaint.color = colors.outline
-                canvas.drawCircle(
-                    x,
-                    y,
-                    dotRadius + outlineWidth,
-                    fillPaint,
-                )
-            }
-
-            fillPaint.color =
-                glucoseColor(
-                    point.valueMgDl,
-                    targetLow,
-                    targetHigh,
-                )
-            canvas.drawCircle(x, y, dotRadius, fillPaint)
-        }
-
-        history.lastOrNull()?.let { point ->
-            val rawX = xFor(point.measuredAtEpochMs)
-            val x =
-                if (visiblePredictions.isNotEmpty()) {
-                    min(rawX, dividerX - 4f.dp)
-                } else {
-                    rawX
-                }
-            val y = yFor(point.valueMgDl)
-            val currentRadius = dotRadius * 1.25f
-
-            if (graphStyle.cgmDotOutlineEnabled) {
-                fillPaint.color = colors.outline
-                canvas.drawCircle(
-                    x,
-                    y,
-                    currentRadius + outlineWidth,
-                    fillPaint,
-                )
-            }
-
-            fillPaint.color =
-                glucoseColor(
-                    point.valueMgDl,
-                    targetLow,
-                    targetHigh,
-                )
-            canvas.drawCircle(
-                x,
-                y,
-                currentRadius,
-                fillPaint,
+        history.forEach { point ->
+            drawCgmDot(
+                canvas = canvas,
+                x = xFor(point.measuredAtEpochMs),
+                y = yFor(point.valueMgDl),
+                valueMgDl = point.valueMgDl,
+                targetLow = targetLow,
+                targetHigh = targetHigh,
+                radius = dotRadius,
+                outlineWidth = outlineWidth,
             )
         }
 
@@ -276,6 +291,35 @@ class WearGlucoseChart @JvmOverloads constructor(
         }
     }
 
+    private fun drawCgmDot(
+        canvas: Canvas,
+        x: Float,
+        y: Float,
+        valueMgDl: Double,
+        targetLow: Double,
+        targetHigh: Double,
+        radius: Float,
+        outlineWidth: Float,
+    ) {
+        if (graphStyle.cgmDotOutlineEnabled) {
+            fillPaint.color = colors.outline
+            canvas.drawCircle(
+                x,
+                y,
+                radius + outlineWidth,
+                fillPaint,
+            )
+        }
+
+        fillPaint.color =
+            glucoseColor(
+                valueMgDl,
+                targetLow,
+                targetHigh,
+            )
+        canvas.drawCircle(x, y, radius, fillPaint)
+    }
+
     private fun drawPrediction(
         canvas: Canvas,
         series: GlucosePrediction,
@@ -286,12 +330,9 @@ class WearGlucoseChart @JvmOverloads constructor(
         fillPaint.color =
             when (series.kind) {
                 PredictionKind.IOB -> colors.predictionIob
-
                 PredictionKind.COB,
                 PredictionKind.ACOB -> colors.predictionCob
-
                 PredictionKind.UAM -> colors.predictionUam
-
                 PredictionKind.ZERO_TEMP -> colors.predictionZeroTemp
             }
 
@@ -331,5 +372,6 @@ class WearGlucoseChart @JvmOverloads constructor(
         private const val TARGET_LOW = 80.0
         private const val TARGET_HIGH = 160.0
         private const val FUTURE_TOLERANCE_MS = 5 * 60_000L
+        private const val HOUR_MS = 60L * 60_000L
     }
 }

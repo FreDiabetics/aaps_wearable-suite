@@ -29,12 +29,15 @@ import androidx.wear.watchface.complications.datasource.ComplicationRequest
 import androidx.wear.watchface.complications.datasource.SuspendingComplicationDataSourceService
 import app.aapswear.model.BasalState
 import app.aapswear.model.CarbState
+import app.aapswear.model.ComplicationPresentationFormatter
+import app.aapswear.model.SugarliciousComplicationIds
 import app.aapswear.model.DataCapability
 import app.aapswear.model.DataSourceId
 import app.aapswear.model.DeviceState
 import app.aapswear.model.Freshness
 import app.aapswear.model.FreshnessPolicy
 import app.aapswear.model.GlucoseSample
+import app.aapswear.model.GlucoseGraphScale
 import app.aapswear.model.GlucoseState
 import app.aapswear.model.GlucoseUnit
 import app.aapswear.model.InsulinState
@@ -92,13 +95,49 @@ abstract class TherapyComplicationService(
     private val kind: ProviderKind,
 ) : SuspendingComplicationDataSourceService() {
 
+    private val catalogId: Int?
+        get() = when (kind) {
+            ProviderKind.GLUCOSE -> SugarliciousComplicationIds.GLUCOSE
+            ProviderKind.TREND_ONLY -> SugarliciousComplicationIds.TREND_ONLY
+            ProviderKind.DELTA_ONLY -> SugarliciousComplicationIds.DELTA_ONLY
+            ProviderKind.GLUCOSE_AGE -> SugarliciousComplicationIds.GLUCOSE_AGE
+            ProviderKind.BASAL -> SugarliciousComplicationIds.BASAL
+            ProviderKind.IOB -> SugarliciousComplicationIds.IOB
+            ProviderKind.COB -> SugarliciousComplicationIds.COB
+            ProviderKind.GLUCOSE_TREND -> SugarliciousComplicationIds.GLUCOSE_TREND
+            ProviderKind.GLUCOSE_PLUS_DELTA -> SugarliciousComplicationIds.GLUCOSE_PLUS_DELTA
+            ProviderKind.GLUCOSE_DELTA -> SugarliciousComplicationIds.TIME_DELTA
+            ProviderKind.GLUCOSE_TREND_AGE -> SugarliciousComplicationIds.GLUCOSE_TREND_AGE
+            ProviderKind.GLUCOSE_TREND_DELTA -> SugarliciousComplicationIds.GLUCOSE_TREND_DELTA
+            ProviderKind.GLUCOSE_TREND_DELTA_AGE -> SugarliciousComplicationIds.GLUCOSE_TREND_DELTA_AGE
+            ProviderKind.IOB_COB_BASAL -> SugarliciousComplicationIds.IOB_COB_BASAL
+            ProviderKind.LOOP -> SugarliciousComplicationIds.LOOP
+            ProviderKind.RESERVOIR -> SugarliciousComplicationIds.RESERVOIR
+            ProviderKind.SENSOR_AGE -> SugarliciousComplicationIds.SENSOR_AGE
+            ProviderKind.TIR -> SugarliciousComplicationIds.TIR
+            ProviderKind.GRAPH -> SugarliciousComplicationIds.GRAPH
+            else -> null
+        }
+
+    override fun onComplicationActivated(complicationInstanceId: Int, type: ComplicationType) {
+        super.onComplicationActivated(complicationInstanceId, type)
+        ActiveComplicationRegistry.activate(this, complicationInstanceId, catalogId)
+    }
+
+    override fun onComplicationDeactivated(complicationInstanceId: Int) {
+        ActiveComplicationRegistry.deactivate(this, complicationInstanceId)
+        super.onComplicationDeactivated(complicationInstanceId)
+    }
+
     override fun getPreviewData(type: ComplicationType): ComplicationData =
         build(type, preview())
 
     override suspend fun onComplicationRequest(
         request: ComplicationRequest,
-    ): ComplicationData =
-        build(request.complicationType, TherapyStateStore(this).state.first())
+    ): ComplicationData {
+        ActiveComplicationRegistry.activate(this, request.complicationInstanceId, catalogId)
+        return build(request.complicationType, TherapyStateStore(this).state.first())
+    }
 
     private fun build(
         type: ComplicationType,
@@ -128,132 +167,59 @@ abstract class TherapyComplicationService(
             ?.let { timeAgo(it, now) }
             ?: DASH
 
-        val pair: Pair<String, String> = when (kind) {
-            ProviderKind.GLUCOSE ->
-                glucoseText to "Glucose"
-
-            ProviderKind.TREND_ONLY ->
-                trendText.ifBlank { DASH } to "Trend"
-
-            ProviderKind.DELTA_ONLY ->
-                deltaText.ifBlank { DASH } to "Delta"
-
-            ProviderKind.GLUCOSE_PLUS_DELTA ->
-                "$glucoseText ${deltaText.ifBlank { DASH }}" to "Glucose + Delta"
-
-            ProviderKind.GLUCOSE_TREND_DELTA_AGE ->
-                "$glucoseText$trendText ${deltaText.ifBlank { DASH }} $ageText" to "Glucose + Trend + Delta + Zeit"
-
-            ProviderKind.GLUCOSE_TREND_AGE ->
-                "$glucoseText$trendText $ageText" to "Glucose + Trend + Zeit"
-
-            ProviderKind.SENSOR_AGE ->
-                DASH to "Sensoralter"
-
-            ProviderKind.TIR ->
-                tirText(state, now) to "TIR 70–180"
-
-            ProviderKind.GLUCOSE_TREND ->
-                "$glucoseText$trendText" to "Glucose"
-
-            ProviderKind.GLUCOSE_DELTA ->
-                "$ageText · ${deltaText.ifBlank { DASH }}" to "Zeit + Delta"
-
-            ProviderKind.GLUCOSE_TREND_DELTA ->
-                "$glucoseText$trendText ${deltaText.ifBlank { DASH }}" to "Glucose + Trend + Delta"
-
-            ProviderKind.GLUCOSE_AGE ->
-                ageText to freshnessLabel(freshness)
-
-            ProviderKind.GLUCOSE_RANGE ->
-                glucoseText to displayRange(glucose, displayable)
-
-            ProviderKind.IOB ->
-                units(therapyState?.insulin?.totalIob, "U", 2) to "IOB"
-
-            ProviderKind.BOLUS_IOB ->
-                units(therapyState?.insulin?.bolusIob, "U", 2) to "Bolus IOB"
-
-            ProviderKind.BASAL_IOB ->
-                units(therapyState?.insulin?.basalIob, "U", 2) to "Basal IOB"
-
-            ProviderKind.COB ->
-                units(therapyState?.carbs?.cobGrams, "g", 0) to "COB"
-
-            ProviderKind.IOB_COB ->
-                "${units(therapyState?.insulin?.totalIob, "U", 1)} " +
-                    units(therapyState?.carbs?.cobGrams, "g", 0) to "IOB · COB"
-
-            ProviderKind.IOB_COB_BASAL ->
-                "${units(therapyState?.insulin?.totalIob, "U", 1)} · ${units(therapyState?.carbs?.cobGrams, "g", 0)}" to
-                    "Basal ${units(therapyState?.basal?.currentUnitsPerHour, "U/h", 2)}"
-
-            ProviderKind.BASAL ->
-                units(therapyState?.basal?.currentUnitsPerHour, "U/h", 2) to "Basal"
-
-            ProviderKind.TEMP_BASAL ->
-                (
-                    therapyState?.basal?.displayText
-                        ?: therapyState?.basal?.tempPercent?.let { "$it%" }
-                        ?: units(
-                            therapyState?.basal?.tempAbsoluteUnitsPerHour,
-                            "U/h",
-                            2,
-                        )
-                    ) to "Temp basal"
-
-            ProviderKind.TEMP_TARGET ->
-                target(
-                    therapyState?.target,
-                    glucose?.displayUnit ?: GlucoseUnit.MG_DL,
-                ) to "Target"
-
-            ProviderKind.LOOP ->
-                loopLabel(therapyState?.loop?.status) to "Loop"
-
-            ProviderKind.LOOP_LAST ->
-                timeAgo(therapyState?.loop?.lastRunAtEpochMs, now) to "Last loop"
-
-            ProviderKind.PROFILE ->
-                (therapyState?.profile?.name ?: DASH) to "Profile"
-
-            ProviderKind.RESERVOIR ->
-                units(therapyState?.pump?.reservoirUnits, "U", 0) to "Pumpe ${therapyState?.pump?.status ?: DASH}"
-
-            ProviderKind.PUMP_BATTERY ->
-                percent(therapyState?.pump?.batteryPercent) to "Pump battery"
-
-            ProviderKind.PHONE_BATTERY ->
-                percent(therapyState?.device?.phoneBatteryPercent) to "Phone battery"
-
-            ProviderKind.SOURCE ->
-                when (state?.source) {
-                    DataSourceId.ANDROID_APS -> "Loop-Daten"
-                    DataSourceId.XDRIP_PLUS -> "xDrip+"
-                    null -> "No data"
-                } to freshnessLabel(freshness)
-
-            ProviderKind.AAPS_STATUS ->
-                "$glucoseText$trendText" to compactTherapyStatus(therapyState)
-
-            ProviderKind.LONG_STATUS ->
-                longStatus(
-                    glucoseText = glucoseText,
-                    trendText = trendText,
-                    deltaText = deltaText,
-                    ageText = ageText,
-                    state = therapyState,
-                    freshness = freshness,
-                ) to "Sugarlicious"
-
-            ProviderKind.GLUCOSE_IMAGE,
-            ProviderKind.GRAPH,
-            ProviderKind.GRAPH_LARGE,
-            ProviderKind.GLUCOSE_RANGED ->
-                glucoseText to "Glucose"
+        val presentationId = when (kind) {
+            ProviderKind.GLUCOSE -> SugarliciousComplicationIds.GLUCOSE
+            ProviderKind.TREND_ONLY -> SugarliciousComplicationIds.TREND_ONLY
+            ProviderKind.DELTA_ONLY -> SugarliciousComplicationIds.DELTA_ONLY
+            ProviderKind.GLUCOSE_PLUS_DELTA -> SugarliciousComplicationIds.GLUCOSE_PLUS_DELTA
+            ProviderKind.GLUCOSE_TREND_DELTA_AGE -> SugarliciousComplicationIds.GLUCOSE_TREND_DELTA_AGE
+            ProviderKind.GLUCOSE_TREND_AGE -> SugarliciousComplicationIds.GLUCOSE_TREND_AGE
+            ProviderKind.SENSOR_AGE -> SugarliciousComplicationIds.SENSOR_AGE
+            ProviderKind.TIR -> SugarliciousComplicationIds.TIR
+            ProviderKind.GLUCOSE_TREND -> SugarliciousComplicationIds.GLUCOSE_TREND
+            ProviderKind.GLUCOSE_DELTA -> SugarliciousComplicationIds.TIME_DELTA
+            ProviderKind.GLUCOSE_TREND_DELTA -> SugarliciousComplicationIds.GLUCOSE_TREND_DELTA
+            ProviderKind.GLUCOSE_AGE -> SugarliciousComplicationIds.GLUCOSE_AGE
+            ProviderKind.IOB -> SugarliciousComplicationIds.IOB
+            ProviderKind.COB -> SugarliciousComplicationIds.COB
+            ProviderKind.IOB_COB_BASAL -> SugarliciousComplicationIds.IOB_COB_BASAL
+            ProviderKind.BASAL -> SugarliciousComplicationIds.BASAL
+            ProviderKind.LOOP -> SugarliciousComplicationIds.LOOP
+            ProviderKind.RESERVOIR -> SugarliciousComplicationIds.RESERVOIR
+            else -> null
+        }
+        val presentation = presentationId?.let {
+            ComplicationPresentationFormatter.format(it, state, now)
         }
 
-        val description = PlainComplicationText.Builder(pair.second).build()
+        val pair: Pair<String, String> = presentation?.let {
+            it.text to (it.title ?: it.contentDescription)
+        } ?: when (kind) {
+            ProviderKind.BOLUS_IOB -> units(therapyState?.insulin?.bolusIob, "U", 2) to "Bolus IOB"
+            ProviderKind.BASAL_IOB -> units(therapyState?.insulin?.basalIob, "U", 2) to "Basal IOB"
+            ProviderKind.IOB_COB -> "${units(therapyState?.insulin?.totalIob, "U", 1)} ${units(therapyState?.carbs?.cobGrams, "g", 0)}" to "IOB · COB"
+            ProviderKind.TEMP_BASAL -> (therapyState?.basal?.displayText ?: therapyState?.basal?.tempPercent?.let { "$it%" } ?: units(therapyState?.basal?.tempAbsoluteUnitsPerHour, "U/h", 2)) to "Temp basal"
+            ProviderKind.TEMP_TARGET -> target(therapyState?.target, glucose?.displayUnit ?: GlucoseUnit.MG_DL) to "Target"
+            ProviderKind.LOOP_LAST -> timeAgo(therapyState?.loop?.lastRunAtEpochMs, now) to "Last loop"
+            ProviderKind.PROFILE -> (therapyState?.profile?.name ?: DASH) to "Profile"
+            ProviderKind.PUMP_BATTERY -> percent(therapyState?.pump?.batteryPercent) to "Pump battery"
+            ProviderKind.PHONE_BATTERY -> percent(therapyState?.device?.phoneBatteryPercent) to "Phone battery"
+            ProviderKind.SOURCE -> when (state?.source) {
+                DataSourceId.ANDROID_APS -> "AndroidAPS"
+                DataSourceId.XDRIP_PLUS -> "xDrip+"
+                null -> "No data"
+            } to freshnessLabel(freshness)
+            ProviderKind.AAPS_STATUS -> "$glucoseText$trendText" to compactTherapyStatus(therapyState)
+            ProviderKind.LONG_STATUS -> longStatus(glucoseText, trendText, deltaText, ageText, therapyState, freshness) to "Sugarlicious"
+            ProviderKind.GLUCOSE_RANGE -> glucoseText to displayRange(glucose, displayable)
+            ProviderKind.GLUCOSE_RANGED,
+            ProviderKind.GLUCOSE_IMAGE,
+            ProviderKind.GRAPH,
+            ProviderKind.GRAPH_LARGE -> glucoseText to "Glucose"
+            else -> DASH to "Sugarlicious"
+        }
+
+        val description = PlainComplicationText.Builder(presentation?.contentDescription ?: pair.second).build()
         val tap = PendingIntent.getActivity(
             this,
             kind.ordinal,
@@ -363,10 +329,13 @@ abstract class TherapyComplicationService(
                         )
                         .setTapAction(tap)
 
-                    if (exposesTrend) {
+                    presentation?.title?.let { title ->
                         builder.setTitle(
-                            PlainComplicationText.Builder(trendValue).build(),
+                            PlainComplicationText.Builder(title).build(),
                         )
+                    }
+                    presentation?.trend?.let { trend ->
+                        TrendComplicationIcon.monochromaticImage(this, trend)?.let(builder::setMonochromaticImage)
                     }
 
                     return builder.build()
@@ -462,21 +431,28 @@ abstract class TherapyComplicationService(
             kind == ProviderKind.LONG_STATUS ||
             type == ComplicationType.LONG_TEXT
         ) {
-            return LongTextComplicationData.Builder(
-                PlainComplicationText.Builder(pair.first).build(),
+            val builder = LongTextComplicationData.Builder(
+                PlainComplicationText.Builder(presentation?.text ?: pair.first).build(),
                 description,
-            )
-                .setTitle(PlainComplicationText.Builder(pair.second).build())
-                .setTapAction(tap)
-                .build()
+            ).setTapAction(tap)
+            (presentation?.title ?: pair.second.takeIf { presentation == null })?.let {
+                builder.setTitle(PlainComplicationText.Builder(it).build())
+            }
+            presentation?.trend?.let { trend ->
+                TrendComplicationIcon.monochromaticImage(this, trend)?.let(builder::setMonochromaticImage)
+            }
+            return builder.build()
         }
 
         val shortBuilder = ShortTextComplicationData.Builder(
-            PlainComplicationText.Builder(pair.first.take(24)).build(),
+            PlainComplicationText.Builder((presentation?.text ?: pair.first).take(16)).build(),
             description,
         ).setTapAction(tap)
-        if (kind == ProviderKind.IOB_COB_BASAL || kind == ProviderKind.RESERVOIR) {
-            shortBuilder.setTitle(PlainComplicationText.Builder(pair.second.take(24)).build())
+        (presentation?.title ?: pair.second.takeIf { presentation == null && (kind == ProviderKind.IOB_COB_BASAL || kind == ProviderKind.RESERVOIR) })?.let {
+            shortBuilder.setTitle(PlainComplicationText.Builder(it.take(16)).build())
+        }
+        presentation?.trend?.let { trend ->
+            TrendComplicationIcon.monochromaticImage(this, trend)?.let(shortBuilder::setMonochromaticImage)
         }
         return shortBuilder.build()
     }
@@ -569,17 +545,8 @@ abstract class TherapyComplicationService(
         }
         canvas.drawRoundRect(0f, 0f, width.toFloat(), height.toFloat(), 22f, 22f, backgroundPaint)
 
-        fun glucoseRatio(valueMgDl: Double): Double {
-            val value = valueMgDl.coerceIn(0.0, 400.0)
-            return when {
-                value <= 80.0 -> 0.055 + value / 80.0 * (0.215 - 0.055)
-                value <= 160.0 -> 0.215 + (value - 80.0) / 80.0 * (0.515 - 0.215)
-                else -> 0.515 + (value - 160.0) / (400.0 - 160.0) * (1.0 - 0.515)
-            }.coerceIn(0.055, 1.0)
-        }
-
         fun yFor(valueMgDl: Double): Float =
-            plotBottom - (glucoseRatio(valueMgDl) * plotHeight).toFloat()
+            plotBottom - (GlucoseGraphScale.ratio(valueMgDl) * plotHeight).toFloat()
 
         val targetPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = colors.rangeInRange

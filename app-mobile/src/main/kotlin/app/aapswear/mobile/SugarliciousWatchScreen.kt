@@ -74,7 +74,9 @@ internal fun SugarliciousWatchScreen(
     onNavigate: (DashboardScreen) -> Unit,
 ) {
     val context = LocalContext.current
-    var activePreset by remember { mutableStateOf(loadComplicationPreset(context)) }
+    val runtimeStatus = remember { WatchRuntimeStatusStore.read(context) }
+    var activePreset by remember { mutableStateOf(runtimeStatus.activeComplicationIds.ifEmpty { loadComplicationPreset(context) }) }
+    var activeFaceIndex by remember { mutableStateOf(runtimeStatus.activeSugarliciousFaceIndex ?: preferences.watchFaceIndex) }
     Column(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 2.dp, vertical = 4.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -91,8 +93,8 @@ internal fun SugarliciousWatchScreen(
                         index = index,
                         state = state,
                         activeComplicationIds = activePreset,
-                        selected = preferences.watchFaceIndex == index,
-                        onSelected = { onSelectedFace(index) },
+                        selected = activeFaceIndex == index,
+                        onSelected = { activeFaceIndex = index; onSelectedFace(index) },
                     )
                 }
 

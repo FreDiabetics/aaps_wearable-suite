@@ -77,7 +77,7 @@ class PersistentBridgeServiceTest {
         val notification = shadowOf(manager).getNotification(PersistentBridgeService.NOTIFICATION_ID)
         val content = notification.extras.getCharSequence(Notification.EXTRA_TEXT).toString()
 
-        assertEquals("123 →", notification.extras.getCharSequence(Notification.EXTRA_TITLE).toString())
+        assertEquals("123", notification.extras.getCharSequence(Notification.EXTRA_TITLE).toString())
         assertTrue(notification.extras.getBoolean(PersistentBridgeService.EXTRA_REQUEST_PROMOTED_ONGOING))
         assertTrue(content.contains("mg/dL"))
         assertNull(notification.getLargeIcon())

@@ -9,6 +9,7 @@ import app.aapswear.protocol.WatchGlucoseUnit
 import app.aapswear.protocol.WearProtocol
 import app.aapswear.protocol.WatchGraphColors
 import app.aapswear.protocol.WatchGraphStyle
+import app.aapswear.protocol.WatchUiColors
 import app.aapswear.mobile.ui.theme.SugarliciousColorRole
 import app.aapswear.mobile.ui.theme.SugarliciousColorStore
 import app.aapswear.storage.TherapyStateStore
@@ -55,6 +56,10 @@ class MobileDataLayerService : WearableListenerService() {
                     ).show()
                 }
             }
+            WearProtocol.WATCH_RUNTIME_STATUS_PATH -> {
+                runCatching { WearProtocol.decodeRuntimeStatus(event.data) }
+                    .onSuccess { WatchRuntimeStatusStore.save(applicationContext, it) }
+            }
         }
     }
 
@@ -84,7 +89,7 @@ internal fun readWatchConfig(context: Context): WatchConfig {
         graphHours =
             preferences
                 .getInt("graphHours", 3)
-                .takeIf { it in listOf(3, 6, 12, 24) }
+                .takeIf { it in listOf(1, 2, 3, 6, 12, 24) }
                 ?: 3,
         showPredictions =
             listOf(
@@ -109,7 +114,8 @@ internal fun readWatchConfig(context: Context): WatchConfig {
             predictionCob = palette.argb(SugarliciousColorRole.PREDICTION_COB),
             predictionUam = palette.argb(SugarliciousColorRole.PREDICTION_UAM),
             predictionZeroTemp = palette.argb(SugarliciousColorRole.PREDICTION_ZERO_TEMP),
-        ),        graphStyle = WatchGraphStyle(
+        ),
+        graphStyle = WatchGraphStyle(
             cgmDotRadiusDp =
                 preferences
                     .getFloat("cgm.dotRadiusDp", 2.4f)
@@ -123,6 +129,19 @@ internal fun readWatchConfig(context: Context): WatchConfig {
                 preferences
                     .getFloat("cgm.dotOutlineWidthDp", 0.95f)
                     .coerceIn(0.25f, 3.0f),
+        ),
+        uiColors = WatchUiColors(
+            background = palette.argb(SugarliciousColorRole.BACKGROUND),
+            tileBackground = palette.argb(SugarliciousColorRole.SURFACE),
+            tileBorder = palette.argb(SugarliciousColorRole.BORDER),
+            textPrimary = palette.argb(SugarliciousColorRole.TEXT_PRIMARY),
+            textSecondary = palette.argb(SugarliciousColorRole.TEXT_SECONDARY),
+            accent = palette.argb(SugarliciousColorRole.PRIMARY),
+            glucoseLow = palette.argb(SugarliciousColorRole.GLUCOSE_LOW),
+            glucoseInRange = palette.argb(SugarliciousColorRole.GLUCOSE_IN_RANGE),
+            glucoseHigh = palette.argb(SugarliciousColorRole.GLUCOSE_HIGH),
+            iob = palette.argb(SugarliciousColorRole.BLUE),
+            cob = palette.argb(SugarliciousColorRole.ORANGE),
         ),
 
         sentAtEpochMs = System.currentTimeMillis(),
@@ -144,4 +163,12 @@ internal suspend fun publishWatchConfig(context: Context) {
         .getDataClient(context)
         .putDataItem(request)
         .await()
+}
+
+internal suspend fun requestWatchRuntimeStatus(context: Context) {
+    Wearable.getNodeClient(context).connectedNodes.await().forEach { node ->
+        Wearable.getMessageClient(context)
+            .sendMessage(node.id, WearProtocol.WATCH_RUNTIME_REQUEST_PATH, byteArrayOf())
+            .await()
+    }
 }

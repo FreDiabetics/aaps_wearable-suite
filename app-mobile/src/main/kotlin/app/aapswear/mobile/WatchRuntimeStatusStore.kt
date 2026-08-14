@@ -1,0 +1,30 @@
+package app.aapswear.mobile
+
+import android.content.Context
+import app.aapswear.protocol.WatchRuntimeStatus
+
+internal object WatchRuntimeStatusStore {
+    private const val PREFS = "watch_runtime_status"
+    private const val FACE = "active_face"
+    private const val IDS = "active_complications"
+    private const val SENT = "sent_at"
+
+    fun save(context: Context, status: WatchRuntimeStatus) {
+        val activeFaceIndex = status.activeSugarliciousFaceIndex
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+            .apply {
+                if (activeFaceIndex == null) remove(FACE)
+                else putInt(FACE, activeFaceIndex)
+            }
+            .putString(IDS, status.activeComplicationIds.joinToString(","))
+            .putLong(SENT, status.sentAtEpochMs)
+            .apply()
+    }
+
+    fun read(context: Context): WatchRuntimeStatus {
+        val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        val face = if (prefs.contains(FACE)) prefs.getInt(FACE, 0).coerceIn(0, 3) else null
+        val ids = prefs.getString(IDS, "").orEmpty().split(',').mapNotNull(String::toIntOrNull).distinct()
+        return WatchRuntimeStatus(face, ids, prefs.getLong(SENT, 0L))
+    }
+}

@@ -3,8 +3,10 @@ package app.aapswear.wear
 import android.content.ComponentName
 import android.content.Context
 import androidx.wear.watchface.complications.datasource.ComplicationDataSourceUpdateRequester
+import app.aapswear.complications.ActiveComplicationRegistry
 import app.aapswear.complications.AllProviders
 import app.aapswear.model.GlucoseSample
+import app.aapswear.protocol.WatchRuntimeStatus
 import app.aapswear.protocol.WearProtocol
 import app.aapswear.storage.TherapyStateStore
 import com.google.android.gms.wearable.DataEvent
@@ -40,30 +42,39 @@ class StateDataLayerService : WearableListenerService() {
             if (event.type != DataEvent.TYPE_CHANGED) return@forEach
 
             when (event.dataItem.uri.path) {
-                WearProtocol.COMPLICATION_PRESET_PATH -> {
+                WearProtocol.COMPLICATION_PRESET_PATH ->
                     persistComplicationPreset(event)
-                }
 
-                WearProtocol.WATCH_CONFIG_PATH -> {
+                WearProtocol.WATCH_CONFIG_PATH ->
                     persistWatchConfig(event)
-                }
 
-                WearProtocol.STATE_PATH -> {
+                WearProtocol.STATE_PATH ->
                     persistTherapyState(event)
-                }
             }
         }
     }
 
-    override fun onMessageReceived(
-        event: MessageEvent,
-    ) {
-        if (event.path != WearProtocol.WATCH_FACE_APPLY_PATH) return
+    override fun onMessageReceived(event: MessageEvent) {
+        when (event.path) {
+            WearProtocol.WATCH_FACE_APPLY_PATH ->
+                applyWatchFace(event)
 
+            WearProtocol.WATCH_RUNTIME_REQUEST_PATH ->
+                scope.launch {
+                    sendRuntimeStatus(
+                        applicationContext,
+                        event.sourceNodeId,
+                    )
+                }
+        }
+    }
+
+    private fun applyWatchFace(event: MessageEvent) {
         val index =
             event.data
                 .decodeToString()
                 .toIntOrNull()
+                ?.coerceIn(0, 3)
                 ?: return
 
         val appContext = applicationContext
@@ -87,29 +98,61 @@ class StateDataLayerService : WearableListenerService() {
                         )
                         .await()
                 }
+
+                runCatching {
+                    sendRuntimeStatus(
+                        appContext,
+                        sourceNodeId,
+                    )
+                }
             }
         }
     }
+
     private fun persistComplicationPreset(event: DataEvent) {
-        val dataMap = runCatching {
-            DataMapItem.fromDataItem(event.dataItem).dataMap
-        }.getOrNull() ?: return
-        val ids = dataMap.getIntegerArrayList("ids").orEmpty()
-            .filter { it in 1..36 }
-            .distinct()
-            .take(MAX_PRESET_ITEMS)
-        val graphHours = dataMap.getInt("graphHours", 3)
-            .takeIf { it in listOf(1, 2, 6, 12, 24) }
-            ?: 3
-        getSharedPreferences(COMPLICATION_SETUP_PREFS, Context.MODE_PRIVATE)
+        val dataMap =
+            runCatching {
+                DataMapItem.fromDataItem(event.dataItem).dataMap
+            }.getOrNull() ?: return
+        val ids =
+            dataMap
+                .getIntegerArrayList("ids")
+                .orEmpty()
+                .filter { it in 1..36 }
+                .distinct()
+                .take(MAX_PRESET_ITEMS)
+        val graphHours =
+            dataMap
+                .getInt("graphHours", 3)
+                .takeIf { it in WearDisplayPreferences.allowedGraphHours }
+                ?: 3
+
+        getSharedPreferences(
+            COMPLICATION_SETUP_PREFS,
+            Context.MODE_PRIVATE,
+        )
             .edit()
-            .putString(COMPLICATION_PRESET_KEY, ids.joinToString(","))
-            .putInt(COMPLICATION_GRAPH_HOURS_KEY, graphHours)
+            .putString(
+                COMPLICATION_PRESET_KEY,
+                ids.joinToString(","),
+            )
+            .putInt(
+                COMPLICATION_GRAPH_HOURS_KEY,
+                graphHours,
+            )
             .apply()
-        getSharedPreferences(WearDisplayPreferences.PREFS, Context.MODE_PRIVATE)
+
+        getSharedPreferences(
+            WearDisplayPreferences.PREFS,
+            Context.MODE_PRIVATE,
+        )
             .edit()
-            .putInt("complication_graph_hours", graphHours)
+            .putInt(
+                "complication_graph_hours",
+                graphHours,
+            )
             .apply()
+
         requestAllComplicationUpdates()
     }
 
@@ -189,6 +232,32 @@ class StateDataLayerService : WearableListenerService() {
         }
     }
 
+    private suspend fun sendRuntimeStatus(
+        context: Context,
+        nodeId: String,
+    ) {
+        val status =
+            WatchRuntimeStatus(
+                activeSugarliciousFaceIndex =
+                    SugarliciousWatchFacePush
+                        .activeFaceIndex(context),
+                activeComplicationIds =
+                    ActiveComplicationRegistry
+                        .activeCatalogIds(context),
+                sentAtEpochMs =
+                    System.currentTimeMillis(),
+            )
+
+        Wearable
+            .getMessageClient(context)
+            .sendMessage(
+                nodeId,
+                WearProtocol.WATCH_RUNTIME_STATUS_PATH,
+                WearProtocol.encodeRuntimeStatus(status),
+            )
+            .await()
+    }
+
     private fun requestAllComplicationUpdates() {
         AllProviders.classes.forEach { provider ->
             ComplicationDataSourceUpdateRequester
@@ -207,7 +276,9 @@ class StateDataLayerService : WearableListenerService() {
 
     companion object {
         private val watchFacePushScope =
-            CoroutineScope(SupervisorJob() + Dispatchers.IO)
+            CoroutineScope(
+                SupervisorJob() + Dispatchers.IO,
+            )
         private val watchFacePushMutex = Mutex()
 
         private const val HISTORY_WINDOW_MS =
