@@ -17,6 +17,7 @@ import app.aapswear.model.TherapyDisplayState
 import app.aapswear.protocol.WatchGraphColors
 import app.aapswear.protocol.WatchGraphStyle
 import kotlin.math.max
+import kotlin.math.roundToInt
 
 @SuppressLint("DrawAllocation")
 class WearGlucoseChart @JvmOverloads constructor(
@@ -361,8 +362,7 @@ class WearGlucoseChart @JvmOverloads constructor(
             else -> colors.cgmInRange
         }
 
-    private fun Double.roundForLabel(): String =
-        kotlin.math.roundToInt(this).toString()
+    private fun Double.roundForLabel(): String = roundToInt().toString()
 
     private val Float.dp: Float
         get() = this * density
