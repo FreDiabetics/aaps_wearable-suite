@@ -1,5 +1,7 @@
 package app.aapswear.mobile
 
+import java.util.Calendar
+import java.util.TimeZone
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -19,15 +21,26 @@ class OverviewWatchFaceTileTest {
     }
 
     @Test
-    fun `only the centered carousel face is visible and preview hands stay fixed`() {
+    fun `only the centered carousel face is visible`() {
         assertEquals(1f, carouselPageVisibility(0f))
         assertEquals(1f, carouselPageVisibility(0.5f))
         assertEquals(0f, carouselPageVisibility(0.5001f))
         assertEquals(0f, carouselPageVisibility(1f))
+    }
 
-        assertEquals(300.0, CAROUSEL_PREVIEW_HOUR_ANGLE, 0.0)
-        assertEquals(60.0, CAROUSEL_PREVIEW_MINUTE_ANGLE, 0.0)
-        assertEquals(180.0, CAROUSEL_PREVIEW_SECOND_ANGLE, 0.0)
+    @Test
+    fun `preview hand angles follow wall clock time`() {
+        val utc = TimeZone.getTimeZone("UTC")
+        val calendar = Calendar.getInstance(utc).apply {
+            set(2026, Calendar.AUGUST, 14, 10, 10, 30)
+            set(Calendar.MILLISECOND, 0)
+        }
+
+        val angles = watchPreviewHandAngles(calendar.timeInMillis, utc)
+
+        assertEquals(305.25f, angles.hour, 0.001f)
+        assertEquals(63f, angles.minute, 0.001f)
+        assertEquals(180f, angles.second, 0.001f)
     }
 
     @Test
