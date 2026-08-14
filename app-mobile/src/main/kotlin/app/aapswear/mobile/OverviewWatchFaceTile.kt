@@ -1,8 +1,11 @@
 package app.aapswear.mobile
 
-import androidx.compose.foundation.background
+import android.content.Context
+import android.graphics.BitmapFactory
+import android.util.Base64
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Arrangement
@@ -35,12 +38,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.drawscope.withTransform
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -50,14 +53,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.util.lerp
 import app.aapswear.mobile.ui.theme.SugarliciousColors
+import app.aapswear.model.TherapyDisplayFormatter
 import app.aapswear.model.TherapyDisplayState
 import app.aapswear.model.Trend
-import app.aapswear.model.TherapyDisplayFormatter
-import android.content.Context
-import android.graphics.BitmapFactory
-import android.util.Base64
 import java.util.Calendar
-import java.util.Locale
 import java.util.TimeZone
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -69,12 +68,14 @@ import kotlin.math.cos
 import kotlin.math.roundToInt
 import kotlin.math.sin
 
-internal val sugarliciousWatchFaceNames = listOf(
-    "Sugarlicious Analog",
-    "Sugarlicious Orbit",
-    "Sugarlicious Rings",
-    "Sugarlicious Graph",
-)
+internal val sugarliciousWatchFaceNames =
+    listOf(
+        "Sugarlicious Analog",
+        "Sugarlicious Orbit",
+        "Sugarlicious Rings",
+        "Sugarlicious Graph",
+    )
+
 private const val carouselPages = 400
 private val carouselHeight = 224.dp
 private val carouselFaceSize = 135.dp
@@ -83,6 +84,7 @@ private val carouselFaceVerticalOffset = (-7).dp
 
 private object GalaxyWatchUltraFrameLoader {
     private val mutex = Mutex()
+
     @Volatile
     private var cached: androidx.compose.ui.graphics.ImageBitmap? = null
 
@@ -92,9 +94,11 @@ private object GalaxyWatchUltraFrameLoader {
         cached?.let { return it }
         return mutex.withLock {
             cached ?: withContext(Dispatchers.IO) {
-                val svg = context.resources.openRawResource(R.raw.galaxy_watch_ultra_mockup_exact)
-                    .bufferedReader()
-                    .use { reader -> reader.readText() }
+                val svg =
+                    context.resources
+                        .openRawResource(R.raw.galaxy_watch_ultra_mockup_exact)
+                        .bufferedReader()
+                        .use { reader -> reader.readText() }
                 val marker = "data:image/png;base64,"
                 val start = svg.indexOf(marker)
                 if (start < 0) return@withContext null
@@ -102,25 +106,33 @@ private object GalaxyWatchUltraFrameLoader {
                 val dataEnd = svg.indexOf('"', dataStart)
                 if (dataEnd <= dataStart) return@withContext null
                 val bytes = Base64.decode(svg.substring(dataStart, dataEnd), Base64.DEFAULT)
-                if (bytes.size < 8 ||
-                    bytes[0] != 0x89.toByte() || bytes[1] != 0x50.toByte() ||
-                    bytes[2] != 0x4e.toByte() || bytes[3] != 0x47.toByte()
+                if (
+                    bytes.size < 8 ||
+                    bytes[0] != 0x89.toByte() ||
+                    bytes[1] != 0x50.toByte() ||
+                    bytes[2] != 0x4e.toByte() ||
+                    bytes[3] != 0x47.toByte()
                 ) {
                     return@withContext null
                 }
-                val options = BitmapFactory.Options().apply {
-                    inSampleSize = 2
-                    inPreferredConfig = android.graphics.Bitmap.Config.ARGB_8888
-                }
-                BitmapFactory.decodeByteArray(bytes, 0, bytes.size, options)?.also { bitmap ->
-                    bitmap.prepareToDraw()
-                }?.asImageBitmap()
+                val options =
+                    BitmapFactory.Options().apply {
+                        inSampleSize = 2
+                        inPreferredConfig = android.graphics.Bitmap.Config.ARGB_8888
+                    }
+                BitmapFactory.decodeByteArray(bytes, 0, bytes.size, options)
+                    ?.also { bitmap -> bitmap.prepareToDraw() }
+                    ?.asImageBitmap()
             }.also { decoded -> cached = decoded }
         }
     }
 }
 
-internal fun carouselTargetPage(currentPage: Int, dragDistance: Float, pageCount: Int = carouselPages): Int {
+internal fun carouselTargetPage(
+    currentPage: Int,
+    dragDistance: Float,
+    pageCount: Int = carouselPages,
+): Int {
     if (abs(dragDistance) < 24f) return currentPage.coerceIn(0, pageCount - 1)
     val direction = if (dragDistance < 0f) 1 else -1
     return (currentPage + direction).coerceIn(0, pageCount - 1)
@@ -139,9 +151,10 @@ internal fun watchPreviewHandAngles(
     epochMs: Long,
     timeZone: TimeZone = TimeZone.getDefault(),
 ): WatchPreviewHandAngles {
-    val calendar = Calendar.getInstance(timeZone).apply {
-        timeInMillis = epochMs
-    }
+    val calendar =
+        Calendar.getInstance(timeZone).apply {
+            timeInMillis = epochMs
+        }
     val seconds =
         calendar.get(Calendar.SECOND) +
             calendar.get(Calendar.MILLISECOND) / 1_000f
@@ -170,62 +183,73 @@ internal fun OverviewWatchFaceTile(
 ) {
     val context = LocalContext.current
     val runtime = WatchRuntimeStatusStore.read(context)
-    val activeComplicationIds = runtime.activeComplicationIds.ifEmpty { loadComplicationPreset(context) }
+    val activeComplicationIds =
+        runtime.activeComplicationIds.ifEmpty {
+            loadComplicationPreset(context)
+        }
     val effectiveFaceIndex = runtime.activeSugarliciousFaceIndex ?: selectedFaceIndex
     val selected = effectiveFaceIndex.coerceIn(0, sugarliciousWatchFaceNames.lastIndex)
     val faceSize = if (compactLayout) 104.dp else carouselFaceSize
     val frameHeight = if (compactLayout) 154.dp else carouselHeight
     val midpoint = carouselPages / 2
     val aligned = midpoint - midpoint % sugarliciousWatchFaceNames.size
-    val pager = rememberPagerState(initialPage = aligned + selected, pageCount = { carouselPages })
+    val pager =
+        rememberPagerState(
+            initialPage = aligned + selected,
+            pageCount = { carouselPages },
+        )
     val carouselScope = rememberCoroutineScope()
+
     LaunchedEffect(pager.settledPage) {
         val index = pager.settledPage % sugarliciousWatchFaceNames.size
         if (index != selected) onSelectedFace(index)
     }
 
     val syncStatus = diagnostics.syncStatus
-    val connected =
-        diagnostics.reachableWatches > 0 ||
-            syncStatus == "ok"
-    val pending =
-        !connected &&
-            syncStatus == "pending"
-    val error =
-        syncStatus !in listOf(
-            null,
-            "ok",
-            "pending",
-        )
+    val connected = diagnostics.reachableWatches > 0 || syncStatus == "ok"
+    val pending = !connected && syncStatus == "pending"
+    val error = syncStatus !in listOf(null, "ok", "pending")
 
     Column(
-        modifier = Modifier.fillMaxWidth().padding(top = 2.dp, bottom = 5.dp),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(top = 2.dp, bottom = 5.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(3.dp),
     ) {
         BoxWithConstraints(
-            Modifier.fillMaxWidth().height(frameHeight).clipToBounds(),
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .height(frameHeight)
+                    .clipToBounds(),
             contentAlignment = Alignment.Center,
         ) {
-            val oneStepSwipe = Modifier.pointerInput(pager.settledPage) {
-                var dragDistance = 0f
-                detectHorizontalDragGestures(
-                    onDragStart = { dragDistance = 0f },
-                    onHorizontalDrag = { change, amount ->
-                        dragDistance += amount
-                        change.consume()
-                    },
-                    onDragEnd = {
-                        val target = carouselTargetPage(pager.settledPage, dragDistance)
-                        if (target != pager.settledPage) {
-                            carouselScope.launch { pager.animateScrollToPage(target) }
-                        }
-                    },
-                    onDragCancel = { dragDistance = 0f },
-                )
-            }
+            val oneStepSwipe =
+                Modifier.pointerInput(pager.settledPage) {
+                    var dragDistance = 0f
+                    detectHorizontalDragGestures(
+                        onDragStart = { dragDistance = 0f },
+                        onHorizontalDrag = { change, amount ->
+                            dragDistance += amount
+                            change.consume()
+                        },
+                        onDragEnd = {
+                            val target = carouselTargetPage(pager.settledPage, dragDistance)
+                            if (target != pager.settledPage) {
+                                carouselScope.launch {
+                                    pager.animateScrollToPage(target)
+                                }
+                            }
+                        },
+                        onDragCancel = { dragDistance = 0f },
+                    )
+                }
             val centeredPadding = ((maxWidth - faceSize) / 2).coerceAtLeast(0.dp)
+
             GalaxyWatchUltraFrame()
+
             HorizontalPager(
                 state = pager,
                 modifier = Modifier.fillMaxSize(),
@@ -237,19 +261,22 @@ internal fun OverviewWatchFaceTile(
             ) { page ->
                 val index = page % sugarliciousWatchFaceNames.size
                 Box(
-                    modifier = Modifier
-                        .offset(y = carouselFaceVerticalOffset)
-                        .graphicsLayer {
-                            val rawDistance = abs(
-                                (pager.currentPage - page) + pager.currentPageOffsetFraction,
-                            )
-                            val distance = rawDistance.coerceIn(0f, 1f)
-                            val scale = lerp(1f, 0.73f, distance)
-                            scaleX = scale
-                            scaleY = scale
-                            alpha = carouselPageVisibility(rawDistance)
-                        }
-                        .clickable(onClick = onEdit),
+                    modifier =
+                        Modifier
+                            .offset(y = carouselFaceVerticalOffset)
+                            .graphicsLayer {
+                                val rawDistance =
+                                    abs(
+                                        (pager.currentPage - page) +
+                                            pager.currentPageOffsetFraction,
+                                    )
+                                val distance = rawDistance.coerceIn(0f, 1f)
+                                val scale = lerp(1f, 0.73f, distance)
+                                scaleX = scale
+                                scaleY = scale
+                                alpha = carouselPageVisibility(rawDistance)
+                            }
+                            .clickable(onClick = onEdit),
                     contentAlignment = Alignment.Center,
                 ) {
                     FaceDial(
@@ -260,11 +287,14 @@ internal fun OverviewWatchFaceTile(
                     )
                 }
             }
+
             if (interactive) {
                 Box(
-                    Modifier.matchParentSize()
-                        .then(oneStepSwipe)
-                        .clickable(onClick = onEdit),
+                    modifier =
+                        Modifier
+                            .matchParentSize()
+                            .then(oneStepSwipe)
+                            .clickable(onClick = onEdit),
                 )
             }
         }
@@ -275,7 +305,7 @@ internal fun OverviewWatchFaceTile(
             verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
             Text(
-                "Galaxy Watch Ultra",
+                text = "Galaxy Watch Ultra",
                 color = SugarliciousColors.TextPrimary,
                 fontSize = 20.sp,
                 fontWeight = FontWeight.Bold,
@@ -283,30 +313,17 @@ internal fun OverviewWatchFaceTile(
 
             val statusColor =
                 when {
-                connected ->
-                    SugarliciousColors.Primary
-
-                pending ->
-                    SugarliciousColors.Yellow
-
-                error ->
-                    SugarliciousColors.Red
-
-                else ->
-                    SugarliciousColors.Red
-            }
-
+                    connected -> SugarliciousColors.Primary
+                    pending -> SugarliciousColors.Yellow
+                    error -> SugarliciousColors.Red
+                    else -> SugarliciousColors.Red
+                }
             val statusText =
                 when {
-                connected ->
-                    "Verbunden"
-
-                pending ->
-                    "Verbindung wird geprüft"
-
-                else ->
-                    "Nicht verbunden"
-            }
+                    connected -> "Verbunden"
+                    pending -> "Verbindung wird geprüft"
+                    else -> "Nicht verbunden"
+                }
 
             Surface(
                 shape = RoundedCornerShape(999.dp),
@@ -323,31 +340,19 @@ internal fun OverviewWatchFaceTile(
                             horizontal = 12.dp,
                             vertical = 6.dp,
                         ),
-                    verticalAlignment =
-                        Alignment.CenterVertically,
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Image(
-                        painter =
-                            painterResource(
-                                R.drawable.ic_watch_status,
-                            ),
+                        painter = painterResource(R.drawable.ic_watch_status),
                         contentDescription = null,
                         modifier =
                             Modifier
                                 .size(14.dp)
-                                .graphicsLayer {
-                                    alpha = 1f
-                                },
+                                .graphicsLayer { alpha = 1f },
                         colorFilter =
-                            androidx.compose.ui.graphics.ColorFilter.tint(
-                                statusColor,
-                            ),
+                            androidx.compose.ui.graphics.ColorFilter.tint(statusColor),
                     )
-
-                    Spacer(
-                        Modifier.width(6.dp),
-                    )
-
+                    Spacer(Modifier.width(6.dp))
                     Text(
                         text = statusText,
                         color = statusColor,
@@ -363,12 +368,13 @@ internal fun OverviewWatchFaceTile(
 @Composable
 private fun GalaxyWatchUltraFrame() {
     val context = LocalContext.current.applicationContext
-    val frame by produceState(
-        initialValue = GalaxyWatchUltraFrameLoader.cachedOrNull(),
-        key1 = context,
-    ) {
-        value = GalaxyWatchUltraFrameLoader.load(context)
-    }
+    val frame by
+        produceState(
+            initialValue = GalaxyWatchUltraFrameLoader.cachedOrNull(),
+            key1 = context,
+        ) {
+            value = GalaxyWatchUltraFrameLoader.load(context)
+        }
     frame?.let { bitmap ->
         Image(
             bitmap = bitmap,
@@ -397,176 +403,86 @@ internal fun FaceDial(
             state?.glucose?.trend ?: Trend.UNKNOWN,
         )
 
-    val previewEpochMs by produceState(System.currentTimeMillis()) {
-        while (true) {
-            value = System.currentTimeMillis()
-            kotlinx.coroutines.delay(1_000L)
+    // The State object is deliberately not read during composition. Its value is read only from
+    // the Canvas draw phase below, so the moving hands invalidate only drawing. Complication labels
+    // and the rest of the mobile preview are not recomposed every second.
+    val previewEpochMsState =
+        produceState(System.currentTimeMillis()) {
+            while (true) {
+                value = System.currentTimeMillis()
+                kotlinx.coroutines.delay(1_000L)
+            }
         }
-    }
-    val handAngles = watchPreviewHandAngles(previewEpochMs)
 
     val accent =
         when (index) {
-            1 ->
-                Color(
-                    0xFF19D7E8,
-                )
-
-            2 ->
-                Color(
-                    0xFFFF8B60,
-                )
-
-            3 ->
-                SugarliciousColors.Primary
-
-            else ->
-                Color.White
+            1 -> Color(0xFF19D7E8)
+            2 -> Color(0xFFFF8B60)
+            3 -> SugarliciousColors.Primary
+            else -> Color.White
         }
 
     Box(
-        modifier
-            .clip(
-                CircleShape,
-            )
-            .background(
-                Color.Black,
-            ),
-        contentAlignment =
-            Alignment.Center,
+        modifier =
+            modifier
+                .clip(CircleShape)
+                .background(Color.Black),
+        contentAlignment = Alignment.Center,
     ) {
-        Canvas(
-            Modifier.fillMaxSize(),
-        ) {
-            val radius =
-                size.minDimension /
-                    2f
+        Canvas(Modifier.fillMaxSize()) {
+            val radius = size.minDimension / 2f
 
-            if (
-                index == 1 ||
-                index == 2
-            ) {
+            if (index == 1 || index == 2) {
                 drawCircle(
                     color =
                         accent.copy(
-                            alpha =
-                                if (
-                                    index == 1
-                                ) {
-                                    0.18f
-                                } else {
-                                    0.11f
-                                },
+                            alpha = if (index == 1) 0.18f else 0.11f,
                         ),
-                    radius =
-                        radius -
-                            8.dp.toPx(),
-                    center =
-                        center,
+                    radius = radius - 8.dp.toPx(),
+                    center = center,
                     style =
                         androidx.compose.ui.graphics.drawscope.Stroke(
-                            width =
-                                if (
-                                    index == 2
-                                ) {
-                                    7.dp.toPx()
-                                } else {
-                                    4.dp.toPx()
-                                },
+                            width = if (index == 2) 7.dp.toPx() else 4.dp.toPx(),
                         ),
                 )
             }
 
-            repeat(
-                60,
-            ) { tick ->
-                val angle =
-                    Math.toRadians(
-                        tick *
-                            6.0 -
-                            90.0,
-                    )
-
-                val major =
-                    tick % 5 ==
-                        0
-
-                val inner =
-                    radius -
-                        if (major) {
-                            13.dp.toPx()
-                        } else {
-                            7.dp.toPx()
-                        }
-
-                val outer =
-                    radius -
-                        3.dp.toPx()
-
+            repeat(60) { tick ->
+                val angle = Math.toRadians(tick * 6.0 - 90.0)
+                val major = tick % 5 == 0
+                val inner = radius - if (major) 13.dp.toPx() else 7.dp.toPx()
+                val outer = radius - 3.dp.toPx()
                 drawLine(
                     color =
                         if (major) {
-                            Color.White.copy(
-                                alpha =
-                                    0.86f,
-                            )
+                            Color.White.copy(alpha = 0.86f)
                         } else {
-                            Color.White.copy(
-                                alpha =
-                                    0.22f,
-                            )
+                            Color.White.copy(alpha = 0.22f)
                         },
                     start =
                         Offset(
-                            x =
-                                center.x +
-                                    cos(
-                                        angle,
-                                    ).toFloat() *
-                                    inner,
-                            y =
-                                center.y +
-                                    sin(
-                                        angle,
-                                    ).toFloat() *
-                                    inner,
+                            x = center.x + cos(angle).toFloat() * inner,
+                            y = center.y + sin(angle).toFloat() * inner,
                         ),
                     end =
                         Offset(
-                            x =
-                                center.x +
-                                    cos(
-                                        angle,
-                                    ).toFloat() *
-                                    outer,
-                            y =
-                                center.y +
-                                    sin(
-                                        angle,
-                                    ).toFloat() *
-                                    outer,
+                            x = center.x + cos(angle).toFloat() * outer,
+                            y = center.y + sin(angle).toFloat() * outer,
                         ),
-                    strokeWidth =
-                        if (major) {
-                            1.7.dp.toPx()
-                        } else {
-                            0.7.dp.toPx()
-                        },
-                    cap =
-                        StrokeCap.Round,
+                    strokeWidth = if (major) 1.7.dp.toPx() else 0.7.dp.toPx(),
+                    cap = StrokeCap.Round,
                 )
             }
 
             val scale = size.minDimension / 512f
-
             fun sx(value: Float): Float = (center.x - 256f * scale) + value * scale
             fun sy(value: Float): Float = (center.y - 256f * scale) + value * scale
 
-            val hourAngle = handAngles.hour
-            val minuteAngle = handAngles.minute
-            val secondAngle = handAngles.second
+            // Snapshot state is read in draw phase only. This keeps the analog hands live without
+            // driving one-second recomposition of the complication preview.
+            val handAngles = watchPreviewHandAngles(previewEpochMsState.value)
 
-            withTransform({ rotate(degrees = hourAngle, pivot = center) }) {
+            withTransform({ rotate(degrees = handAngles.hour, pivot = center) }) {
                 drawRect(
                     color = Color.White,
                     topLeft = Offset(sx(252.75f), sy(224.44f)),
@@ -580,7 +496,7 @@ internal fun FaceDial(
                 )
             }
 
-            withTransform({ rotate(degrees = minuteAngle, pivot = center) }) {
+            withTransform({ rotate(degrees = handAngles.minute, pivot = center) }) {
                 drawRect(
                     color = Color.White,
                     topLeft = Offset(sx(252.75f), sy(224.44f)),
@@ -600,7 +516,7 @@ internal fun FaceDial(
                 center = center,
             )
 
-            withTransform({ rotate(degrees = secondAngle, pivot = center) }) {
+            withTransform({ rotate(degrees = handAngles.second, pivot = center) }) {
                 drawRect(
                     color = Color.White,
                     topLeft = Offset(sx(254f), sy(6f)),
@@ -623,57 +539,36 @@ internal fun FaceDial(
         Column(
             modifier =
                 Modifier
-                    .align(
-                        Alignment.BottomCenter,
-                    )
-                    .padding(
-                        bottom =
-                            20.dp,
-                    ),
-            horizontalAlignment =
-                Alignment.CenterHorizontally,
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = 20.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Row(
-                verticalAlignment =
-                    Alignment.CenterVertically,
-            ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    glucose,
-                    color =
-                        accent,
-                    fontSize =
-                        15.sp,
-                    fontWeight =
-                        FontWeight.Bold,
+                    text = glucose,
+                    color = accent,
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.Bold,
                 )
-
-                Spacer(
-                    Modifier.width(
-                        2.dp,
-                    ),
-                )
-
+                Spacer(Modifier.width(2.dp))
                 Text(
-                    trend,
-                    color =
-                        SugarliciousColors.Primary,
-                    fontSize =
-                        9.sp,
-                    fontWeight =
-                        FontWeight.Bold,
+                    text = trend,
+                    color = SugarliciousColors.Primary,
+                    fontSize = 9.sp,
+                    fontWeight = FontWeight.Bold,
                 )
             }
 
             if (activeComplicationIds.isEmpty()) {
                 Text(
-                    "Keine Complications",
+                    text = "Keine Complications",
                     color = Color.White.copy(alpha = 0.48f),
                     fontSize = 5.2.sp,
                 )
             } else {
                 activeComplicationIds.take(8).forEach { complicationId ->
                     Text(
-                        complicationPreviewLabel(complicationId, state),
+                        text = complicationPreviewLabel(complicationId, state),
                         color = Color.White.copy(alpha = 0.62f),
                         fontSize = 4.9.sp,
                         maxLines = 1,
