@@ -217,6 +217,8 @@ class WearSettingsActivity : Activity() {
             updateGraphColors { colors -> colors.copy(outline = it) }
         }
 
+        root.addView(WatchFaceDesignSettingsView(this), fullWidth())
+
         TextView(this).apply {
             text = "Die Watch übernimmt beim nächsten Sync weiterhin die in Sugarlicious gespeicherten Theme- und Graph-Einstellungen."
             textSize = 8f

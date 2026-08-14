@@ -58,13 +58,9 @@ object SugarliciousComplicationIds {
 
     val ordered = listOf(
         GLUCOSE,
-        TREND_ONLY,
-        DELTA_ONLY,
-        GLUCOSE_AGE,
         BASAL,
         IOB,
         COB,
-        GLUCOSE_TREND,
         GLUCOSE_PLUS_DELTA,
         TIME_DELTA,
         GLUCOSE_TREND_AGE,

@@ -79,13 +79,9 @@ internal enum class ComplicationCategory(
 
 internal val SugarliciousComplicationCatalog = listOf(
     ComplicationCatalogEntry(1, "Glukose", ComplicationCategory.GLUCOSE, "SHORT · RANGED · LONG"),
-    ComplicationCatalogEntry(35, "Trend", ComplicationCategory.GLUCOSE, "SHORT"),
-    ComplicationCatalogEntry(36, "Delta", ComplicationCategory.GLUCOSE, "SHORT"),
-    ComplicationCatalogEntry(5, "Zeit seit letztem Wert", ComplicationCategory.GLUCOSE, "SHORT"),
     ComplicationCatalogEntry(16, "Basal", ComplicationCategory.THERAPY, "SHORT"),
     ComplicationCatalogEntry(11, "IOB", ComplicationCategory.THERAPY, "SHORT · RANGED"),
     ComplicationCatalogEntry(14, "COB", ComplicationCategory.THERAPY, "SHORT · RANGED"),
-    ComplicationCatalogEntry(2, "Glukose + Trend", ComplicationCategory.GLUCOSE, "SHORT · RANGED"),
     ComplicationCatalogEntry(29, "Glukose + Delta", ComplicationCategory.GLUCOSE, "SHORT · LONG"),
     ComplicationCatalogEntry(3, "Zeit + Delta", ComplicationCategory.GLUCOSE, "SHORT"),
     ComplicationCatalogEntry(33, "Glukose + Trend + Zeit", ComplicationCategory.GLUCOSE, "SHORT · LONG"),
