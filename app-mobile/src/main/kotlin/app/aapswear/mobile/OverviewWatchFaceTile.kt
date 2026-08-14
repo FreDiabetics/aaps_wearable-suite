@@ -638,7 +638,7 @@ internal fun FaceDial(
                     fontSize = 5.2.sp,
                 )
             } else {
-                activeComplicationIds.take(3).forEach { complicationId ->
+                activeComplicationIds.take(8).forEach { complicationId ->
                     Text(
                         complicationPreviewLabel(complicationId, state),
                         color = Color.White.copy(alpha = 0.62f),
