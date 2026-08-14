@@ -39,6 +39,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
@@ -146,15 +147,9 @@ internal fun watchPreviewHandAngles(
         Calendar.getInstance(timeZone).apply {
             timeInMillis = epochMs
         }
-    val seconds =
-        calendar.get(Calendar.SECOND) +
-            calendar.get(Calendar.MILLISECOND) / 1_000f
-    val minutes =
-        calendar.get(Calendar.MINUTE) +
-            seconds / 60f
-    val hours =
-        calendar.get(Calendar.HOUR) +
-            minutes / 60f
+    val seconds = calendar.get(Calendar.SECOND) + calendar.get(Calendar.MILLISECOND) / 1_000f
+    val minutes = calendar.get(Calendar.MINUTE) + seconds / 60f
+    val hours = calendar.get(Calendar.HOUR) + minutes / 60f
     return WatchPreviewHandAngles(
         hour = hours * 30f,
         minute = minutes * 6f,
@@ -177,14 +172,11 @@ internal fun OverviewWatchFaceTile(
     var runtime by remember { mutableStateOf(WatchRuntimeStatusStore.read(appContext)) }
 
     DisposableEffect(appContext) {
-        val listener =
-            SharedPreferences.OnSharedPreferenceChangeListener { _, _ ->
-                runtime = WatchRuntimeStatusStore.read(appContext)
-            }
-        WatchRuntimeStatusStore.registerListener(appContext, listener)
-        onDispose {
-            WatchRuntimeStatusStore.unregisterListener(appContext, listener)
+        val listener = SharedPreferences.OnSharedPreferenceChangeListener { _, _ ->
+            runtime = WatchRuntimeStatusStore.read(appContext)
         }
+        WatchRuntimeStatusStore.registerListener(appContext, listener)
+        onDispose { WatchRuntimeStatusStore.unregisterListener(appContext, listener) }
     }
 
     LaunchedEffect(appContext) {
@@ -193,9 +185,13 @@ internal fun OverviewWatchFaceTile(
 
     val effectiveFaceIndex = runtime.activeSugarliciousFaceIndex ?: selectedFaceIndex
     val selected = effectiveFaceIndex.coerceIn(0, sugarliciousWatchFaceNames.lastIndex)
+    // The large watch represents the connected watch. Wear's runtime provider IDs are the source
+    // of truth; the phone's saved face preset is only a fallback before runtime status arrives.
     val activeComplicationIds =
-        WatchFacePresetStore.read(appContext, selected).ifEmpty {
-            runtime.activeComplicationIds.ifEmpty { loadComplicationPreset(appContext) }
+        runtime.activeComplicationIds.ifEmpty {
+            WatchFacePresetStore.read(appContext, selected).ifEmpty {
+                loadComplicationPreset(appContext)
+            }
         }
     val faceSize = if (compactLayout) 104.dp else carouselFaceSize
     val frameHeight = if (compactLayout) 154.dp else carouselHeight
@@ -210,9 +206,7 @@ internal fun OverviewWatchFaceTile(
 
     LaunchedEffect(selected) {
         val currentIndex = pager.settledPage % sugarliciousWatchFaceNames.size
-        if (currentIndex != selected) {
-            pager.scrollToPage(aligned + selected)
-        }
+        if (currentIndex != selected) pager.scrollToPage(aligned + selected)
     }
 
     LaunchedEffect(pager.settledPage, runtime.activeSugarliciousFaceIndex) {
@@ -228,19 +222,12 @@ internal fun OverviewWatchFaceTile(
     val error = syncStatus !in listOf(null, "ok", "pending")
 
     Column(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .padding(top = 2.dp, bottom = 5.dp),
+        modifier = Modifier.fillMaxWidth().padding(top = 2.dp, bottom = 5.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(3.dp),
     ) {
         BoxWithConstraints(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .height(frameHeight)
-                    .clipToBounds(),
+            modifier = Modifier.fillMaxWidth().height(frameHeight).clipToBounds(),
             contentAlignment = Alignment.Center,
         ) {
             val oneStepSwipe =
@@ -258,9 +245,7 @@ internal fun OverviewWatchFaceTile(
                             onDragEnd = {
                                 val target = carouselTargetPage(pager.settledPage, dragDistance)
                                 if (target != pager.settledPage) {
-                                    carouselScope.launch {
-                                        pager.animateScrollToPage(target)
-                                    }
+                                    carouselScope.launch { pager.animateScrollToPage(target) }
                                 }
                             },
                             onDragCancel = { dragDistance = 0f },
@@ -282,30 +267,22 @@ internal fun OverviewWatchFaceTile(
             ) { page ->
                 val index = page % sugarliciousWatchFaceNames.size
                 Box(
-                    modifier =
-                        Modifier
-                            .offset(y = carouselFaceVerticalOffset)
-                            .graphicsLayer {
-                                val rawDistance =
-                                    abs(
-                                        (pager.currentPage - page) +
-                                            pager.currentPageOffsetFraction,
-                                    )
-                                val distance = rawDistance.coerceIn(0f, 1f)
-                                val scale = lerp(1f, 0.73f, distance)
-                                scaleX = scale
-                                scaleY = scale
-                                alpha = carouselPageVisibility(rawDistance)
-                            }
-                            .clickable(onClick = onEdit),
+                    modifier = Modifier
+                        .offset(y = carouselFaceVerticalOffset)
+                        .graphicsLayer {
+                            val rawDistance = abs((pager.currentPage - page) + pager.currentPageOffsetFraction)
+                            val distance = rawDistance.coerceIn(0f, 1f)
+                            val scale = lerp(1f, 0.73f, distance)
+                            scaleX = scale
+                            scaleY = scale
+                            alpha = carouselPageVisibility(rawDistance)
+                        }
+                        .clickable(onClick = onEdit),
                     contentAlignment = Alignment.Center,
                 ) {
                     val pageComplications =
-                        if (index == selected) {
-                            activeComplicationIds
-                        } else {
-                            WatchFacePresetStore.read(appContext, index)
-                        }
+                        if (index == selected) activeComplicationIds
+                        else WatchFacePresetStore.read(appContext, index)
                     FaceDial(
                         index = index,
                         state = state,
@@ -317,11 +294,10 @@ internal fun OverviewWatchFaceTile(
 
             if (interactive) {
                 Box(
-                    modifier =
-                        Modifier
-                            .matchParentSize()
-                            .then(oneStepSwipe)
-                            .clickable(onClick = onEdit),
+                    modifier = Modifier
+                        .matchParentSize()
+                        .then(oneStepSwipe)
+                        .clickable(onClick = onEdit),
                 )
             }
         }
@@ -355,29 +331,20 @@ internal fun OverviewWatchFaceTile(
             Surface(
                 shape = RoundedCornerShape(999.dp),
                 color = statusColor.copy(alpha = 0.14f),
-                border =
-                    androidx.compose.foundation.BorderStroke(
-                        width = 1.dp,
-                        color = statusColor.copy(alpha = 0.72f),
-                    ),
+                border = androidx.compose.foundation.BorderStroke(
+                    width = 1.dp,
+                    color = statusColor.copy(alpha = 0.72f),
+                ),
             ) {
                 Row(
-                    modifier =
-                        Modifier.padding(
-                            horizontal = 12.dp,
-                            vertical = 6.dp,
-                        ),
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Image(
                         painter = painterResource(R.drawable.ic_watch_status),
                         contentDescription = null,
-                        modifier =
-                            Modifier
-                                .size(14.dp)
-                                .graphicsLayer { alpha = 1f },
-                        colorFilter =
-                            androidx.compose.ui.graphics.ColorFilter.tint(statusColor),
+                        modifier = Modifier.size(14.dp).graphicsLayer { alpha = 1f },
+                        colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(statusColor),
                     )
                     Spacer(Modifier.width(6.dp))
                     Text(
@@ -395,13 +362,12 @@ internal fun OverviewWatchFaceTile(
 @Composable
 private fun GalaxyWatchUltraFrame() {
     val context = LocalContext.current.applicationContext
-    val frame by
-        produceState(
-            initialValue = GalaxyWatchUltraFrameLoader.cachedOrNull(),
-            key1 = context,
-        ) {
-            value = GalaxyWatchUltraFrameLoader.load(context)
-        }
+    val frame by produceState(
+        initialValue = GalaxyWatchUltraFrameLoader.cachedOrNull(),
+        key1 = context,
+    ) {
+        value = GalaxyWatchUltraFrameLoader.load(context)
+    }
     frame?.let { bitmap ->
         Image(
             bitmap = bitmap,
