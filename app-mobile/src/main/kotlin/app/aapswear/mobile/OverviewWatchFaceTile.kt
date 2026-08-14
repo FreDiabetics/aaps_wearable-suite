@@ -303,16 +303,21 @@ internal fun OverviewWatchFaceTile(
         }
 
         Column(
-            modifier = Modifier.offset(y = (-8).dp),
+            modifier = Modifier.fillMaxWidth().offset(y = (-8).dp),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(4.dp),
+            verticalArrangement = Arrangement.spacedBy(3.dp),
         ) {
-            Text(
-                text = "Galaxy Watch Ultra",
-                color = SugarliciousColors.TextPrimary,
-                fontSize = 20.sp,
-                fontWeight = FontWeight.Bold,
-            )
+            Box(
+                modifier = Modifier.fillMaxWidth().height(24.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text = "Galaxy Watch Ultra",
+                    color = SugarliciousColors.TextPrimary,
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold,
+                )
+            }
 
             val statusColor =
                 when {
