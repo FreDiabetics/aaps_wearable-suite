@@ -1,0 +1,100 @@
+name: Fix v6 dashboard settings state
+
+on:
+  push:
+    branches: [agent/complication-watch-refactor-v6]
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: ${{ !contains(github.event.head_commit.message, '[dashboard-state-fixed]') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Persist settings accordion state
+        shell: python
+        run: |
+          from pathlib import Path
+          import re
+
+          path = Path('app-mobile/src/main/kotlin/app/aapswear/mobile/DashboardViews.kt')
+          text = path.read_text(encoding='utf-8')
+
+          if 'private val settingsUiPreferences' not in text:
+              anchor = '    private var colorSettingsExpanded = false\n'
+              if anchor not in text:
+                  raise SystemExit('color settings state declaration not found')
+              replacement = (
+                  '    private val settingsUiPreferences =\n'
+                  '        context.getSharedPreferences("dashboard_settings_ui", Context.MODE_PRIVATE)\n'
+                  '    private var colorSettingsExpanded =\n'
+                  '        settingsUiPreferences.getBoolean("colors_expanded", false)\n'
+              )
+              text = text.replace(anchor, replacement, 1)
+
+          text = re.sub(
+              r'^\s{4}private var predictionSettingsExpanded\s*=\s*false\s*$',
+              '    private var predictionSettingsExpanded =\n        settingsUiPreferences.getBoolean("predictions_expanded", false)',
+              text,
+              count=1,
+              flags=re.M,
+          )
+          text = re.sub(
+              r'^\s{4}private var notificationGraphSettingsExpanded\s*=\s*false\s*$',
+              '    private var notificationGraphSettingsExpanded =\n        settingsUiPreferences.getBoolean("notification_graph_expanded", false)',
+              text,
+              count=1,
+              flags=re.M,
+          )
+
+          insertions = [
+              (
+                  'colorSettingsExpanded = !colorSettingsExpanded',
+                  'settingsUiPreferences.edit().putBoolean("colors_expanded", colorSettingsExpanded).apply()',
+              ),
+              (
+                  'predictionSettingsExpanded = !predictionSettingsExpanded',
+                  'settingsUiPreferences.edit().putBoolean("predictions_expanded", predictionSettingsExpanded).apply()',
+              ),
+              (
+                  'notificationGraphSettingsExpanded = !notificationGraphSettingsExpanded',
+                  'settingsUiPreferences.edit().putBoolean("notification_graph_expanded", notificationGraphSettingsExpanded).apply()',
+              ),
+          ]
+          for toggle, persist in insertions:
+              if persist in text:
+                  continue
+              match = re.search(rf'^(\s*){re.escape(toggle)}\s*$', text, flags=re.M)
+              if not match:
+                  raise SystemExit(f'toggle not found: {toggle}')
+              indent = match.group(1)
+              original = match.group(0)
+              text = text.replace(original, original + '\n' + indent + persist, 1)
+
+          required = (
+              'settingsUiPreferences.getBoolean("colors_expanded", false)',
+              'settingsUiPreferences.getBoolean("predictions_expanded", false)',
+              'settingsUiPreferences.getBoolean("notification_graph_expanded", false)',
+              'putBoolean("colors_expanded", colorSettingsExpanded)',
+              'putBoolean("predictions_expanded", predictionSettingsExpanded)',
+              'putBoolean("notification_graph_expanded", notificationGraphSettingsExpanded)',
+          )
+          missing = [item for item in required if item not in text]
+          if missing:
+              raise SystemExit('settings persistence incomplete: ' + ', '.join(missing))
+
+          path.write_text(text, encoding='utf-8')
+      - run: git diff --check
+      - name: Commit migration
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app-mobile/src/main/kotlin/app/aapswear/mobile/DashboardViews.kt
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "Persist dashboard settings accordion state [dashboard-state-fixed]"
+          git pull --rebase origin agent/complication-watch-refactor-v6
+          git push origin HEAD:agent/complication-watch-refactor-v6
