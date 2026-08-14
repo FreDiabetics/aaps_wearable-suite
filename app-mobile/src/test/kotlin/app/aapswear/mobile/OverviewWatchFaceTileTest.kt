@@ -44,10 +44,10 @@ class OverviewWatchFaceTileTest {
     }
 
     @Test
-    fun `mobile watch previews are permanently fixed to ten two and six`() {
+    fun `mobile watch previews use the fixed requested hand positions`() {
         assertEquals(300f, fixedWatchPreviewHandAngles.hour, 0.001f)
-        assertEquals(60f, fixedWatchPreviewHandAngles.minute, 0.001f)
-        assertEquals(180f, fixedWatchPreviewHandAngles.second, 0.001f)
+        assertEquals(42f, fixedWatchPreviewHandAngles.minute, 0.001f)
+        assertEquals(192f, fixedWatchPreviewHandAngles.second, 0.001f)
     }
 
     @Test
