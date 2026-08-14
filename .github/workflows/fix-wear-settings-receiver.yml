@@ -1,0 +1,47 @@
+name: Fix Wear settings receiver
+
+on:
+  push:
+    branches:
+      - agent/complication-watch-refactor-v6
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    if: ${{ github.event.head_commit.message == 'Add Wear settings receiver fix' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Apply guarded Kotlin receiver fix
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('app-wear/src/main/kotlin/app/aapswear/wear/WearSettingsActivity.kt')
+          s = p.read_text()
+          replacements = {
+              'setColor(current.uiColors.tileBackground)': 'setColor(this@WearSettingsActivity.current.uiColors.tileBackground)',
+              'setStroke(1.dp, current.uiColors.tileBorder)': 'setStroke(1.dp, this@WearSettingsActivity.current.uiColors.tileBorder)',
+              'if (selected) current.uiColors.accent else current.uiColors.tileBorder': 'if (selected) this@WearSettingsActivity.current.uiColors.accent else this@WearSettingsActivity.current.uiColors.tileBorder',
+          }
+          for old, new in replacements.items():
+              count = s.count(old)
+              if count != 1:
+                  raise SystemExit(f'expected one occurrence of {old!r}, found {count}')
+              s = s.replace(old, new)
+          p.write_text(s)
+          PY
+          rm .github/workflows/fix-wear-settings-receiver.yml
+          git diff --check
+      - name: Commit source fix
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app-wear/src/main/kotlin/app/aapswear/wear/WearSettingsActivity.kt .github/workflows/fix-wear-settings-receiver.yml
+          git commit -m "Fix Wear settings color receiver"
+          git push origin HEAD:agent/complication-watch-refactor-v6
