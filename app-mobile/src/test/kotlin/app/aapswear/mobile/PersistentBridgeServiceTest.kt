@@ -50,7 +50,7 @@ class PersistentBridgeServiceTest {
 
     @Test
     @Config(sdk = [36])
-    fun `live preference requests promoted status with current glucose and graph`() {
+    fun `live preference requests promoted status with current glucose delta and graph`() {
         val context = ApplicationProvider.getApplicationContext<android.content.Context>()
         context.getSharedPreferences("dashboard_ui", android.content.Context.MODE_PRIVATE).edit()
             .clear()
@@ -63,7 +63,13 @@ class PersistentBridgeServiceTest {
         val now = System.currentTimeMillis()
         val therapyState = TherapyDisplayState(
             receivedAtEpochMs = now,
-            glucose = GlucoseState(123.0, GlucoseUnit.MG_DL, Trend.FLAT, now),
+            glucose = GlucoseState(
+                valueMgDl = 123.0,
+                displayUnit = GlucoseUnit.MG_DL,
+                trend = Trend.FLAT,
+                measuredAtEpochMs = now,
+                deltaMgDl = 5.0,
+            ),
             glucoseHistory = listOf(
                 app.aapswear.model.GlucoseSample(115.0, now - 10 * 60_000L),
                 app.aapswear.model.GlucoseSample(120.0, now - 5 * 60_000L),
@@ -79,56 +85,29 @@ class PersistentBridgeServiceTest {
 
         assertEquals("123", notification.extras.getCharSequence(Notification.EXTRA_TITLE).toString())
         assertTrue(notification.extras.getBoolean(PersistentBridgeService.EXTRA_REQUEST_PROMOTED_ONGOING))
-        assertTrue(content.contains("mg/dL"))
+        assertTrue(content.contains("+5"))
+        assertFalse(content.contains("mg/dL"))
         assertNull(notification.getLargeIcon())
         assertNotNull(notification.contentView)
         assertNotNull(notification.bigContentView)
         assertNull(notification.extras.getParcelable(Notification.EXTRA_PICTURE))
 
-        val collapsedGraph =
-            NotificationGraphRenderer.renderCollapsed(
-                context,
-                therapyState,
-                context.getSharedPreferences(
-                    "dashboard_ui",
-                    android.content.Context.MODE_PRIVATE,
-                ),
-            )
-        val expandedGraph =
-            NotificationGraphRenderer.renderExpanded(
-                context,
-                therapyState,
-                context.getSharedPreferences(
-                    "dashboard_ui",
-                    android.content.Context.MODE_PRIVATE,
-                ),
-            )
+        val collapsedGraph = NotificationGraphRenderer.renderCollapsed(
+            context,
+            therapyState,
+            context.getSharedPreferences("dashboard_ui", android.content.Context.MODE_PRIVATE),
+        )
+        val expandedGraph = NotificationGraphRenderer.renderExpanded(
+            context,
+            therapyState,
+            context.getSharedPreferences("dashboard_ui", android.content.Context.MODE_PRIVATE),
+        )
 
-        assertEquals(
-            NotificationGraphRenderer.COLLAPSED_WIDTH,
-            collapsedGraph.width,
-        )
-        assertEquals(
-            NotificationGraphRenderer.COLLAPSED_HEIGHT,
-            collapsedGraph.height,
-        )
-        assertEquals(
-            NotificationGraphRenderer.EXPANDED_WIDTH,
-            expandedGraph.width,
-        )
-        assertEquals(
-            NotificationGraphRenderer.EXPANDED_HEIGHT,
-            expandedGraph.height,
-        )
-        assertEquals(
-            0,
-            Color.alpha(
-                collapsedGraph.getPixel(
-                    0,
-                    0,
-                ),
-            ),
-        )
+        assertEquals(NotificationGraphRenderer.COLLAPSED_WIDTH, collapsedGraph.width)
+        assertEquals(NotificationGraphRenderer.COLLAPSED_HEIGHT, collapsedGraph.height)
+        assertEquals(NotificationGraphRenderer.EXPANDED_WIDTH, expandedGraph.width)
+        assertEquals(NotificationGraphRenderer.EXPANDED_HEIGHT, expandedGraph.height)
+        assertEquals(0, Color.alpha(collapsedGraph.getPixel(0, 0)))
         assertTrue(
             Color.alpha(
                 expandedGraph.getPixel(
