@@ -286,10 +286,14 @@ class DashboardViewFactory(
         androidx.compose.runtime.mutableStateOf<ComposeRenderState?>(null)
     private var activeComposeScreen: DashboardScreen? = null
     private var activeComposeView: androidx.compose.ui.platform.ComposeView? = null
-    private var colorSettingsExpanded = false
-    private var predictionSettingsExpanded = false
-    private var notificationGraphSettingsExpanded = false
-
+    private val settingsUiPreferences =
+        context.getSharedPreferences("dashboard_settings_ui", Context.MODE_PRIVATE)
+    private var colorSettingsExpanded =
+        settingsUiPreferences.getBoolean("colors_expanded", false)
+    private var predictionSettingsExpanded =
+        settingsUiPreferences.getBoolean("predictions_expanded", false)
+    private var notificationGraphSettingsExpanded =
+        settingsUiPreferences.getBoolean("notification_graph_expanded", false)
     private val density =
         context.resources.displayMetrics.density
 
@@ -556,6 +560,7 @@ class DashboardViewFactory(
                 addView(
                     actionRow("Farben & Darstellung", "Anpassen") {
                         colorSettingsExpanded = !colorSettingsExpanded
+                        settingsUiPreferences.edit().putBoolean("colors_expanded", colorSettingsExpanded).apply()
                         colorContainer.visibility = if (colorSettingsExpanded) View.VISIBLE else View.GONE
                     },
                 )
@@ -658,6 +663,7 @@ class DashboardViewFactory(
                             if (preferences.anyCgmPredictionEnabled) "Aktiv" else "Aus",
                         ) {
                             predictionSettingsExpanded = !predictionSettingsExpanded
+                            settingsUiPreferences.edit().putBoolean("predictions_expanded", predictionSettingsExpanded).apply()
                             predictionContainer.visibility = if (predictionSettingsExpanded) View.VISIBLE else View.GONE
                         },
                     )
@@ -737,6 +743,7 @@ class DashboardViewFactory(
                     addView(
                         actionRow("CGM-Dots & Farben", "Anpassen") {
                             notificationGraphSettingsExpanded = !notificationGraphSettingsExpanded
+                            settingsUiPreferences.edit().putBoolean("notification_graph_expanded", notificationGraphSettingsExpanded).apply()
                             notificationGraphCustomization.visibility = if (notificationGraphSettingsExpanded) View.VISIBLE else View.GONE
                         },
                     )
