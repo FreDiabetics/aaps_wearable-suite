@@ -329,9 +329,9 @@ abstract class TherapyComplicationService(
                         )
                         .setTapAction(tap)
 
-                    if (presentation?.title != null) {
+                    presentation?.title?.let { title ->
                         builder.setTitle(
-                            PlainComplicationText.Builder(presentation.title).build(),
+                            PlainComplicationText.Builder(title).build(),
                         )
                     }
                     presentation?.trend?.let { trend ->
