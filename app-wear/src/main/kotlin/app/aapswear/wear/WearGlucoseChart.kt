@@ -8,13 +8,13 @@ import android.graphics.Paint
 import android.util.AttributeSet
 import android.util.TypedValue
 import android.view.View
+import app.aapswear.model.GlucoseGraphScale
 import app.aapswear.model.GlucosePrediction
 import app.aapswear.model.GlucoseSample
 import app.aapswear.model.PredictionKind
 import app.aapswear.model.TherapyDisplayState
 import app.aapswear.protocol.WatchGraphColors
 import app.aapswear.protocol.WatchGraphStyle
-import kotlin.math.ceil
 import kotlin.math.max
 import kotlin.math.min
 
@@ -55,10 +55,14 @@ class WearGlucoseChart @JvmOverloads constructor(
         style: WatchGraphStyle,
     ) {
         state = newState
-        durationHours = graphHours.takeIf { it in listOf(3, 6, 12, 24) } ?: 3
+        durationHours =
+            graphHours
+                .takeIf { it in WearDisplayPreferences.allowedGraphHours }
+                ?: 3
         this.showPredictions = showPredictions
         this.colors = colors
         graphStyle = style
+        emptyTextPaint.color = colors.divider
         invalidate()
     }
 
@@ -67,7 +71,30 @@ class WearGlucoseChart @JvmOverloads constructor(
 
         val now = System.currentTimeMillis()
         canvas.drawColor(colors.graphBackground)
-        val start = now - durationHours * 60L * 60_000L
+
+        val currentMeasurement =
+            state?.glucose?.measuredAtEpochMs
+                ?.coerceAtMost(now + FUTURE_TOLERANCE_MS)
+                ?: now
+        val predictions =
+            if (showPredictions) {
+                state?.glucosePredictions.orEmpty()
+            } else {
+                emptyList()
+            }
+        val predictionEnd =
+            predictions
+                .flatMap { it.samples }
+                .maxOfOrNull { it.measuredAtEpochMs }
+                ?: currentMeasurement
+        val end =
+            if (showPredictions) {
+                max(currentMeasurement, predictionEnd)
+            } else {
+                currentMeasurement
+            }.coerceAtLeast(60_000L)
+        val start =
+            end - durationHours * HOUR_MS
 
         val history =
             buildList {
@@ -83,39 +110,28 @@ class WearGlucoseChart @JvmOverloads constructor(
             }
                 .filter {
                     it.valueMgDl in 20.0..1000.0 &&
-                        it.measuredAtEpochMs >= start &&
-                        it.measuredAtEpochMs <= now + FUTURE_TOLERANCE_MS
+                        it.measuredAtEpochMs in start..end
                 }
                 .associateBy { it.measuredAtEpochMs }
                 .values
                 .sortedBy { it.measuredAtEpochMs }
 
-        val predictions =
-            if (showPredictions) state?.glucosePredictions.orEmpty() else emptyList()
-
-        val predictionEnd =
-            predictions
-                .flatMap { it.samples }
-                .maxOfOrNull { it.measuredAtEpochMs }
-                ?: now
-
-        val end = max(now, predictionEnd).coerceAtLeast(start + 60_000L)
         val visiblePredictions =
             predictions
                 .map { series ->
                     series.copy(
                         samples =
                             series.samples.filter {
-                                it.measuredAtEpochMs in start..end
+                                it.measuredAtEpochMs in currentMeasurement..end
                             },
                     )
                 }
                 .filter { it.samples.isNotEmpty() }
 
-        val left = 7f.dp
-        val right = width - 7f.dp
-        val top = 6f.dp
-        val bottom = height - 6f.dp
+        val left = 5f.dp
+        val right = width - 5f.dp
+        val top = 4f.dp
+        val bottom = height - 4f.dp
         if (right <= left || bottom <= top) return
 
         if (history.isEmpty()) {
@@ -127,15 +143,6 @@ class WearGlucoseChart @JvmOverloads constructor(
             )
             return
         }
-
-        val values =
-            history.map { it.valueMgDl } +
-                visiblePredictions.flatMap { it.samples }.map { it.valueMgDl }
-
-        val minimum = min(40.0, values.minOrNull() ?: 40.0) - 10.0
-        val maximum = max(200.0, values.maxOrNull() ?: 200.0) + 10.0
-        val yMin = (minimum / 20.0).toInt() * 20.0
-        val yMax = ceil(maximum / 20.0) * 20.0
 
         fun xFor(timestamp: Long): Float =
             left +
@@ -149,11 +156,8 @@ class WearGlucoseChart @JvmOverloads constructor(
 
         fun yFor(value: Double): Float =
             bottom -
-                (
-                    (value - yMin) /
-                        (yMax - yMin).coerceAtLeast(1.0)
-                    )
-                    .coerceIn(0.0, 1.0)
+                GlucoseGraphScale
+                    .ratio(value)
                     .toFloat() *
                 (bottom - top)
 
@@ -162,7 +166,6 @@ class WearGlucoseChart @JvmOverloads constructor(
         val targetTop = yFor(targetHigh)
         val targetBottom = yFor(targetLow)
 
-        // Keep the exact ARGB value from the phone, including user-selected alpha.
         fillPaint.color = colors.rangeInRange
         canvas.drawRoundRect(
             left,
@@ -179,7 +182,7 @@ class WearGlucoseChart @JvmOverloads constructor(
         canvas.drawLine(left, targetTop, right, targetTop, linePaint)
         canvas.drawLine(left, targetBottom, right, targetBottom, linePaint)
 
-        val dividerX = xFor(now)
+        val dividerX = xFor(currentMeasurement)
         if (visiblePredictions.isNotEmpty()) {
             linePaint.color = colors.divider
             linePaint.strokeWidth = 1f.dp
@@ -201,14 +204,8 @@ class WearGlucoseChart @JvmOverloads constructor(
                 .coerceIn(0.25f, 3.0f)
                 .dp
 
-        history.forEachIndexed { index, point ->
-            val rawX = xFor(point.measuredAtEpochMs)
-            val x =
-                if (visiblePredictions.isNotEmpty() && index == history.lastIndex) {
-                    min(rawX, dividerX - 4f.dp)
-                } else {
-                    rawX
-                }
+        history.forEach { point ->
+            val x = xFor(point.measuredAtEpochMs)
             val y = yFor(point.valueMgDl)
 
             if (graphStyle.cgmDotOutlineEnabled) {
@@ -231,13 +228,7 @@ class WearGlucoseChart @JvmOverloads constructor(
         }
 
         history.lastOrNull()?.let { point ->
-            val rawX = xFor(point.measuredAtEpochMs)
-            val x =
-                if (visiblePredictions.isNotEmpty()) {
-                    min(rawX, dividerX - 4f.dp)
-                } else {
-                    rawX
-                }
+            val x = xFor(point.measuredAtEpochMs)
             val y = yFor(point.valueMgDl)
             val currentRadius = dotRadius * 1.25f
 
@@ -286,12 +277,9 @@ class WearGlucoseChart @JvmOverloads constructor(
         fillPaint.color =
             when (series.kind) {
                 PredictionKind.IOB -> colors.predictionIob
-
                 PredictionKind.COB,
                 PredictionKind.ACOB -> colors.predictionCob
-
                 PredictionKind.UAM -> colors.predictionUam
-
                 PredictionKind.ZERO_TEMP -> colors.predictionZeroTemp
             }
 
@@ -331,5 +319,6 @@ class WearGlucoseChart @JvmOverloads constructor(
         private const val TARGET_LOW = 80.0
         private const val TARGET_HIGH = 160.0
         private const val FUTURE_TOLERANCE_MS = 5 * 60_000L
+        private const val HOUR_MS = 60L * 60_000L
     }
 }
