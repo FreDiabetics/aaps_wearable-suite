@@ -28,8 +28,6 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.text.SimpleDateFormat
-import java.util.Date
 import java.util.Locale
 import kotlin.math.roundToInt
 
@@ -39,23 +37,19 @@ class WearActivity : Activity() {
             SupervisorJob() + Dispatchers.Main,
         )
 
-    private var clockJob: Job? = null
+    private var refreshJob: Job? = null
     private var latest: TherapyDisplayState? = null
     private var connectedNodes = 0
 
-    private lateinit var clock: TextView
     private lateinit var glucose: TextView
-    private lateinit var unit: TextView
     private lateinit var trendContainer: LinearLayout
     private lateinit var trendArrow1: ImageView
     private lateinit var trendArrow2: ImageView
     private lateinit var delta: TextView
     private lateinit var age: TextView
-    private lateinit var status: TextView
     private lateinit var source: TextView
     private lateinit var connection: TextView
     private lateinit var syncHint: TextView
-    private lateinit var historyInfo: TextView
     private lateinit var iob: TextView
     private lateinit var cob: TextView
     private lateinit var basal: TextView
@@ -75,7 +69,7 @@ class WearActivity : Activity() {
 
         findViewById<View>(R.id.wear_connection_card)
             .setOnClickListener { requestPhoneRefresh() }
-        findViewById<View>(R.id.wear_settings)
+        findViewById<View>(R.id.wear_settings_action)
             .setOnClickListener {
                 startActivity(
                     Intent(
@@ -109,7 +103,7 @@ class WearActivity : Activity() {
             displayPreferencesListener,
         )
 
-        clockJob =
+        refreshJob =
             scope.launch {
                 while (true) {
                     render()
@@ -119,8 +113,8 @@ class WearActivity : Activity() {
     }
 
     override fun onStop() {
-        clockJob?.cancel()
-        clockJob = null
+        refreshJob?.cancel()
+        refreshJob = null
 
         getSharedPreferences(
             WearDisplayPreferences.PREFS,
@@ -138,19 +132,15 @@ class WearActivity : Activity() {
     }
 
     private fun bindViews() {
-        clock = findViewById(R.id.wear_clock)
         glucose = findViewById(R.id.wear_glucose)
-        unit = findViewById(R.id.wear_unit)
         trendContainer = findViewById(R.id.wear_trend_container)
         trendArrow1 = findViewById(R.id.wear_trend_arrow_1)
         trendArrow2 = findViewById(R.id.wear_trend_arrow_2)
         delta = findViewById(R.id.wear_delta)
         age = findViewById(R.id.wear_age)
-        status = findViewById(R.id.wear_status)
         source = findViewById(R.id.wear_source)
         connection = findViewById(R.id.wear_connection)
         syncHint = findViewById(R.id.wear_sync_hint)
-        historyInfo = findViewById(R.id.wear_history_info)
         iob = findViewById(R.id.wear_iob)
         cob = findViewById(R.id.wear_cob)
         basal = findViewById(R.id.wear_basal)
@@ -188,7 +178,7 @@ class WearActivity : Activity() {
     }
 
     private fun render() {
-        if (!::clock.isInitialized) return
+        if (!::glucose.isInitialized) return
 
         val now = System.currentTimeMillis()
         val state = latest
@@ -213,13 +203,6 @@ class WearActivity : Activity() {
 
         val targetLow = state?.target?.lowMgDl ?: 80.0
         val targetHigh = state?.target?.highMgDl ?: 160.0
-
-        clock.text =
-            SimpleDateFormat(
-                "HH:mm",
-                Locale.getDefault(),
-            ).format(Date(now))
-
         val resolvedUnit =
             resolveUnit(
                 glucoseState?.displayUnit,
@@ -245,13 +228,6 @@ class WearActivity : Activity() {
             },
         )
 
-        unit.text =
-            when {
-                !canShowValue -> "keine Daten"
-                resolvedUnit == GlucoseUnit.MMOL_L -> "mmol/L"
-                else -> "mg/dL"
-            }
-
         renderTrend(
             if (canShowValue) glucoseState.trend else null,
             preferences.uiColors.textPrimary,
@@ -266,40 +242,7 @@ class WearActivity : Activity() {
             } else {
                 "—"
             }
-
         age.text = ageMinutes(glucoseState?.measuredAtEpochMs, now)
-
-        status.text =
-            when (freshness) {
-                Freshness.CURRENT -> "● LIVE"
-                Freshness.DELAYED -> "● VERZÖGERT"
-                Freshness.STALE -> "● VERALTET"
-                Freshness.NO_DATA -> "○ KEINE DATEN"
-            }
-
-        status.setTextColor(
-            when (freshness) {
-                Freshness.CURRENT -> preferences.uiColors.accent
-                Freshness.DELAYED -> preferences.uiColors.glucoseHigh
-                Freshness.STALE -> preferences.uiColors.glucoseLow
-                Freshness.NO_DATA -> preferences.uiColors.textSecondary
-            },
-        )
-
-        val history =
-            state
-                ?.glucoseHistory
-                .orEmpty()
-                .filter {
-                    now - it.measuredAtEpochMs <= HISTORY_WINDOW_MS
-                }
-
-        historyInfo.text =
-            if (history.isEmpty()) {
-                "Keine Historie"
-            } else {
-                "${preferences.graphHours} h · ${history.size} Werte"
-            }
 
         chart.bind(
             newState = state,
@@ -314,9 +257,9 @@ class WearActivity : Activity() {
         findViewById<View>(R.id.wear_basal_card).visibility =
             if (preferences.showTherapyStats) View.VISIBLE else View.GONE
 
-        iob.text = formatNumber(state?.insulin?.totalIob, 2, " IE")
+        iob.text = formatNumber(state?.insulin?.totalIob, 2, " U")
         cob.text = formatNumber(state?.carbs?.cobGrams, 0, " g")
-        basal.text = formatNumber(state?.basal?.currentUnitsPerHour, 2, " IE/h")
+        basal.text = formatNumber(state?.basal?.currentUnitsPerHour, 2, " U/h")
 
         source.text =
             when (state?.source) {
@@ -370,61 +313,51 @@ class WearActivity : Activity() {
         val ui = preferences.uiColors
         findViewById<View>(R.id.wear_root).setBackgroundColor(ui.background)
 
-        val normalCards =
-            listOf(
-                R.id.wear_glucose_card,
-                R.id.wear_basal_card,
-                R.id.wear_iob_card,
-                R.id.wear_cob_card,
-                R.id.wear_connection_card,
-            )
-        normalCards.forEach { id ->
+        listOf(
+            R.id.wear_glucose_card,
+            R.id.wear_basal_card,
+            R.id.wear_iob_card,
+            R.id.wear_cob_card,
+            R.id.wear_connection_card,
+            R.id.wear_settings_action,
+        ).forEach { id ->
             findViewById<View>(id).background =
                 roundedBackground(
                     ui.tileBackground,
                     ui.tileBorder,
                 )
         }
-        findViewById<View>(R.id.wear_graph_card).background =
-            roundedBackground(
-                preferences.graphColors.graphBackground,
-                ui.tileBorder,
-            )
 
-        val primaryTextIds =
-            listOf(
-                R.id.wear_brand_text,
-                R.id.wear_glucose,
-                R.id.wear_unit,
-                R.id.wear_basal,
-                R.id.wear_iob,
-                R.id.wear_cob,
-                R.id.wear_source,
-            )
-        primaryTextIds.forEach { id ->
+        // The chart paints its own background, target range, grid and outer contour.
+        findViewById<View>(R.id.wear_graph_card).background = null
+
+        listOf(
+            R.id.wear_glucose,
+            R.id.wear_basal,
+            R.id.wear_iob,
+            R.id.wear_cob,
+            R.id.wear_source,
+            R.id.wear_settings_label,
+        ).forEach { id ->
             findViewById<TextView>(id).setTextColor(ui.textPrimary)
         }
-        val secondaryTextIds =
-            listOf(
-                R.id.wear_clock,
-                R.id.wear_age,
-                R.id.wear_history_info,
-                R.id.wear_sync_hint,
-                R.id.wear_watchface_push_status,
-                R.id.wear_footer_text,
-            )
-        secondaryTextIds.forEach { id ->
+        listOf(
+            R.id.wear_age,
+            R.id.wear_sync_hint,
+            R.id.wear_watchface_push_status,
+            R.id.wear_footer_text,
+        ).forEach { id ->
             findViewById<TextView>(id).setTextColor(ui.textSecondary)
         }
+
         delta.setTextColor(ui.accent)
         iob.setTextColor(ui.iob)
         cob.setTextColor(ui.cob)
 
         val primaryTint = ColorStateList.valueOf(ui.textPrimary)
-        findViewById<ImageView>(R.id.wear_brand_icon).imageTintList = primaryTint
-        findViewById<ImageView>(R.id.wear_settings).imageTintList = primaryTint
+        findViewById<ImageView>(R.id.wear_settings_icon).imageTintList = primaryTint
         findViewById<ImageView>(R.id.wear_footer_icon).imageTintList =
-            ColorStateList.valueOf(ui.textSecondary)
+            ColorStateList.valueOf(ui.accent)
     }
 
     private fun roundedBackground(
@@ -566,6 +499,5 @@ class WearActivity : Activity() {
         private const val WATCH_FACE_PERMISSION_REQUEST = 701
         private const val ONBOARDING_PREFS = "wear_onboarding"
         private const val KEY_WFP_PERMISSION_REQUESTED = "watchface_permission_requested"
-        private const val HISTORY_WINDOW_MS = 24 * 60 * 60_000L
     }
 }
