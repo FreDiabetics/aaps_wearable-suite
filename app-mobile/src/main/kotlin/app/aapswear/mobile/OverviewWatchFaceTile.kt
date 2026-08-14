@@ -56,7 +56,9 @@ import app.aapswear.model.TherapyDisplayFormatter
 import android.content.Context
 import android.graphics.BitmapFactory
 import android.util.Base64
+import java.util.Calendar
 import java.util.Locale
+import java.util.TimeZone
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
@@ -127,9 +129,34 @@ internal fun carouselTargetPage(currentPage: Int, dragDistance: Float, pageCount
 internal fun carouselPageVisibility(distanceFromCenter: Float): Float =
     if (distanceFromCenter <= 0.50f) 1f else 0f
 
-internal const val CAROUSEL_PREVIEW_HOUR_ANGLE = 300.0
-internal const val CAROUSEL_PREVIEW_MINUTE_ANGLE = 60.0
-internal const val CAROUSEL_PREVIEW_SECOND_ANGLE = 180.0
+internal data class WatchPreviewHandAngles(
+    val hour: Float,
+    val minute: Float,
+    val second: Float,
+)
+
+internal fun watchPreviewHandAngles(
+    epochMs: Long,
+    timeZone: TimeZone = TimeZone.getDefault(),
+): WatchPreviewHandAngles {
+    val calendar = Calendar.getInstance(timeZone).apply {
+        timeInMillis = epochMs
+    }
+    val seconds =
+        calendar.get(Calendar.SECOND) +
+            calendar.get(Calendar.MILLISECOND) / 1_000f
+    val minutes =
+        calendar.get(Calendar.MINUTE) +
+            seconds / 60f
+    val hours =
+        calendar.get(Calendar.HOUR) +
+            minutes / 60f
+    return WatchPreviewHandAngles(
+        hour = hours * 30f,
+        minute = minutes * 6f,
+        second = seconds * 6f,
+    )
+}
 
 @Composable
 internal fun OverviewWatchFaceTile(
@@ -370,6 +397,14 @@ internal fun FaceDial(
             state?.glucose?.trend ?: Trend.UNKNOWN,
         )
 
+    val previewEpochMs by produceState(System.currentTimeMillis()) {
+        while (true) {
+            value = System.currentTimeMillis()
+            kotlinx.coroutines.delay(1_000L)
+        }
+    }
+    val handAngles = watchPreviewHandAngles(previewEpochMs)
+
     val accent =
         when (index) {
             1 ->
@@ -527,11 +562,9 @@ internal fun FaceDial(
             fun sx(value: Float): Float = (center.x - 256f * scale) + value * scale
             fun sy(value: Float): Float = (center.y - 256f * scale) + value * scale
 
-            // Preview hands are intentionally static. Runtime time belongs to the real watchface;
-            // a moving phone mock-up made the preview look like a random second watch.
-            val hourAngle = CAROUSEL_PREVIEW_HOUR_ANGLE.toFloat()
-            val minuteAngle = CAROUSEL_PREVIEW_MINUTE_ANGLE.toFloat()
-            val secondAngle = CAROUSEL_PREVIEW_SECOND_ANGLE.toFloat()
+            val hourAngle = handAngles.hour
+            val minuteAngle = handAngles.minute
+            val secondAngle = handAngles.second
 
             withTransform({ rotate(degrees = hourAngle, pivot = center) }) {
                 drawRect(
