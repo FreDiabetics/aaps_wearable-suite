@@ -38,11 +38,35 @@ data class WatchGraphColors(
     val predictionZeroTemp: Int = 0xFF30DBDE.toInt(),
 )
 
+
+@Serializable
+data class WatchUiColors(
+    val background: Int = 0xFF181818.toInt(),
+    val tileBackground: Int = 0xFF242424.toInt(),
+    val tileBorder: Int = 0xFF404040.toInt(),
+    val textPrimary: Int = 0xFFF5F5F5.toInt(),
+    val textSecondary: Int = 0xFFB5B5B5.toInt(),
+    val accent: Int = 0xFF6DE892.toInt(),
+    val glucoseLow: Int = 0xFFFF5C69.toInt(),
+    val glucoseInRange: Int = 0xFFF5F5F5.toInt(),
+    val glucoseHigh: Int = 0xFFFFD040.toInt(),
+    val iob: Int = 0xFF64BFFF.toInt(),
+    val cob: Int = 0xFFFF9D18.toInt(),
+)
+
 @Serializable
 data class WatchGraphStyle(
     val cgmDotRadiusDp: Float = 2.4f,
     val cgmDotOutlineEnabled: Boolean = true,
     val cgmDotOutlineWidthDp: Float = 0.95f,
+)
+
+
+@Serializable
+data class WatchRuntimeStatus(
+    val activeSugarliciousFaceIndex: Int? = null,
+    val activeComplicationIds: List<Int> = emptyList(),
+    val sentAtEpochMs: Long = 0L,
 )
 
 @Serializable
@@ -54,10 +78,11 @@ data class WatchConfig(
     val showTherapyStats: Boolean = true,
     val graphColors: WatchGraphColors = WatchGraphColors(),
     val graphStyle: WatchGraphStyle = WatchGraphStyle(),
+    val uiColors: WatchUiColors = WatchUiColors(),
     val sentAtEpochMs: Long = 0L,
 ) {
     companion object {
-        const val CURRENT_SCHEMA = 3
+        const val CURRENT_SCHEMA = 4
     }
 }
 
@@ -69,6 +94,8 @@ object WearProtocol {
     const val COMPLICATION_PRESET_PATH = "/aaps-display/v1/complication-preset"
     const val WATCH_FACE_APPLY_PATH = "/aaps-display/v1/watchface-apply"
     const val WATCH_FACE_STATUS_PATH = "/aaps-display/v1/watchface-status"
+    const val WATCH_RUNTIME_STATUS_PATH = "/aaps-display/v1/watch-runtime-status"
+    const val WATCH_RUNTIME_REQUEST_PATH = "/aaps-display/v1/watch-runtime-request"
     const val CAPABILITY = "aaps_display"
 
     private val json = Json {
@@ -88,10 +115,21 @@ object WearProtocol {
     fun encodeConfig(config: WatchConfig): ByteArray =
         json.encodeToString(config).encodeToByteArray()
 
+    fun encodeRuntimeStatus(status: WatchRuntimeStatus): ByteArray =
+        json.encodeToString(status).encodeToByteArray()
+
+    fun decodeRuntimeStatus(bytes: ByteArray): WatchRuntimeStatus {
+        val decoded = json.decodeFromString<WatchRuntimeStatus>(bytes.decodeToString())
+        return decoded.copy(
+            activeSugarliciousFaceIndex = decoded.activeSugarliciousFaceIndex?.coerceIn(0, 3),
+            activeComplicationIds = decoded.activeComplicationIds.distinct().take(12),
+        )
+    }
+
     fun decodeConfig(bytes: ByteArray): WatchConfig {
         val decoded = json.decodeFromString<WatchConfig>(bytes.decodeToString())
         return decoded.copy(
-            graphHours = decoded.graphHours.takeIf { it in listOf(3, 6, 12, 24) } ?: 3,
+            graphHours = decoded.graphHours.takeIf { it in listOf(1, 2, 3, 6, 12, 24) } ?: 3,
             graphStyle = decoded.graphStyle.copy(
                 cgmDotRadiusDp = decoded.graphStyle.cgmDotRadiusDp.coerceIn(1.5f, 6.0f),
                 cgmDotOutlineWidthDp = decoded.graphStyle.cgmDotOutlineWidthDp.coerceIn(0.25f, 3.0f),

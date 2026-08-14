@@ -281,6 +281,13 @@ class PersistentBridgeService : Service(), SharedPreferences.OnSharedPreferenceC
                 R.id.notification_meta,
                 textSecondary,
             )
+            val trendBitmap = display.trend?.let { NotificationTrendRenderer.render(this@PersistentBridgeService, it) }
+            if (trendBitmap != null) {
+                setViewVisibility(R.id.notification_trend, View.VISIBLE)
+                setImageViewBitmap(R.id.notification_trend, trendBitmap)
+            } else {
+                setViewVisibility(R.id.notification_trend, View.GONE)
+            }
             if (graph != null) {
                 setViewVisibility(
                     R.id.notification_graph,
@@ -306,17 +313,13 @@ class PersistentBridgeService : Service(), SharedPreferences.OnSharedPreferenceC
         val glucose = state?.glucose
         val freshness = FreshnessPolicy.classify(glucose?.measuredAtEpochMs, System.currentTimeMillis())
         if (glucose == null || freshness == Freshness.STALE || freshness == Freshness.NO_DATA) {
-            return NotificationDisplay("—", "Keine aktuellen Glukosedaten")
+            return NotificationDisplay("—", "Keine aktuellen Glukosedaten", null)
         }
         val selectedUnit = DashboardUiPreferences.read(uiPreferences).unitFor(state)
         val value = if (selectedUnit == GlucoseUnit.MMOL_L) {
             String.format(Locale.getDefault(), "%.1f", glucose.valueMgDl / 18.0)
         } else glucose.valueMgDl.roundToInt().toString()
         val unit = if (selectedUnit == GlucoseUnit.MMOL_L) "mmol/L" else "mg/dL"
-        val trend =
-            TherapyDisplayFormatter.trendArrow(
-                glucose.trend,
-            )
         val age = ((System.currentTimeMillis() - glucose.measuredAtEpochMs).coerceAtLeast(0L) / 60_000L)
         val prefix = if (freshness == Freshness.DELAYED) "Verzögert · " else ""
         val subtitle =
@@ -325,7 +328,7 @@ class PersistentBridgeService : Service(), SharedPreferences.OnSharedPreferenceC
             } else {
                 "$prefix$age min"
             }
-        return NotificationDisplay("$value $trend", subtitle)
+        return NotificationDisplay(value, subtitle, glucose.trend)
     }
 
     private fun createNotificationChannel() {
@@ -338,7 +341,7 @@ class PersistentBridgeService : Service(), SharedPreferences.OnSharedPreferenceC
         getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
     }
 
-    private data class NotificationDisplay(val title: String, val subtitle: String)
+    private data class NotificationDisplay(val title: String, val subtitle: String, val trend: app.aapswear.model.Trend?)
 
     companion object {
         const val PREFERENCE_LIVE_NOTIFICATION = "liveNotification"
@@ -367,8 +370,8 @@ class PersistentBridgeService : Service(), SharedPreferences.OnSharedPreferenceC
 internal object NotificationGraphRenderer {
     const val COLLAPSED_WIDTH = 704
     const val COLLAPSED_HEIGHT = 184
-    const val EXPANDED_WIDTH = 640
-    const val EXPANDED_HEIGHT = 256
+    const val EXPANDED_WIDTH = 720
+    const val EXPANDED_HEIGHT = 296
 
     // Kept for compatibility with older tests/callers.
     const val WIDTH = EXPANDED_WIDTH

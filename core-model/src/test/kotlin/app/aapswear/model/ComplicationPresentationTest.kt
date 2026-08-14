@@ -1,0 +1,48 @@
+package app.aapswear.model
+
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
+import org.junit.Test
+
+class ComplicationPresentationTest {
+    private val now = 1_700_000_000_000L
+    private val state = TherapyDisplayState(
+        receivedAtEpochMs = now,
+        sourceVersion = "4.0.0",
+        glucose = GlucoseState(123.0, GlucoseUnit.MG_DL, Trend.FORTY_FIVE_UP, now - 2 * 60_000L, 5.0),
+        glucoseHistory = listOf(
+            GlucoseSample(80.0, now - 10 * 60_000L),
+            GlucoseSample(120.0, now - 5 * 60_000L),
+            GlucoseSample(200.0, now),
+        ),
+        insulin = InsulinState(totalIob = 1.2),
+        carbs = CarbState(cobGrams = 15.0),
+        basal = BasalState(currentUnitsPerHour = 0.7),
+    )
+
+    @Test fun `glucose trend keeps text and icon separate`() {
+        val p = ComplicationPresentationFormatter.format(SugarliciousComplicationIds.GLUCOSE_TREND, state, now)
+        assertEquals("123", p.text)
+        assertEquals(Trend.FORTY_FIVE_UP, p.trend)
+        assertNull(p.title)
+    }
+
+    @Test fun `glucose delta uses title instead of concatenating`() {
+        val p = ComplicationPresentationFormatter.format(SugarliciousComplicationIds.GLUCOSE_PLUS_DELTA, state, now)
+        assertEquals("123", p.text)
+        assertEquals("+5", p.title)
+    }
+
+    @Test fun `time delta keeps compact lines`() {
+        val p = ComplicationPresentationFormatter.format(SugarliciousComplicationIds.TIME_DELTA, state, now)
+        assertEquals("+5", p.text)
+        assertEquals("2m", p.title)
+    }
+
+    @Test fun `trend geometry matches mobile overview`() {
+        assertEquals(-45f, TrendVisuals.spec(Trend.FORTY_FIVE_UP)!!.rotationDegrees)
+        assertEquals(2, TrendVisuals.spec(Trend.DOUBLE_DOWN)!!.arrowCount)
+        assertNull(TrendVisuals.spec(Trend.UNKNOWN))
+    }
+}

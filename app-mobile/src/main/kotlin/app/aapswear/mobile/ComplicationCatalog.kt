@@ -47,7 +47,11 @@ import app.aapswear.mobile.ui.theme.SugarliciousColors
 import app.aapswear.mobile.ui.theme.SugarliciousColorRole
 import app.aapswear.model.Freshness
 import app.aapswear.model.FreshnessPolicy
+import app.aapswear.model.ComplicationPresentationFormatter
+import app.aapswear.model.SugarliciousComplicationIds
+import app.aapswear.model.Trend
 import app.aapswear.model.GlucoseSample
+import app.aapswear.model.GlucoseGraphScale
 import app.aapswear.model.GlucoseUnit
 import app.aapswear.model.TherapyDisplayFormatter
 import app.aapswear.model.TherapyDisplayState
@@ -395,9 +399,16 @@ private fun CompactComplicationPreview(
         return
     }
     val preview = previewFor(entry.id, state)
-    Text(preview.primary, color = preview.color, fontSize = 10.sp, lineHeight = 11.sp,
-        fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis,
-        textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+    if (preview.trend != null && entry.id == SugarliciousComplicationIds.TREND_ONLY) {
+        SugarliciousTrendIndicator(preview.trend, arrowSize = 20.dp, color = preview.color)
+    } else {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+            Text(preview.primary, color = preview.color, fontSize = 10.sp, lineHeight = 11.sp,
+                fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+            preview.trend?.let { SugarliciousTrendIndicator(it, arrowSize = 12.dp, color = preview.color) }
+        }
+    }
     if (preview.secondary.isNotBlank()) {
         Text(preview.secondary, color = SugarliciousColors.TextSecondary, fontSize = 6.5.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
@@ -706,13 +717,8 @@ private fun MiniGlucosePreview(samples: List<GlucoseSample>, current: GlucoseSam
         val right = size.width - 3.dp.toPx()
         val top = 3.dp.toPx()
         val bottom = size.height - 3.dp.toPx()
-        val values = merged.map { it.valueMgDl }
-        val minimum = kotlin.math.min(40.0, values.minOrNull() ?: 40.0) - 10.0
-        val maximum = kotlin.math.max(200.0, values.maxOrNull() ?: 200.0) + 10.0
-        val yMin = kotlin.math.floor(minimum / 20.0) * 20.0
-        val yMax = kotlin.math.ceil(maximum / 20.0) * 20.0
         fun x(timestamp: Long) = left + (((timestamp - cutoff).toDouble() / (hours * 60L * 60_000L).toDouble()).coerceIn(0.0, 1.0) * (right - left)).toFloat()
-        fun y(value: Double) = bottom - (((value - yMin) / (yMax - yMin).coerceAtLeast(1.0)).coerceIn(0.0, 1.0) * (bottom - top)).toFloat()
+        fun y(value: Double) = bottom - (GlucoseGraphScale.ratio(value) * (bottom - top)).toFloat()
         val low = 80.0
         val high = 160.0
         drawRect(
@@ -742,6 +748,7 @@ private data class PhonePreview(
     val primary: String,
     val secondary: String,
     val color: Color = SugarliciousColors.TextPrimary,
+    val trend: Trend? = null,
 )
 
 private fun previewFor(
@@ -749,132 +756,48 @@ private fun previewFor(
     state: TherapyDisplayState?,
 ): PhonePreview {
     val now = System.currentTimeMillis()
-    val glucose = state?.glucose
-    val freshness = FreshnessPolicy.classify(glucose?.measuredAtEpochMs, now)
-    val current = freshness == Freshness.CURRENT || freshness == Freshness.DELAYED
-    val g = glucose.takeIf { current }
-
-    val glucoseText = g?.let { TherapyDisplayFormatter.glucose(it) } ?: "123"
-    val trend = g?.let { TherapyDisplayFormatter.trendArrow(it.trend) }
-        ?.ifBlank { "→" } ?: "→"
-    val delta = g?.let {
-        TherapyDisplayFormatter.signedDelta(it.deltaMgDl, it.displayUnit)
-    }?.ifBlank { "+5" } ?: "+5"
-    val age = g?.measuredAtEpochMs?.let {
-        TherapyDisplayFormatter.ageMinutes(it, now)
-    } ?: "2m"
-
+    val effectiveState = state ?: previewTherapyState(now)
+    val presentation = ComplicationPresentationFormatter.format(id, effectiveState, now)
+    val g = effectiveState.glucose
     val glucoseColor = when {
         g == null -> SugarliciousColors.TextPrimary
         g.valueMgDl < 80.0 -> SugarliciousColors.GlucoseLow
         g.valueMgDl > 160.0 -> SugarliciousColors.GlucoseHigh
         else -> SugarliciousColors.GlucoseInRange
     }
-
-    fun number(v: Double?, digits: Int, fallback: String): String =
-        v?.let { String.format(Locale.US, "%.${digits}f", it) } ?: fallback
-
-    return when (id) {
-        1 -> PhonePreview(glucoseText, unitLabel(g?.displayUnit), glucoseColor)
-        35 -> PhonePreview(trend, "")
-        36 -> PhonePreview(delta, "")
-        2 -> PhonePreview("$glucoseText$trend", "Glucose + Trend", glucoseColor)
-        28 -> PhonePreview("$glucoseText$trend", "Text", glucoseColor)
-        29 -> PhonePreview("$glucoseText $delta", "", glucoseColor)
-        30 -> PhonePreview("—", "Sensoralter")
-        31 -> {
-            val samples = state?.glucoseHistory.orEmpty().filter { it.measuredAtEpochMs >= now - 24L * 60L * 60_000L }
-            val tir = if (samples.isEmpty()) 100 else samples.count { it.valueMgDl in 70.0..180.0 } * 100 / samples.size
-            PhonePreview("${tir}%", "TIR 70–180")
-        }
-        32 -> PhonePreview("$glucoseText$trend $delta $age", "", glucoseColor)
-        33 -> PhonePreview("$glucoseText$trend $age", "", glucoseColor)
-        34 -> PhonePreview(
-            "${number(state?.insulin?.totalIob, 1, "1.2")}U · ${number(state?.carbs?.cobGrams, 0, "15")}g",
-            "Basal ${number(state?.basal?.currentUnitsPerHour, 2, "0.80")}U/h",
-        )
-        3 -> PhonePreview("$age · $delta", "")
-        4 -> PhonePreview("$glucoseText$trend", "Δ $delta", glucoseColor)
-        5 -> PhonePreview(age, freshness.name.lowercase())
-        6 -> PhonePreview("$glucoseText$trend", "Bild-Complication", glucoseColor)
-        7 -> PhonePreview(
-            glucoseText,
-            when {
-                g == null -> "Demo: im Bereich"
-                g.valueMgDl < 80.0 -> "niedrig"
-                g.valueMgDl > 160.0 -> "hoch"
-                else -> "im Bereich"
-            },
-            glucoseColor,
-        )
-        8 -> PhonePreview(glucoseText, trend, glucoseColor)
-        9, 10 -> PhonePreview("$glucoseText$trend", "Dot-Graph", glucoseColor)
-
-        11 -> PhonePreview(number(state?.insulin?.totalIob, 2, "1.20") + "U", "")
-        12 -> PhonePreview(number(state?.insulin?.bolusIob, 2, "0.80") + " U", "Bolus")
-        13 -> PhonePreview(number(state?.insulin?.basalIob, 2, "0.40") + " U", "Basal IOB")
-        14 -> PhonePreview(number(state?.carbs?.cobGrams, 0, "15") + "g", "")
-        15 -> PhonePreview(
-            "${number(state?.insulin?.totalIob, 1, "1.2")} U · " +
-                "${number(state?.carbs?.cobGrams, 0, "15")} g",
-            "IOB · COB",
-        )
-        16 -> PhonePreview(
-            number(state?.basal?.currentUnitsPerHour, 2, "0.80") + " U/h",
-            "Basal",
-        )
-        17 -> PhonePreview(
-            state?.basal?.displayText
-                ?: state?.basal?.tempPercent?.let { "$it%" }
-                ?: "120%",
-            "Temp basal",
-        )
-        18 -> PhonePreview(
-            TherapyDisplayFormatter.target(
-                state?.target ?: app.aapswear.model.TargetState(80.0, 160.0),
-                g?.displayUnit ?: GlucoseUnit.MG_DL,
-            ),
-            "Target",
-        )
-        19 -> {
-            val loopStatus = state?.loop?.status
-            PhonePreview(
-                when (loopStatus?.lowercase()) {
-                    "enacted" -> "aktiv"
-                    "suggested" -> "Vorschlag"
-                    null -> "aktiv"
-                    else -> loopStatus
-                },
-                "Loop",
-            )
-        }
-        20 -> PhonePreview(
-            state?.loop?.lastRunAtEpochMs?.let {
-                TherapyDisplayFormatter.ageMinutes(it, now)
-            } ?: "2m",
-            "letzter Loop",
-        )
-        21 -> PhonePreview(state?.profile?.name ?: "Daily 1.9", "Profil")
-
-        22 -> PhonePreview(number(state?.pump?.reservoirUnits, 0, "120") + " U", "Reservoir")
-        23 -> PhonePreview(state?.pump?.batteryPercent?.let { "$it%" } ?: "80%", "Pumpenakku")
-        24 -> PhonePreview(state?.device?.phoneBatteryPercent?.let { "$it%" } ?: "85%", "Telefonakku")
-        25 -> PhonePreview("Lokale Quelle", "Datenquelle")
-        26 -> PhonePreview(
-            "$glucoseText$trend",
-            "IOB ${number(state?.insulin?.totalIob, 1, "1.2")} · " +
-                "COB ${number(state?.carbs?.cobGrams, 0, "15")}",
-            glucoseColor,
-        )
-        27 -> PhonePreview(
-            "$glucoseText$trend · Δ $delta",
-            "IOB ${number(state?.insulin?.totalIob, 1, "1.2")} · " +
-                "COB ${number(state?.carbs?.cobGrams, 0, "15")} · Loop",
-            glucoseColor,
-        )
-        else -> PhonePreview("—", "")
-    }
+    return PhonePreview(
+        primary = presentation.text,
+        secondary = presentation.title.orEmpty(),
+        color = if (id in setOf(
+                SugarliciousComplicationIds.GLUCOSE,
+                SugarliciousComplicationIds.GLUCOSE_TREND,
+                SugarliciousComplicationIds.GLUCOSE_PLUS_DELTA,
+                SugarliciousComplicationIds.GLUCOSE_TREND_DELTA,
+                SugarliciousComplicationIds.GLUCOSE_TREND_DELTA_AGE,
+                SugarliciousComplicationIds.GLUCOSE_TREND_AGE,
+            )) glucoseColor else SugarliciousColors.TextPrimary,
+        trend = presentation.trend,
+    )
 }
+
+private fun previewTherapyState(now: Long): TherapyDisplayState =
+    TherapyDisplayState(
+        receivedAtEpochMs = now,
+        sourceVersion = "AndroidAPS",
+        glucose = app.aapswear.model.GlucoseState(
+            valueMgDl = 123.0,
+            displayUnit = GlucoseUnit.MG_DL,
+            trend = Trend.FORTY_FIVE_UP,
+            measuredAtEpochMs = now - 2 * 60_000L,
+            deltaMgDl = 5.0,
+        ),
+        glucoseHistory = demoHistory(now, 24),
+        insulin = app.aapswear.model.InsulinState(totalIob = 1.2, bolusIob = 0.8, basalIob = 0.4),
+        carbs = app.aapswear.model.CarbState(cobGrams = 15.0),
+        basal = app.aapswear.model.BasalState(currentUnitsPerHour = 0.70),
+        loop = app.aapswear.model.LoopState(status = "enacted", lastRunAtEpochMs = now - 2 * 60_000L),
+        pump = app.aapswear.model.PumpState(status = "OK", reservoirUnits = 120.0, batteryPercent = 80),
+    )
 
 internal fun complicationPreviewLabel(id: Int, state: TherapyDisplayState?): String {
     val entry = SugarliciousComplicationCatalog.firstOrNull { it.id == id }

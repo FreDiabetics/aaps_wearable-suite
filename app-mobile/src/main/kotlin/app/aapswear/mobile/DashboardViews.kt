@@ -286,6 +286,9 @@ class DashboardViewFactory(
         androidx.compose.runtime.mutableStateOf<ComposeRenderState?>(null)
     private var activeComposeScreen: DashboardScreen? = null
     private var activeComposeView: androidx.compose.ui.platform.ComposeView? = null
+    private var colorSettingsExpanded = false
+    private var predictionSettingsExpanded = false
+    private var notificationGraphSettingsExpanded = false
 
     private val density =
         context.resources.displayMetrics.density
@@ -459,7 +462,7 @@ class DashboardViewFactory(
                             Triple("Automatisch", preferences.dataSource == DataSourcePreference.AUTOMATIC) {
                                 callbacks.setDataSource(DataSourcePreference.AUTOMATIC)
                             },
-                            Triple("Loop-App", preferences.dataSource == DataSourcePreference.ANDROID_APS) {
+                            Triple("AndroidAPS", preferences.dataSource == DataSourcePreference.ANDROID_APS) {
                                 callbacks.setDataSource(DataSourcePreference.ANDROID_APS)
                             },
                             Triple("xDrip+", preferences.dataSource == DataSourcePreference.XDRIP_PLUS) {
@@ -495,7 +498,7 @@ class DashboardViewFactory(
         val colorContainer =
             LinearLayout(context).apply {
                 orientation = LinearLayout.VERTICAL
-                visibility = View.GONE
+                visibility = if (colorSettingsExpanded) View.VISIBLE else View.GONE
                 val colorSettings =
                     androidx.compose.ui.platform.ComposeView(context).apply {
                         setViewCompositionStrategy(
@@ -552,8 +555,8 @@ class DashboardViewFactory(
                 addView(divider())
                 addView(
                     actionRow("Farben & Darstellung", "Anpassen") {
-                        colorContainer.visibility =
-                            if (colorContainer.visibility == View.VISIBLE) View.GONE else View.VISIBLE
+                        colorSettingsExpanded = !colorSettingsExpanded
+                        colorContainer.visibility = if (colorSettingsExpanded) View.VISIBLE else View.GONE
                     },
                 )
             },
@@ -565,7 +568,7 @@ class DashboardViewFactory(
         val predictionContainer =
             LinearLayout(context).apply {
                 orientation = LinearLayout.VERTICAL
-                visibility = View.GONE
+                visibility = if (predictionSettingsExpanded) View.VISIBLE else View.GONE
                 addView(
                     tile(null).apply {
                         addView(
@@ -654,8 +657,8 @@ class DashboardViewFactory(
                             "Vorhersagen",
                             if (preferences.anyCgmPredictionEnabled) "Aktiv" else "Aus",
                         ) {
-                            predictionContainer.visibility =
-                                if (predictionContainer.visibility == View.VISIBLE) View.GONE else View.VISIBLE
+                            predictionSettingsExpanded = !predictionSettingsExpanded
+                            predictionContainer.visibility = if (predictionSettingsExpanded) View.VISIBLE else View.GONE
                         },
                     )
                 }
@@ -682,7 +685,7 @@ class DashboardViewFactory(
         parent.addView(settingsGroupLabel("BENACHRICHTIGUNG"), fullWidth())
         val notificationGraphCustomization = LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
-            visibility = View.GONE
+            visibility = if (notificationGraphSettingsExpanded) View.VISIBLE else View.GONE
             addView(
                 androidx.compose.ui.platform.ComposeView(context).apply {
                     setViewCompositionStrategy(
@@ -733,8 +736,8 @@ class DashboardViewFactory(
                     addView(divider())
                     addView(
                         actionRow("CGM-Dots & Farben", "Anpassen") {
-                            notificationGraphCustomization.visibility =
-                                if (notificationGraphCustomization.visibility == View.VISIBLE) View.GONE else View.VISIBLE
+                            notificationGraphSettingsExpanded = !notificationGraphSettingsExpanded
+                            notificationGraphCustomization.visibility = if (notificationGraphSettingsExpanded) View.VISIBLE else View.GONE
                         },
                     )
                 }
@@ -770,7 +773,8 @@ class DashboardViewFactory(
 
             header.addView(
                 ImageView(context).apply {
-                    setImageResource(R.drawable.frediabetics_logo)
+                    setImageResource(R.drawable.ic_monochrome_outlined)
+                    imageTintList = ColorStateList.valueOf(text)
                     contentDescription = context.getString(R.string.brand_logo)
                     scaleType = ImageView.ScaleType.FIT_CENTER
                 },

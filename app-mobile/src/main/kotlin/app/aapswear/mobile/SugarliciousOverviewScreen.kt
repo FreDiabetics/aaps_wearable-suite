@@ -63,11 +63,17 @@ internal fun SugarliciousOverviewScreen(
         LocalWindowInfo.current.containerSize.height.toDp().value.roundToInt()
     }
     val metrics = DashboardLayoutMetrics.forScreenHeight(screenHeightDp)
-    val gap = if (preferences.compact) 6.dp else 9.dp
-    val compactGraphHeightDp = maxOf(
-        metrics.metabolicChartHeight - 18,
-        96,
-    )
+    val fullyLoadedOverview = preferences.showDetails && preferences.showCgmGraph && preferences.showMetabolicGraph
+    val gap = if (preferences.compact || fullyLoadedOverview) 5.dp else 9.dp
+    val compactGraphHeightDp = if (fullyLoadedOverview) {
+        when {
+            screenHeightDp >= 900 -> 104
+            screenHeightDp >= 820 -> 92
+            else -> 82
+        }
+    } else {
+        maxOf(metrics.metabolicChartHeight - 18, 96)
+    }
 
     val cgmChartViewport =
         remember {
@@ -180,20 +186,6 @@ internal fun SugarliciousOverviewScreen(
                 .padding(horizontal = 2.dp, vertical = 2.dp),
         verticalArrangement = Arrangement.spacedBy(gap),
     ) {
-        OverviewWatchFaceTile(
-            state = state,
-            diagnostics = diagnostics,
-            selectedFaceIndex = preferences.watchFaceIndex,
-            onSelectedFace = callbacks.setWatchFaceIndex,
-            onEdit = {
-                callbacks.navigate(
-                    DashboardScreen.WATCH,
-                )
-            },
-        )
-
-        Spacer(Modifier.height(8.dp))
-
         GlucoseHeroCard(
             glucoseText = glucoseText,
             glucoseColor = glucoseColor,
@@ -203,11 +195,22 @@ internal fun SugarliciousOverviewScreen(
             deltaMgDl = glucose?.deltaMgDl,age = age,
             unitLabel = unitLabel(unit),
             tirStats = tirStats,
-            heightDp = maxOf(metrics.summaryTileHeight + 18, 108),
+            heightDp = if (fullyLoadedOverview) maxOf(metrics.summaryTileHeight, 88) else maxOf(metrics.summaryTileHeight + 18, 108),
+        )
+
+        OverviewInlineHeader(onSettings = { callbacks.navigate(DashboardScreen.SETTINGS) })
+
+        OverviewWatchFaceTile(
+            state = state,
+            diagnostics = diagnostics,
+            selectedFaceIndex = preferences.watchFaceIndex,
+            onSelectedFace = callbacks.setWatchFaceIndex,
+            onEdit = { callbacks.navigate(DashboardScreen.WATCH) },
+            compactLayout = fullyLoadedOverview,
         )
 
         if (preferences.showDetails) {
-            QuickStatsRow(state = state.takeIf { displayable }, heightDp = metrics.statTileHeight)
+            QuickStatsRow(state = state.takeIf { displayable }, heightDp = if (fullyLoadedOverview) minOf(metrics.statTileHeight, 60) else metrics.statTileHeight)
         }
 
         if (preferences.showCgmGraph) {
@@ -289,7 +292,7 @@ private fun GlucoseHeroCard(
 
                         Spacer(Modifier.width(6.dp))
 
-                        TrendIndicator(
+                        SugarliciousTrendIndicator(
                             correctedTrendForDisplay(
                                 trend,
                                 deltaMgDl,
@@ -470,105 +473,6 @@ private fun correctedTrendForDisplay(
     }
 }
 
-@Composable
-private fun TrendIndicator(trend: Trend) {
-    val arrowSize =
-        when (trend) {
-            Trend.FLAT,
-            Trend.SINGLE_UP,
-            Trend.SINGLE_DOWN,
-            -> 24.dp
-
-            Trend.FORTY_FIVE_UP,
-            Trend.FORTY_FIVE_DOWN,
-            -> 26.dp
-
-            Trend.DOUBLE_UP,
-            Trend.DOUBLE_DOWN,
-            -> 25.dp
-
-            Trend.UNKNOWN ->
-                25.dp
-        }
-
-    val rotation =
-        when (trend) {
-            Trend.DOUBLE_UP,
-            Trend.SINGLE_UP,
-            -> -90f
-
-            Trend.FORTY_FIVE_UP ->
-                -45f
-
-            Trend.FLAT ->
-                0f
-
-            Trend.FORTY_FIVE_DOWN ->
-                45f
-
-            Trend.SINGLE_DOWN,
-            Trend.DOUBLE_DOWN,
-            -> 90f
-
-            Trend.UNKNOWN ->
-                return
-        }
-
-    val doubleArrow =
-        trend == Trend.DOUBLE_UP ||
-            trend == Trend.DOUBLE_DOWN
-
-    Box(
-        modifier =
-            Modifier.size(
-                width =
-                    if (doubleArrow) {
-                        54.dp
-                    } else {
-                        32.dp
-                    },
-                height = 44.dp,
-            ),
-        contentAlignment =
-            Alignment.Center,
-    ) {
-        Row(
-            verticalAlignment =
-                Alignment.CenterVertically,
-            horizontalArrangement =
-                Arrangement.spacedBy(
-                    if (doubleArrow) {
-                        1.dp
-                    } else {
-                        0.dp
-                    },
-                ),
-        ) {
-            repeat(
-                if (doubleArrow) {
-                    2
-                } else {
-                    1
-                },
-            ) {
-                Image(
-                    painter =
-                        painterResource(
-                            R.drawable.ic_trend_arrow,
-                        ),
-                    contentDescription = null,
-                    colorFilter = ColorFilter.tint(SugarliciousColors.TextPrimary),
-                    modifier =
-                        Modifier
-                            .size(arrowSize)
-                            .graphicsLayer(
-                                rotationZ = rotation,
-                            ),
-                )
-            }
-        }
-    }
-}
 @Composable
 private fun QuickStatsRow(
     state: TherapyDisplayState?,

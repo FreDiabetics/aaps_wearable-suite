@@ -27,7 +27,8 @@ class TherapyComplicationsTest {
     fun `glucose plus delta exposes both values`() {
         val service = Robolectric.buildService(GlucosePlusDeltaComplication::class.java).create().get()
         val data = service.getPreviewData(ComplicationType.SHORT_TEXT) as ShortTextComplicationData
-        assertEquals("123 +5", data.text.getTextAt(service.resources, Instant.now()).toString())
+        assertEquals("123", data.text.getTextAt(service.resources, Instant.now()).toString())
+        assertEquals("+5", data.title!!.getTextAt(service.resources, Instant.now()).toString())
     }
 
     @Test
@@ -35,14 +36,15 @@ class TherapyComplicationsTest {
         val service = Robolectric.buildService(IobCobBasalComplication::class.java).create().get()
         val data = service.getPreviewData(ComplicationType.SHORT_TEXT) as ShortTextComplicationData
         assertEquals("1.2U · 15g", data.text.getTextAt(service.resources, Instant.now()).toString())
-        assertEquals("Basal 0.80U/h", data.title!!.getTextAt(service.resources, Instant.now()).toString())
+        assertEquals("0.80U/h", data.title!!.getTextAt(service.resources, Instant.now()).toString())
     }
 
     @Test
     fun `glucose trend also supplies short text`() {
         val service = Robolectric.buildService(GlucoseTrendComplication::class.java).create().get()
         val data = service.getPreviewData(ComplicationType.SHORT_TEXT) as ShortTextComplicationData
-        assertEquals("123↗", data.text.getTextAt(service.resources, Instant.now()).toString())
+        assertEquals("123", data.text.getTextAt(service.resources, Instant.now()).toString())
+        org.junit.Assert.assertNotNull(data.monochromaticImage)
     }
 
     @Test
@@ -70,16 +72,8 @@ class TherapyComplicationsTest {
                 )
                 .toString(),
         )
-        assertEquals(
-            "↗",
-            data.title!!
-                .getTextAt(
-                    service.resources,
-                    Instant.now(),
-                )
-                .toString(),
-        )
-        assertNull(data.monochromaticImage)
+        assertNull(data.title)
+        org.junit.Assert.assertNotNull(data.monochromaticImage)
         assertNull(data.smallImage)
     }
 
@@ -97,15 +91,13 @@ class TherapyComplicationsTest {
             ) as ShortTextComplicationData
 
         assertEquals(
-            "0m · +5",
-            data.text
-                .getTextAt(
-                    service.resources,
-                    Instant.now(),
-                )
-                .toString(),
+            "+5",
+            data.text.getTextAt(service.resources, Instant.now()).toString(),
         )
-        assertNull(data.title)
+        assertEquals(
+            "0m",
+            data.title!!.getTextAt(service.resources, Instant.now()).toString(),
+        )
     }
 
     @Test

@@ -139,10 +139,15 @@ internal fun OverviewWatchFaceTile(
     onSelectedFace: (Int) -> Unit,
     onEdit: () -> Unit,
     interactive: Boolean = true,
+    compactLayout: Boolean = false,
 ) {
     val context = LocalContext.current
-    val activeComplicationIds = loadComplicationPreset(context)
-    val selected = selectedFaceIndex.coerceIn(0, sugarliciousWatchFaceNames.lastIndex)
+    val runtime = WatchRuntimeStatusStore.read(context)
+    val activeComplicationIds = runtime.activeComplicationIds.ifEmpty { loadComplicationPreset(context) }
+    val effectiveFaceIndex = runtime.activeSugarliciousFaceIndex ?: selectedFaceIndex
+    val selected = effectiveFaceIndex.coerceIn(0, sugarliciousWatchFaceNames.lastIndex)
+    val faceSize = if (compactLayout) 104.dp else carouselFaceSize
+    val frameHeight = if (compactLayout) 154.dp else carouselHeight
     val midpoint = carouselPages / 2
     val aligned = midpoint - midpoint % sugarliciousWatchFaceNames.size
     val pager = rememberPagerState(initialPage = aligned + selected, pageCount = { carouselPages })
@@ -172,7 +177,7 @@ internal fun OverviewWatchFaceTile(
         verticalArrangement = Arrangement.spacedBy(3.dp),
     ) {
         BoxWithConstraints(
-            Modifier.fillMaxWidth().height(carouselHeight).clipToBounds(),
+            Modifier.fillMaxWidth().height(frameHeight).clipToBounds(),
             contentAlignment = Alignment.Center,
         ) {
             val oneStepSwipe = Modifier.pointerInput(pager.settledPage) {
@@ -192,14 +197,14 @@ internal fun OverviewWatchFaceTile(
                     onDragCancel = { dragDistance = 0f },
                 )
             }
-            val centeredPadding = ((maxWidth - carouselFaceSize) / 2).coerceAtLeast(0.dp)
+            val centeredPadding = ((maxWidth - faceSize) / 2).coerceAtLeast(0.dp)
             GalaxyWatchUltraFrame()
             HorizontalPager(
                 state = pager,
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(horizontal = centeredPadding),
                 pageSpacing = carouselPageSpacing,
-                pageSize = PageSize.Fixed(carouselFaceSize),
+                pageSize = PageSize.Fixed(faceSize),
                 userScrollEnabled = false,
                 verticalAlignment = Alignment.CenterVertically,
             ) { page ->
@@ -224,7 +229,7 @@ internal fun OverviewWatchFaceTile(
                         index = index,
                         state = state,
                         activeComplicationIds = activeComplicationIds,
-                        modifier = Modifier.size(carouselFaceSize),
+                        modifier = Modifier.size(faceSize),
                     )
                 }
             }
@@ -522,14 +527,11 @@ internal fun FaceDial(
             fun sx(value: Float): Float = (center.x - 256f * scale) + value * scale
             fun sy(value: Float): Float = (center.y - 256f * scale) + value * scale
 
-            // Live preview time.
-            val calendar = java.util.Calendar.getInstance()
-            val hour = calendar.get(java.util.Calendar.HOUR)
-            val minute = calendar.get(java.util.Calendar.MINUTE)
-            val second = calendar.get(java.util.Calendar.SECOND)
-            val hourAngle = (hour % 12) * 30f + minute * 0.5f
-            val minuteAngle = minute * 6f + second * 0.1f
-            val secondAngle = second * 6f
+            // Preview hands are intentionally static. Runtime time belongs to the real watchface;
+            // a moving phone mock-up made the preview look like a random second watch.
+            val hourAngle = CAROUSEL_PREVIEW_HOUR_ANGLE.toFloat()
+            val minuteAngle = CAROUSEL_PREVIEW_MINUTE_ANGLE.toFloat()
+            val secondAngle = CAROUSEL_PREVIEW_SECOND_ANGLE.toFloat()
 
             withTransform({ rotate(degrees = hourAngle, pivot = center) }) {
                 drawRect(

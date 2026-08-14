@@ -57,21 +57,31 @@ class MainActivity : ComponentActivity() {
     private val diagnosticsListener = SharedPreferences.OnSharedPreferenceChangeListener { _, _ -> runOnUiThread(::refresh) }
     private val uiListener =
         SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
-            if (uiPreferenceRequiresDashboardRefresh(key)) {
-                runOnUiThread {
-                    SugarliciousColors.apply(SugarliciousColorStore.load(uiPreferences))
+            runOnUiThread {
+                SugarliciousColors.apply(SugarliciousColorStore.load(uiPreferences))
+                if (screen == DashboardScreen.SETTINGS && isInteractiveAppearancePreference(key)) {
+                    // Keep the active color picker/slider and expanded section alive. Rebuilding the
+                    // complete Settings hierarchy here used to close the configurator on every drag.
+                    applyRuntimeColors()
+                } else if (uiPreferenceRequiresDashboardRefresh(key)) {
                     refresh(forceSettingsRender = true)
                 }
             }
             scope.launch(Dispatchers.IO) {
-                runCatching {
-                    publishWatchConfig(applicationContext)
-                }
+                runCatching { publishWatchConfig(applicationContext) }
             }
         }
 
     internal fun uiPreferenceRequiresDashboardRefresh(key: String?): Boolean =
         key != "watchFaceIndex"
+
+    internal fun isInteractiveAppearancePreference(key: String?): Boolean =
+        key != null && (
+            key.startsWith("color.") ||
+                key.startsWith("notification.color.") ||
+                key.startsWith("cgm.dot") ||
+                key.startsWith("notification.cgm.dot")
+            )
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -217,7 +227,14 @@ class MainActivity : ComponentActivity() {
         super.onStart()
         diagnostics.registerOnSharedPreferenceChangeListener(diagnosticsListener)
         uiPreferences.registerOnSharedPreferenceChangeListener(uiListener)
-        clockJob = scope.launch { while (true) { delay(30.seconds); refresh() } }
+        clockJob = scope.launch {
+            while (true) {
+                runCatching { requestWatchRuntimeStatus(applicationContext) }
+                delay(30.seconds)
+                refresh()
+            }
+        }
+        scope.launch(Dispatchers.IO) { runCatching { requestWatchRuntimeStatus(applicationContext) } }
         refresh()
     }
 
@@ -313,24 +330,24 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun updateTopBar() {
+        val bar = findViewById<View>(R.id.top_app_bar)
         val back = findViewById<View>(R.id.top_back)
         val brand = findViewById<View>(R.id.brand_logo)
         val title = findViewById<TextView>(R.id.app_title)
         val settings = findViewById<View>(R.id.top_settings)
         when (screen) {
             DashboardScreen.OVERVIEW -> {
-                back.visibility = View.GONE
-                brand.visibility = View.VISIBLE
-                settings.visibility = View.VISIBLE
-                styleTitle()
+                bar.visibility = View.GONE
             }
             DashboardScreen.WATCH -> {
+                bar.visibility = View.VISIBLE
                 back.visibility = View.VISIBLE
                 brand.visibility = View.GONE
                 settings.visibility = View.GONE
                 title.text = "Watch"
             }
             DashboardScreen.SETTINGS -> {
+                bar.visibility = View.VISIBLE
                 back.visibility = View.VISIBLE
                 brand.visibility = View.GONE
                 settings.visibility = View.GONE
@@ -388,7 +405,7 @@ class MainActivity : ComponentActivity() {
     private fun syncNow() {
         val latest = state
         if (latest == null) {
-            Toast.makeText(this, "Noch keine gültigen Loop-Daten vorhanden", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "Noch keine gültigen AndroidAPS-Daten vorhanden", Toast.LENGTH_SHORT).show()
             return
         }
         diagnostics.edit { putString("lastSyncStatus", "pending") }
