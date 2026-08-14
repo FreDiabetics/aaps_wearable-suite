@@ -2,17 +2,21 @@ package app.aapswear.wear
 
 import android.app.Activity
 import android.content.Context
+import android.content.Intent
 import android.content.SharedPreferences
+import android.content.res.ColorStateList
+import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
 import android.view.View
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import app.aapswear.model.DataSourceId
 import app.aapswear.model.Freshness
 import app.aapswear.model.FreshnessPolicy
 import app.aapswear.model.GlucoseUnit
-import app.aapswear.model.TherapyDisplayFormatter
 import app.aapswear.model.TherapyDisplayState
+import app.aapswear.model.TrendVisuals
 import app.aapswear.protocol.WatchGlucoseUnit
 import app.aapswear.storage.TherapyStateStore
 import kotlinx.coroutines.CoroutineScope
@@ -42,7 +46,9 @@ class WearActivity : Activity() {
     private lateinit var clock: TextView
     private lateinit var glucose: TextView
     private lateinit var unit: TextView
-    private lateinit var trend: TextView
+    private lateinit var trendContainer: LinearLayout
+    private lateinit var trendArrow1: ImageView
+    private lateinit var trendArrow2: ImageView
     private lateinit var delta: TextView
     private lateinit var age: TextView
     private lateinit var status: TextView
@@ -58,10 +64,7 @@ class WearActivity : Activity() {
     private lateinit var watchFacePushStatus: TextView
 
     private val displayPreferencesListener =
-        SharedPreferences.OnSharedPreferenceChangeListener {
-                _,
-                _,
-            ->
+        SharedPreferences.OnSharedPreferenceChangeListener { _, _ ->
             runOnUiThread(::render)
         }
 
@@ -70,17 +73,17 @@ class WearActivity : Activity() {
         setContentView(R.layout.activity_wear)
         bindViews()
 
-        findViewById<View>(
-            R.id.wear_connection_card,
-        ).setOnClickListener {
-            requestPhoneRefresh()
-        }
-
-        findViewById<View>(
-            R.id.wear_watchface_push_card,
-        ).setOnClickListener {
-            requestWatchFaceActivationPermission()
-        }
+        findViewById<View>(R.id.wear_connection_card)
+            .setOnClickListener { requestPhoneRefresh() }
+        findViewById<View>(R.id.wear_settings)
+            .setOnClickListener {
+                startActivity(
+                    Intent(
+                        this,
+                        WearSettingsActivity::class.java,
+                    ),
+                )
+            }
 
         scope.launch {
             TherapyStateStore(this@WearActivity)
@@ -91,6 +94,7 @@ class WearActivity : Activity() {
                 }
         }
 
+        requestWatchFacePermissionOnFirstLaunch()
         requestPhoneRefresh(initial = true)
         render()
     }
@@ -137,7 +141,9 @@ class WearActivity : Activity() {
         clock = findViewById(R.id.wear_clock)
         glucose = findViewById(R.id.wear_glucose)
         unit = findViewById(R.id.wear_unit)
-        trend = findViewById(R.id.wear_trend)
+        trendContainer = findViewById(R.id.wear_trend_container)
+        trendArrow1 = findViewById(R.id.wear_trend_arrow_1)
+        trendArrow2 = findViewById(R.id.wear_trend_arrow_2)
         delta = findViewById(R.id.wear_delta)
         age = findViewById(R.id.wear_age)
         status = findViewById(R.id.wear_status)
@@ -150,22 +156,14 @@ class WearActivity : Activity() {
         basal = findViewById(R.id.wear_basal)
         therapyRow = findViewById(R.id.wear_therapy_row)
         chart = findViewById(R.id.wear_glucose_chart)
-        watchFacePushStatus =
-            findViewById(
-                R.id.wear_watchface_push_status,
-            )
+        watchFacePushStatus = findViewById(R.id.wear_watchface_push_status)
     }
 
-    private fun requestPhoneRefresh(
-        initial: Boolean = false,
-    ) {
+    private fun requestPhoneRefresh(initial: Boolean = false) {
         if (!::connection.isInitialized) return
 
         if (!initial) {
-            syncHint.text =
-                getString(
-                    R.string.syncing_values,
-                )
+            syncHint.text = "Werte werden synchronisiert"
         }
 
         scope.launch {
@@ -195,8 +193,8 @@ class WearActivity : Activity() {
         val now = System.currentTimeMillis()
         val state = latest
         val glucoseState = state?.glucose
-        val preferences =
-            WearDisplayPreferences.read(this)
+        val preferences = WearDisplayPreferences.read(this)
+        applyUiColors(preferences)
 
         val freshness =
             FreshnessPolicy.classify(
@@ -213,10 +211,8 @@ class WearActivity : Activity() {
                     Freshness.DELAYED,
                 )
 
-        val targetLow =
-            state?.target?.lowMgDl ?: 80.0
-        val targetHigh =
-            state?.target?.highMgDl ?: 160.0
+        val targetLow = state?.target?.lowMgDl ?: 80.0
+        val targetHigh = state?.target?.highMgDl ?: 160.0
 
         clock.text =
             SimpleDateFormat(
@@ -241,43 +237,25 @@ class WearActivity : Activity() {
             }
 
         glucose.setTextColor(
-            getColor(
-                when {
-                    !canShowValue ->
-                        R.color.wear_text
-
-                    glucoseState.valueMgDl < targetLow ->
-                        R.color.wear_red
-
-                    glucoseState.valueMgDl > targetHigh ->
-                        R.color.wear_yellow
-
-                    else ->
-                        R.color.wear_text
-                },
-            ),
+            when {
+                !canShowValue -> preferences.uiColors.textPrimary
+                glucoseState.valueMgDl < targetLow -> preferences.uiColors.glucoseLow
+                glucoseState.valueMgDl > targetHigh -> preferences.uiColors.glucoseHigh
+                else -> preferences.uiColors.glucoseInRange
+            },
         )
 
         unit.text =
             when {
-                !canShowValue ->
-                    "keine Daten"
-
-                resolvedUnit == GlucoseUnit.MMOL_L ->
-                    "mmol/L"
-
-                else ->
-                    "mg/dL"
+                !canShowValue -> "keine Daten"
+                resolvedUnit == GlucoseUnit.MMOL_L -> "mmol/L"
+                else -> "mg/dL"
             }
 
-        trend.text =
-            if (canShowValue) {
-                TherapyDisplayFormatter.trendArrow(
-                    glucoseState.trend,
-                )
-            } else {
-                "—"
-            }
+        renderTrend(
+            if (canShowValue) glucoseState.trend else null,
+            preferences.uiColors.textPrimary,
+        )
 
         delta.text =
             if (canShowValue) {
@@ -289,43 +267,23 @@ class WearActivity : Activity() {
                 "—"
             }
 
-        age.text =
-            ageMinutes(
-                glucoseState?.measuredAtEpochMs,
-                now,
-            )
+        age.text = ageMinutes(glucoseState?.measuredAtEpochMs, now)
 
         status.text =
             when (freshness) {
-                Freshness.CURRENT ->
-                    "● LIVE"
-
-                Freshness.DELAYED ->
-                    "● VERZÖGERT"
-
-                Freshness.STALE ->
-                    "● VERALTET"
-
-                Freshness.NO_DATA ->
-                    "○ KEINE DATEN"
+                Freshness.CURRENT -> "● LIVE"
+                Freshness.DELAYED -> "● VERZÖGERT"
+                Freshness.STALE -> "● VERALTET"
+                Freshness.NO_DATA -> "○ KEINE DATEN"
             }
 
         status.setTextColor(
-            getColor(
-                when (freshness) {
-                    Freshness.CURRENT ->
-                        R.color.wear_accent
-
-                    Freshness.DELAYED ->
-                        R.color.wear_orange
-
-                    Freshness.STALE ->
-                        R.color.wear_red
-
-                    Freshness.NO_DATA ->
-                        R.color.wear_text_secondary
-                },
-            ),
+            when (freshness) {
+                Freshness.CURRENT -> preferences.uiColors.accent
+                Freshness.DELAYED -> preferences.uiColors.glucoseHigh
+                Freshness.STALE -> preferences.uiColors.glucoseLow
+                Freshness.NO_DATA -> preferences.uiColors.textSecondary
+            },
         )
 
         val history =
@@ -333,8 +291,7 @@ class WearActivity : Activity() {
                 ?.glucoseHistory
                 .orEmpty()
                 .filter {
-                    now - it.measuredAtEpochMs <=
-                        HISTORY_WINDOW_MS
+                    now - it.measuredAtEpochMs <= HISTORY_WINDOW_MS
                 }
 
         historyInfo.text =
@@ -347,54 +304,28 @@ class WearActivity : Activity() {
         chart.bind(
             newState = state,
             graphHours = preferences.graphHours,
-            showPredictions =
-                preferences.showPredictions,
+            showPredictions = preferences.showPredictions,
             colors = preferences.graphColors,
             style = preferences.graphStyle,
         )
 
         therapyRow.visibility =
-            if (preferences.showTherapyStats) {
-                View.VISIBLE
-            } else {
-                View.GONE
-            }
+            if (preferences.showTherapyStats) View.VISIBLE else View.GONE
+        findViewById<View>(R.id.wear_basal_card).visibility =
+            if (preferences.showTherapyStats) View.VISIBLE else View.GONE
 
-        iob.text =
-            formatNumber(
-                state?.insulin?.totalIob,
-                2,
-                " IE",
-            )
-
-        cob.text =
-            formatNumber(
-                state?.carbs?.cobGrams,
-                0,
-                " g",
-            )
-
-        basal.text =
-            formatNumber(
-                state?.basal?.currentUnitsPerHour,
-                2,
-                " IE/h",
-            )
+        iob.text = formatNumber(state?.insulin?.totalIob, 2, " IE")
+        cob.text = formatNumber(state?.carbs?.cobGrams, 0, " g")
+        basal.text = formatNumber(state?.basal?.currentUnitsPerHour, 2, " IE/h")
 
         source.text =
             when (state?.source) {
-                DataSourceId.ANDROID_APS ->
-                    "Lokale Loop-Daten"
-
+                DataSourceId.ANDROID_APS -> "AndroidAPS"
                 DataSourceId.XDRIP_PLUS ->
                     state.sourceVersion
                         ?.let { "xDrip+ $it" }
                         ?: "xDrip+"
-
-                null ->
-                    getString(
-                        R.string.data_source_unavailable,
-                    )
+                null -> "Datenquelle nicht verfügbar"
             }
 
         connection.text =
@@ -403,58 +334,150 @@ class WearActivity : Activity() {
             } else {
                 "○ Telefon nicht erreichbar"
             }
-
         connection.setTextColor(
-            getColor(
-                if (connectedNodes > 0) {
-                    R.color.wear_accent
-                } else {
-                    R.color.wear_text_secondary
-                },
-            ),
+            if (connectedNodes > 0) {
+                preferences.uiColors.accent
+            } else {
+                preferences.uiColors.textSecondary
+            },
         )
 
         renderWatchFacePushStatus()
     }
 
-    private fun requestWatchFaceActivationPermission() {
-        when {
-            !SugarliciousWatchFacePush.isSupported() ->
-                watchFacePushStatus.text =
-                    "Direktwechsel: Wear OS 6+ erforderlich"
+    private fun renderTrend(
+        trend: app.aapswear.model.Trend?,
+        color: Int,
+    ) {
+        val spec = trend?.let(TrendVisuals::spec)
+        if (spec == null) {
+            trendContainer.visibility = View.GONE
+            return
+        }
 
-            SugarliciousWatchFacePush
-                .hasActivationPermission(this) ->
-                watchFacePushStatus.text =
-                    "Direktwechsel freigegeben"
+        trendContainer.visibility = View.VISIBLE
+        val tint = ColorStateList.valueOf(color)
+        trendArrow1.imageTintList = tint
+        trendArrow2.imageTintList = tint
+        trendArrow1.rotation = spec.rotationDegrees
+        trendArrow2.rotation = spec.rotationDegrees
+        trendArrow1.visibility = View.VISIBLE
+        trendArrow2.visibility =
+            if (spec.arrowCount == 2) View.VISIBLE else View.GONE
+    }
 
-            else ->
-                requestPermissions(
-                    arrayOf(
-                        SugarliciousWatchFacePush
-                            .ACTIVE_PERMISSION,
-                    ),
-                    WATCH_FACE_PERMISSION_REQUEST,
+    private fun applyUiColors(preferences: WearDisplayPreferences) {
+        val ui = preferences.uiColors
+        findViewById<View>(R.id.wear_root).setBackgroundColor(ui.background)
+
+        val normalCards =
+            listOf(
+                R.id.wear_glucose_card,
+                R.id.wear_basal_card,
+                R.id.wear_iob_card,
+                R.id.wear_cob_card,
+                R.id.wear_connection_card,
+            )
+        normalCards.forEach { id ->
+            findViewById<View>(id).background =
+                roundedBackground(
+                    ui.tileBackground,
+                    ui.tileBorder,
                 )
+        }
+        findViewById<View>(R.id.wear_graph_card).background =
+            roundedBackground(
+                preferences.graphColors.graphBackground,
+                ui.tileBorder,
+            )
+
+        val primaryTextIds =
+            listOf(
+                R.id.wear_brand_text,
+                R.id.wear_glucose,
+                R.id.wear_unit,
+                R.id.wear_basal,
+                R.id.wear_iob,
+                R.id.wear_cob,
+                R.id.wear_source,
+            )
+        primaryTextIds.forEach { id ->
+            findViewById<TextView>(id).setTextColor(ui.textPrimary)
+        }
+        val secondaryTextIds =
+            listOf(
+                R.id.wear_clock,
+                R.id.wear_age,
+                R.id.wear_history_info,
+                R.id.wear_sync_hint,
+                R.id.wear_watchface_push_status,
+                R.id.wear_footer_text,
+            )
+        secondaryTextIds.forEach { id ->
+            findViewById<TextView>(id).setTextColor(ui.textSecondary)
+        }
+        delta.setTextColor(ui.accent)
+        iob.setTextColor(ui.iob)
+        cob.setTextColor(ui.cob)
+
+        val primaryTint = ColorStateList.valueOf(ui.textPrimary)
+        findViewById<ImageView>(R.id.wear_brand_icon).imageTintList = primaryTint
+        findViewById<ImageView>(R.id.wear_settings).imageTintList = primaryTint
+        findViewById<ImageView>(R.id.wear_footer_icon).imageTintList =
+            ColorStateList.valueOf(ui.textSecondary)
+    }
+
+    private fun roundedBackground(
+        fill: Int,
+        border: Int,
+    ): GradientDrawable =
+        GradientDrawable().apply {
+            shape = GradientDrawable.RECTANGLE
+            cornerRadius = 18f * resources.displayMetrics.density
+            setColor(fill)
+            setStroke(
+                (1f * resources.displayMetrics.density).roundToInt().coerceAtLeast(1),
+                border,
+            )
+        }
+
+    private fun requestWatchFacePermissionOnFirstLaunch() {
+        val onboarding =
+            getSharedPreferences(
+                ONBOARDING_PREFS,
+                Context.MODE_PRIVATE,
+            )
+        if (onboarding.getBoolean(KEY_WFP_PERMISSION_REQUESTED, false)) return
+
+        onboarding
+            .edit()
+            .putBoolean(KEY_WFP_PERMISSION_REQUESTED, true)
+            .apply()
+
+        if (
+            SugarliciousWatchFacePush.isSupported() &&
+            !SugarliciousWatchFacePush.hasActivationPermission(this)
+        ) {
+            requestPermissions(
+                arrayOf(
+                    SugarliciousWatchFacePush.ACTIVE_PERMISSION,
+                ),
+                WATCH_FACE_PERMISSION_REQUEST,
+            )
         }
     }
 
     private fun renderWatchFacePushStatus() {
-        if (!::watchFacePushStatus.isInitialized) {
-            return
-        }
+        if (!::watchFacePushStatus.isInitialized) return
 
         watchFacePushStatus.text =
             when {
                 !SugarliciousWatchFacePush.isSupported() ->
-                    "Direktwechsel auf diesem Wear OS nicht verfügbar"
-
-                SugarliciousWatchFacePush
-                    .hasActivationPermission(this) ->
-                    "Direktwechsel freigegeben"
-
+                    "Watchface-Direktwechsel: Wear OS 6+ erforderlich"
+                SugarliciousWatchFacePush.hasActivationPermission(this) ->
+                    "Watchface-Direktwechsel freigegeben"
                 else ->
-                    "Tippen, um Direktwechsel einmalig freizugeben"
+                    "Watchface-Direktwechsel nicht freigegeben"
             }
     }
 
@@ -468,10 +491,7 @@ class WearActivity : Activity() {
             permissions,
             grantResults,
         )
-
-        if (requestCode ==
-            WATCH_FACE_PERMISSION_REQUEST
-        ) {
+        if (requestCode == WATCH_FACE_PERMISSION_REQUEST) {
             renderWatchFacePushStatus()
         }
     }
@@ -481,14 +501,9 @@ class WearActivity : Activity() {
         preference: WatchGlucoseUnit,
     ): GlucoseUnit =
         when (preference) {
-            WatchGlucoseUnit.AAPS ->
-                stateUnit ?: GlucoseUnit.MG_DL
-
-            WatchGlucoseUnit.MG_DL ->
-                GlucoseUnit.MG_DL
-
-            WatchGlucoseUnit.MMOL_L ->
-                GlucoseUnit.MMOL_L
+            WatchGlucoseUnit.AAPS -> stateUnit ?: GlucoseUnit.MG_DL
+            WatchGlucoseUnit.MG_DL -> GlucoseUnit.MG_DL
+            WatchGlucoseUnit.MMOL_L -> GlucoseUnit.MMOL_L
         }
 
     private fun formatGlucose(
@@ -502,9 +517,7 @@ class WearActivity : Activity() {
                 valueMgDl / 18.0,
             )
         } else {
-            valueMgDl
-                .roundToInt()
-                .toString()
+            valueMgDl.roundToInt().toString()
         }
 
     private fun formatDelta(
@@ -512,28 +525,14 @@ class WearActivity : Activity() {
         unit: GlucoseUnit,
     ): String {
         valueMgDl ?: return "—"
-
         val value =
-            if (unit == GlucoseUnit.MMOL_L) {
-                valueMgDl / 18.0
-            } else {
-                valueMgDl
-            }
-
-        val prefix =
-            if (value >= 0.0) "+" else ""
-
+            if (unit == GlucoseUnit.MMOL_L) valueMgDl / 18.0 else valueMgDl
+        val prefix = if (value >= 0.0) "+" else ""
         return prefix +
             if (unit == GlucoseUnit.MMOL_L) {
-                String.format(
-                    Locale.getDefault(),
-                    "%.1f",
-                    value,
-                )
+                String.format(Locale.getDefault(), "%.1f", value)
             } else {
-                value
-                    .roundToInt()
-                    .toString()
+                value.roundToInt().toString()
             }
     }
 
@@ -543,7 +542,7 @@ class WearActivity : Activity() {
     ): String =
         timestamp
             ?.let {
-                "${((now - it).coerceAtLeast(0L) / 60_000L)}m"
+                "${((now - it).coerceAtLeast(0L) / 60_000L)} min"
             }
             ?: "—"
 
@@ -564,10 +563,9 @@ class WearActivity : Activity() {
             ?: "—"
 
     companion object {
-        private const val WATCH_FACE_PERMISSION_REQUEST =
-            701
-
-        private const val HISTORY_WINDOW_MS =
-            24 * 60 * 60_000L
+        private const val WATCH_FACE_PERMISSION_REQUEST = 701
+        private const val ONBOARDING_PREFS = "wear_onboarding"
+        private const val KEY_WFP_PERMISSION_REQUESTED = "watchface_permission_requested"
+        private const val HISTORY_WINDOW_MS = 24 * 60 * 60_000L
     }
 }
