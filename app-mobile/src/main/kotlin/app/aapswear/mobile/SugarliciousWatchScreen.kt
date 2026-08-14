@@ -139,7 +139,7 @@ internal fun SugarliciousWatchScreen(
         }
 
         key(editingFaceIndex) {
-            CompositionLocalProvider(LocalSugarliciousTrendArrowMaxSize provides 13.dp) {
+            CompositionLocalProvider(LocalSugarliciousTrendArrowMaxSize provides 8.dp) {
                 ComplicationStudio(
                     state = state,
                     onPresetChanged = { updated ->
