@@ -87,7 +87,8 @@ jobs:
           forbidden = ('TrendOnlyComplication', 'DeltaOnlyComplication', 'GlucoseAgeComplication', 'GlucoseTrendComplication')
           if any(x in manifest for x in forbidden):
               raise SystemExit('Removed complications are still exported')
-          if catalog.count('ComplicationCatalogEntry(') != 15:
+          # One occurrence is the data-class constructor; the remaining 15 are the requested entries.
+          if catalog.count('ComplicationCatalogEntry(') != 16:
               raise SystemExit('Complication Studio must expose exactly 15 requested entries')
           if 'listOf(1, 2, 6, 12, 24)' not in catalog:
               raise SystemExit('Requested CGM complication graph scales missing')
