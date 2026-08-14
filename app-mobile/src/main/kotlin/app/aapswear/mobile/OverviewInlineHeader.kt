@@ -33,13 +33,13 @@ internal fun OverviewInlineHeader(onSettings: () -> Unit) {
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(
-            modifier = Modifier.size(width = 26.dp, height = 38.dp),
+            modifier = Modifier.size(width = 30.dp, height = 38.dp),
             contentAlignment = Alignment.CenterStart,
         ) {
             Image(
                 painter = painterResource(R.drawable.ic_foreground),
                 contentDescription = null,
-                modifier = Modifier.size(42.dp).offset(x = (-9).dp),
+                modifier = Modifier.size(25.dp),
             )
         }
 
@@ -67,7 +67,7 @@ internal fun OverviewInlineHeader(onSettings: () -> Unit) {
             Image(
                 painter = painterResource(R.drawable.ic_settings),
                 contentDescription = "Einstellungen",
-                modifier = Modifier.size(36.dp).offset(x = 7.25.dp),
+                modifier = Modifier.size(23.dp).offset(x = 5.dp),
                 colorFilter = ColorFilter.tint(SettingsIconGray),
             )
         }

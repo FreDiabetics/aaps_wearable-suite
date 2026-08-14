@@ -4,7 +4,7 @@ android {
     namespace="app.aapswear.watchface.gota"
     compileSdk=36
     defaultConfig {
-        applicationId="app.aapswear.watchface.gota"
+        applicationId="app.aapswear.watchfacepush.gota"
         minSdk=33
         targetSdk=35
         versionCode=3

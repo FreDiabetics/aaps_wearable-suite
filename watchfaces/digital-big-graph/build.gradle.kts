@@ -4,7 +4,7 @@ android {
     namespace="app.aapswear.watchface.digitalbiggraph"
     compileSdk=36
     defaultConfig {
-        applicationId="app.aapswear.watchface.digitalbiggraph"
+        applicationId="app.aapswear.watchfacepush.digitalbiggraph"
         minSdk=33
         targetSdk=35
         versionCode=3

@@ -4,7 +4,7 @@ android {
     namespace="app.aapswear.watchface.pzero"
     compileSdk=36
     defaultConfig {
-        applicationId="app.aapswear.watchface.pzero"
+        applicationId="app.aapswear.watchfacepush.pzero"
         minSdk=33
         targetSdk=35
         versionCode=3

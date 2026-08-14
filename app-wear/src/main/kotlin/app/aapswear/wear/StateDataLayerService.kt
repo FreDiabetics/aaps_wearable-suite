@@ -74,7 +74,7 @@ class StateDataLayerService : WearableListenerService() {
             event.data
                 .decodeToString()
                 .toIntOrNull()
-                ?.coerceIn(0, 3)
+                ?.coerceAtLeast(0)
                 ?: return
 
         val appContext = applicationContext

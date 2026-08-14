@@ -6,6 +6,7 @@ import android.os.ParcelFileDescriptor
 import androidx.wear.watchfacepush.WatchFacePushManagerFactory
 import java.io.File
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.delay
 
 internal object SugarliciousWatchFacePush {
     const val ACTIVE_PERMISSION =
@@ -15,6 +16,7 @@ internal object SugarliciousWatchFacePush {
     private const val LAST_APPLIED_FACE = "last_applied_face"
     private const val LAST_APPLIED_AT = "last_applied_at"
     private const val SETTLING_WINDOW_MS = 15_000L
+    private const val ACTIVATION_RETRY_DELAY_MS = 900L
 
     private data class FaceSpec(
         val packageName: String,
@@ -44,6 +46,34 @@ internal object SugarliciousWatchFacePush {
                 "watchfaces/sugarlicious_graph.apk",
                 "watchfaces/sugarlicious_graph_token.txt",
             ),
+            FaceSpec(
+                "app.aapswear.watchfacepush.digital",
+                "watchfaces/sugarlicious_digital.apk",
+                "watchfaces/sugarlicious_digital_token.txt",
+            ),
+            FaceSpec("app.aapswear.watchfacepush.aapsbigchart", "watchfaces/aaps_big_chart.apk", "watchfaces/aaps_big_chart_token.txt"),
+            FaceSpec("app.aapswear.watchfacepush.aapscircle", "watchfaces/aaps_circle.apk", "watchfaces/aaps_circle_token.txt"),
+            FaceSpec("app.aapswear.watchfacepush.aapscockpit", "watchfaces/aaps_cockpit.apk", "watchfaces/aaps_cockpit_token.txt"),
+            FaceSpec("app.aapswear.watchfacepush.aapscommunity", "watchfaces/aaps_community.apk", "watchfaces/aaps_community_token.txt"),
+            FaceSpec("app.aapswear.watchfacepush.aapsdigitalstyle", "watchfaces/aaps_digital_style.apk", "watchfaces/aaps_digital_style_token.txt"),
+            FaceSpec("app.aapswear.watchfacepush.aapslarge", "watchfaces/aaps_large.apk", "watchfaces/aaps_large_token.txt"),
+            FaceSpec("app.aapswear.watchfacepush.aapsnochart", "watchfaces/aaps_no_chart.apk", "watchfaces/aaps_no_chart_token.txt"),
+            FaceSpec("app.aapswear.watchfacepush.aapsstandard", "watchfaces/aaps_standard.apk", "watchfaces/aaps_standard_token.txt"),
+            FaceSpec("app.aapswear.watchfacepush.aapsv2", "watchfaces/aaps_v2.apk", "watchfaces/aaps_v2_token.txt"),
+            FaceSpec("app.aapswear.watchfacepush.aapsv2ttdark", "watchfaces/aaps_v2_tt_dark.apk", "watchfaces/aaps_v2_tt_dark_token.txt"),
+            FaceSpec("app.aapswear.watchfacepush.aapsv4", "watchfaces/aaps_v4.apk", "watchfaces/aaps_v4_token.txt"),
+            FaceSpec("app.aapswear.watchfacepush.aimico", "watchfaces/aimico.apk", "watchfaces/aimico_token.txt"),
+            FaceSpec("app.aapswear.watchfacepush.analoggwatch", "watchfaces/analog_g_watch.apk", "watchfaces/analog_g_watch_token.txt"),
+            FaceSpec("app.aapswear.watchfacepush.bluering", "watchfaces/blue_ring.apk", "watchfaces/blue_ring_token.txt"),
+            FaceSpec("app.aapswear.watchfacepush.digitalbiggraph", "watchfaces/digital_big_graph.apk", "watchfaces/digital_big_graph_token.txt"),
+            FaceSpec("app.aapswear.watchfacepush.digitalgwatch", "watchfaces/digital_g_watch.apk", "watchfaces/digital_g_watch_token.txt"),
+            FaceSpec("app.aapswear.watchfacepush.gears", "watchfaces/gears.apk", "watchfaces/gears_token.txt"),
+            FaceSpec("app.aapswear.watchfacepush.gota", "watchfaces/gota.apk", "watchfaces/gota_token.txt"),
+            FaceSpec("app.aapswear.watchfacepush.luckyloopkoeln", "watchfaces/lucky_loop_koeln.apk", "watchfaces/lucky_loop_koeln_token.txt"),
+            FaceSpec("app.aapswear.watchfacepush.pzero", "watchfaces/p_zero.apk", "watchfaces/p_zero_token.txt"),
+            FaceSpec("app.aapswear.watchfacepush.robby", "watchfaces/robby.apk", "watchfaces/robby_token.txt"),
+            FaceSpec("app.aapswear.watchfacepush.simpledigital", "watchfaces/simple_digital.apk", "watchfaces/simple_digital_token.txt"),
+            FaceSpec("app.aapswear.watchfacepush.steampunk", "watchfaces/steam_punk.apk", "watchfaces/steam_punk_token.txt"),
         )
 
     fun isSupported(): Boolean =
@@ -67,7 +97,7 @@ internal object SugarliciousWatchFacePush {
                     manager.listWatchFaces()
                         .installedWatchFaceDetails
 
-                faces.indexOfFirst { face ->
+                faces.take(5).indexOfFirst { face ->
                     installed.any { details ->
                         details.packageName == face.packageName &&
                             runCatching {
@@ -193,7 +223,7 @@ internal object SugarliciousWatchFacePush {
                     "Watchface geladen - Direktwechsel auf der Uhr freigeben"
 
                 else -> {
-                    manager.setWatchFaceAsActive(details.slotId)
+                    activateWithSettlingRetry(manager, details.slotId, spec.packageName)
                     rememberApplied(context, index)
                     "Watchface aktiv"
                 }
@@ -205,6 +235,27 @@ internal object SugarliciousWatchFacePush {
         } finally {
             apk.delete()
         }
+    }
+
+    private suspend fun activateWithSettlingRetry(
+        manager: androidx.wear.watchfacepush.WatchFacePushManager,
+        slotId: String,
+        packageName: String,
+    ) {
+        var lastError: Exception? = null
+        repeat(3) { attempt ->
+            try {
+                manager.setWatchFaceAsActive(slotId)
+                return
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                if (runCatching { manager.isWatchFaceActive(packageName) }.getOrDefault(false)) return
+                lastError = error
+                if (attempt < 2) delay(ACTIVATION_RETRY_DELAY_MS * (attempt + 1))
+            }
+        }
+        throw lastError ?: IllegalStateException("Watchface activation failed")
     }
 
     private fun rememberApplied(

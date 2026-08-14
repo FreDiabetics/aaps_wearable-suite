@@ -4,7 +4,7 @@ android {
     namespace="app.aapswear.watchface.aimico"
     compileSdk=36
     defaultConfig {
-        applicationId="app.aapswear.watchface.aimico"
+        applicationId="app.aapswear.watchfacepush.aimico"
         minSdk=33
         targetSdk=35
         versionCode=3

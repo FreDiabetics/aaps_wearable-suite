@@ -50,7 +50,7 @@ enum class SugarliciousColorRole(
     CGM_DOT_LOW("cgm_dot_low", "CGM-Punkte · tief", SugarliciousColorGroup.GLUCOSE, 0xFFFF5C69.toInt(), configurable = true),
     CGM_DOT_IN_RANGE("cgm_dot_in_range", "CGM-Punkte · im Ziel", SugarliciousColorGroup.GLUCOSE, 0xFF54DF30.toInt(), 0xFF2E9C45.toInt(), true),
     CGM_DOT_HIGH("cgm_dot_high", "CGM-Punkte · hoch", SugarliciousColorGroup.GLUCOSE, 0xFFFFD040.toInt(), 0xFFD47D00.toInt(), true),
-    TARGET_BAND("target_band", "Zielbereich im Graph", SugarliciousColorGroup.GLUCOSE, 0xFF0A391C.toInt()),
+    TARGET_BAND("target_band", "Zielbereich im Graph", SugarliciousColorGroup.GLUCOSE, 0xFF0A391C.toInt(), configurable = true),
 
     GREEN("green", "Grün / Status", SugarliciousColorGroup.THERAPY, 0xFF54DF30.toInt()),
     BLUE("blue", "Blau / IOB", SugarliciousColorGroup.THERAPY, 0xFF64BFFF.toInt()),

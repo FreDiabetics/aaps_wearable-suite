@@ -401,7 +401,7 @@ internal object NotificationGraphRenderer {
         }
 
         paint.style = Paint.Style.FILL
-        paint.color = graphColor(SugarliciousColorRole.RANGE_IN_RANGE)
+        paint.color = graphColor(SugarliciousColorRole.TARGET_BAND)
         canvas.drawRoundRect(
             plotLeft,
             y(targetHigh),
