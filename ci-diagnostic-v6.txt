@@ -1,170 +1,158 @@
-exit_code=1
-head=9ea754e2f1396e5592f291b5630954d96ab7828d
+exit_code=0
+head=7f31fc7dec3fc286f53c1067e6f3e1110f963ec1
 scope=affected-modules
 --- compiler/test/error lines ---
-MainActivityTest > Sugarlicious about tile shows independent branding and contact FAILED
-MainActivityTest > diagnostics update while overview dashboard stays visible FAILED
-PersistentBridgeServiceTest > live preference requests promoted status with current glucose and graph FAILED
-38 tests completed, 3 failed
-> Task :app-mobile:testDebugUnitTest FAILED
-FAILURE: Build failed with an exception.
-* What went wrong:
-Execution failed for task ':app-mobile:testDebugUnitTest'.
-> There were failing tests. See the report at: file:///home/runner/work/aaps_wearable-suite/aaps_wearable-suite/app-mobile/build/reports/tests/testDebugUnitTest/index.html
-org.gradle.api.tasks.TaskExecutionException: Execution failed for task ':app-mobile:testDebugUnitTest'.
-Caused by: org.gradle.api.internal.exceptions.MarkedVerificationException: There were failing tests. See the report at: file:///home/runner/work/aaps_wearable-suite/aaps_wearable-suite/app-mobile/build/reports/tests/testDebugUnitTest/index.html
-BUILD FAILED in 4m 31s
 --- tail ---
+> Task :app-mobile:mergeDebugResources
+> Task :app-mobile:processDebugResources
+> Task :app-mobile:packageDebugUnitTestForUnitTest
+> Task :app-mobile:generateDebugUnitTestConfig
+> Task :app-mobile:desugarDebugFileDependencies
+> Task :app-mobile:mergeDebugJniLibFolders
+> Task :data-source-aaps:mergeDebugJniLibFolders
+> Task :data-source-aaps:mergeDebugNativeLibs NO-SOURCE
+> Task :data-source-aaps:copyDebugJniLibsProjectOnly
+> Task :data-source-xdrip:mergeDebugJniLibFolders
+> Task :data-source-xdrip:mergeDebugNativeLibs NO-SOURCE
+> Task :data-source-xdrip:copyDebugJniLibsProjectOnly
+> Task :wear-storage:mergeDebugJniLibFolders
+> Task :wear-storage:mergeDebugNativeLibs NO-SOURCE
+> Task :wear-storage:copyDebugJniLibsProjectOnly
+> Task :app-mobile:checkDebugDuplicateClasses
+> Task :app-mobile:generateDebugGlobalSynthetics
+> Task :app-mobile:writeDebugAppMetadata
+> Task :app-mobile:writeDebugSigningConfigVersions
+> Task :app-wear:preBuild UP-TO-DATE
+> Task :app-wear:preDebugBuild UP-TO-DATE
+> Task :app-wear:generateDebugResources
+> Task :app-wear:packageDebugResources
+> Task :app-wear:processDebugNavigationResources
+> Task :app-mobile:validateSigningDebug
+> Task :app-wear:javaPreCompileDebug FROM-CACHE
+> Task :app-wear:checkDebugAarMetadata
+> Task :app-wear:mapDebugSourceSetPaths
+> Task :app-wear:compileDebugNavigationResources FROM-CACHE
+> Task :app-wear:parseDebugLocalResources
+> Task :app-wear:generateDebugRFile
+> Task :app-wear:createDebugCompatibleScreenManifests
+> Task :app-wear:extractDeepLinksDebug FROM-CACHE
+> Task :app-wear:processDebugMainManifest
+> Task :app-wear:processDebugManifest
+> Task :app-wear:processDebugManifestForPackage
+> Task :app-wear:preDebugUnitTestBuild UP-TO-DATE
+> Task :app-wear:javaPreCompileDebugUnitTest FROM-CACHE
+> Task :app-wear:generateDebugAssets UP-TO-DATE
+> Task :app-wear:mergeDebugAssets
+> Task :app-wear:mergeDebugUnitTestManifest
+> Task :app-wear:processDebugUnitTestManifest
+> Task :app-wear:mergeDebugNativeDebugMetadata NO-SOURCE
+> Task :app-wear:compressDebugAssets FROM-CACHE
+> Task :app-wear:mergeDebugResources
+> Task :app-wear:generateDebugGlobalSynthetics
+> Task :app-wear:processDebugResources
+> Task :app-wear:packageDebugUnitTestForUnitTest
+> Task :app-wear:generateDebugUnitTestConfig
+> Task :app-wear:desugarDebugFileDependencies
+> Task :app-wear:mergeDebugJniLibFolders
+> Task :complications:mergeDebugJniLibFolders
+> Task :complications:mergeDebugNativeLibs NO-SOURCE
+> Task :complications:copyDebugJniLibsProjectOnly
+> Task :app-wear:validateSigningDebug
+> Task :app-wear:writeDebugAppMetadata
+> Task :app-wear:writeDebugSigningConfigVersions
+> Task :app-wear:checkDebugDuplicateClasses
 
-* Try:
-> Run with --scan to get full insights from a Build Scan (powered by Develocity).
+> Task :core-model:compileKotlin
+w: file:///home/runner/work/aaps_wearable-suite/aaps_wearable-suite/core-model/src/main/kotlin/app/aapswear/model/ComplicationPresentation.kt:161:46 Unnecessary safe call on a non-null receiver of type 'String'.
 
-* Exception is:
-org.gradle.api.tasks.TaskExecutionException: Execution failed for task ':app-mobile:testDebugUnitTest'.
-	at org.gradle.api.internal.tasks.execution.ExecuteActionsTaskExecuter.lambda$executeIfValid$1(ExecuteActionsTaskExecuter.java:135)
-	at org.gradle.internal.Try$Failure.ifSuccessfulOrElse(Try.java:288)
-	at org.gradle.api.internal.tasks.execution.ExecuteActionsTaskExecuter.executeIfValid(ExecuteActionsTaskExecuter.java:133)
-	at org.gradle.api.internal.tasks.execution.ExecuteActionsTaskExecuter.execute(ExecuteActionsTaskExecuter.java:121)
-	at org.gradle.api.internal.tasks.execution.ProblemsTaskPathTrackingTaskExecuter.execute(ProblemsTaskPathTrackingTaskExecuter.java:41)
-	at org.gradle.api.internal.tasks.execution.ResolveTaskExecutionModeExecuter.execute(ResolveTaskExecutionModeExecuter.java:51)
-	at org.gradle.api.internal.tasks.execution.FinalizePropertiesTaskExecuter.execute(FinalizePropertiesTaskExecuter.java:46)
-	at org.gradle.api.internal.tasks.execution.SkipTaskWithNoActionsExecuter.execute(SkipTaskWithNoActionsExecuter.java:57)
-	at org.gradle.api.internal.tasks.execution.SkipOnlyIfTaskExecuter.execute(SkipOnlyIfTaskExecuter.java:74)
-	at org.gradle.api.internal.tasks.execution.CatchExceptionTaskExecuter.execute(CatchExceptionTaskExecuter.java:36)
-	at org.gradle.api.internal.tasks.execution.EventFiringTaskExecuter$1.executeTask(EventFiringTaskExecuter.java:77)
-	at org.gradle.api.internal.tasks.execution.EventFiringTaskExecuter$1.call(EventFiringTaskExecuter.java:55)
-	at org.gradle.api.internal.tasks.execution.EventFiringTaskExecuter$1.call(EventFiringTaskExecuter.java:52)
-	at org.gradle.internal.operations.DefaultBuildOperationRunner$CallableBuildOperationWorker.execute(DefaultBuildOperationRunner.java:210)
-	at org.gradle.internal.operations.DefaultBuildOperationRunner$CallableBuildOperationWorker.execute(DefaultBuildOperationRunner.java:205)
-	at org.gradle.internal.operations.DefaultBuildOperationRunner$2.execute(DefaultBuildOperationRunner.java:67)
-	at org.gradle.internal.operations.DefaultBuildOperationRunner$2.execute(DefaultBuildOperationRunner.java:60)
-	at org.gradle.internal.operations.DefaultBuildOperationRunner.execute(DefaultBuildOperationRunner.java:167)
-	at org.gradle.internal.operations.DefaultBuildOperationRunner.execute(DefaultBuildOperationRunner.java:60)
-	at org.gradle.internal.operations.DefaultBuildOperationRunner.call(DefaultBuildOperationRunner.java:54)
-	at org.gradle.api.internal.tasks.execution.EventFiringTaskExecuter.execute(EventFiringTaskExecuter.java:52)
-	at org.gradle.execution.plan.DefaultNodeExecutor.executeLocalTaskNode(DefaultNodeExecutor.java:55)
-	at org.gradle.execution.plan.DefaultNodeExecutor.execute(DefaultNodeExecutor.java:34)
-	at org.gradle.execution.taskgraph.DefaultTaskExecutionGraph$InvokeNodeExecutorsAction.execute(DefaultTaskExecutionGraph.java:355)
-	at org.gradle.execution.taskgraph.DefaultTaskExecutionGraph$InvokeNodeExecutorsAction.execute(DefaultTaskExecutionGraph.java:343)
-	at org.gradle.execution.taskgraph.DefaultTaskExecutionGraph$BuildOperationAwareExecutionAction.lambda$execute$0(DefaultTaskExecutionGraph.java:339)
-	at org.gradle.internal.operations.CurrentBuildOperationRef.with(CurrentBuildOperationRef.java:84)
-	at org.gradle.execution.taskgraph.DefaultTaskExecutionGraph$BuildOperationAwareExecutionAction.execute(DefaultTaskExecutionGraph.java:339)
-	at org.gradle.execution.taskgraph.DefaultTaskExecutionGraph$BuildOperationAwareExecutionAction.execute(DefaultTaskExecutionGraph.java:328)
-	at org.gradle.execution.plan.DefaultPlanExecutor$ExecutorWorker.execute(DefaultPlanExecutor.java:459)
-	at org.gradle.execution.plan.DefaultPlanExecutor$ExecutorWorker.run(DefaultPlanExecutor.java:376)
-	at org.gradle.internal.concurrent.ExecutorPolicy$CatchAndRecordFailures.onExecute(ExecutorPolicy.java:64)
-	at org.gradle.internal.concurrent.AbstractManagedExecutor$1.run(AbstractManagedExecutor.java:47)
-Caused by: org.gradle.api.internal.exceptions.MarkedVerificationException: There were failing tests. See the report at: file:///home/runner/work/aaps_wearable-suite/aaps_wearable-suite/app-mobile/build/reports/tests/testDebugUnitTest/index.html
-	at org.gradle.api.tasks.testing.AbstractTestTask.executeTests(AbstractTestTask.java:615)
-	at org.gradle.api.tasks.testing.Test.executeTests(Test.java:760)
-	at com.android.build.gradle.tasks.factory.AndroidUnitTest.executeTests(AndroidUnitTest.java:203)
-	at org.gradle.internal.reflect.JavaMethod.invoke(JavaMethod.java:125)
-	at org.gradle.api.internal.project.taskfactory.StandardTaskAction.doExecute(StandardTaskAction.java:58)
-	at org.gradle.api.internal.project.taskfactory.StandardTaskAction.execute(StandardTaskAction.java:51)
-	at org.gradle.api.internal.project.taskfactory.StandardTaskAction.execute(StandardTaskAction.java:29)
-	at org.gradle.api.internal.tasks.execution.TaskExecution$3.run(TaskExecution.java:259)
-	at org.gradle.internal.operations.DefaultBuildOperationRunner$1.execute(DefaultBuildOperationRunner.java:30)
-	at org.gradle.internal.operations.DefaultBuildOperationRunner$1.execute(DefaultBuildOperationRunner.java:27)
-	at org.gradle.internal.operations.DefaultBuildOperationRunner$2.execute(DefaultBuildOperationRunner.java:67)
-	at org.gradle.internal.operations.DefaultBuildOperationRunner$2.execute(DefaultBuildOperationRunner.java:60)
-	at org.gradle.internal.operations.DefaultBuildOperationRunner.execute(DefaultBuildOperationRunner.java:167)
-	at org.gradle.internal.operations.DefaultBuildOperationRunner.execute(DefaultBuildOperationRunner.java:60)
-	at org.gradle.internal.operations.DefaultBuildOperationRunner.run(DefaultBuildOperationRunner.java:48)
-	at org.gradle.api.internal.tasks.execution.TaskExecution.executeAction(TaskExecution.java:244)
-	at org.gradle.api.internal.tasks.execution.TaskExecution.executeActions(TaskExecution.java:227)
-	at org.gradle.api.internal.tasks.execution.TaskExecution.executeWithPreviousOutputFiles(TaskExecution.java:210)
-	at org.gradle.api.internal.tasks.execution.TaskExecution.execute(TaskExecution.java:176)
-	at org.gradle.internal.execution.steps.ExecuteStep.executeInternal(ExecuteStep.java:167)
-	at org.gradle.internal.execution.steps.ExecuteStep.access$000(ExecuteStep.java:47)
-	at org.gradle.internal.execution.steps.ExecuteStep$1.call(ExecuteStep.java:137)
-	at org.gradle.internal.execution.steps.ExecuteStep$1.call(ExecuteStep.java:134)
-	at org.gradle.internal.operations.DefaultBuildOperationRunner$CallableBuildOperationWorker.execute(DefaultBuildOperationRunner.java:210)
-	at org.gradle.internal.operations.DefaultBuildOperationRunner$CallableBuildOperationWorker.execute(DefaultBuildOperationRunner.java:205)
-	at org.gradle.internal.operations.DefaultBuildOperationRunner$2.execute(DefaultBuildOperationRunner.java:67)
-	at org.gradle.internal.operations.DefaultBuildOperationRunner$2.execute(DefaultBuildOperationRunner.java:60)
-	at org.gradle.internal.operations.DefaultBuildOperationRunner.execute(DefaultBuildOperationRunner.java:167)
-	at org.gradle.internal.operations.DefaultBuildOperationRunner.execute(DefaultBuildOperationRunner.java:60)
-	at org.gradle.internal.operations.DefaultBuildOperationRunner.call(DefaultBuildOperationRunner.java:54)
-	at org.gradle.internal.execution.steps.ExecuteStep.execute(ExecuteStep.java:134)
-	at org.gradle.internal.execution.steps.ExecuteStep$Mutable.execute(ExecuteStep.java:80)
-	at org.gradle.internal.execution.steps.CancelExecutionStep.execute(CancelExecutionStep.java:42)
-	at org.gradle.internal.execution.steps.TimeoutStep.executeWithoutTimeout(TimeoutStep.java:75)
-	at org.gradle.internal.execution.steps.TimeoutStep.execute(TimeoutStep.java:55)
-	at org.gradle.internal.execution.steps.PreCreateOutputParentsStep.execute(PreCreateOutputParentsStep.java:51)
-	at org.gradle.internal.execution.steps.PreCreateOutputParentsStep.execute(PreCreateOutputParentsStep.java:29)
-	at org.gradle.internal.execution.steps.RemovePreviousOutputsStep.executeMutable(RemovePreviousOutputsStep.java:67)
-	at org.gradle.internal.execution.steps.RemovePreviousOutputsStep.executeMutable(RemovePreviousOutputsStep.java:39)
-	at org.gradle.internal.execution.steps.MutableStep.execute(MutableStep.java:26)
-	at org.gradle.internal.execution.steps.BroadcastChangingOutputsStep.execute(BroadcastChangingOutputsStep.java:42)
-	at org.gradle.internal.execution.steps.BroadcastChangingOutputsStep.execute(BroadcastChangingOutputsStep.java:24)
-	at org.gradle.internal.execution.steps.CaptureOutputsAfterExecutionStep.execute(CaptureOutputsAfterExecutionStep.java:69)
-	at org.gradle.internal.execution.steps.CaptureOutputsAfterExecutionStep.execute(CaptureOutputsAfterExecutionStep.java:46)
-	at org.gradle.internal.execution.steps.ResolveInputChangesStep.executeMutable(ResolveInputChangesStep.java:39)
-	at org.gradle.internal.execution.steps.ResolveInputChangesStep.executeMutable(ResolveInputChangesStep.java:28)
-	at org.gradle.internal.execution.steps.MutableStep.execute(MutableStep.java:26)
-	at org.gradle.internal.execution.steps.BuildCacheStep.executeWithoutCache(BuildCacheStep.java:189)
-	at org.gradle.internal.execution.steps.BuildCacheStep.executeAndStoreInCache(BuildCacheStep.java:145)
-	at org.gradle.internal.execution.steps.BuildCacheStep.lambda$executeWithCache$4(BuildCacheStep.java:104)
-	at org.gradle.internal.execution.steps.BuildCacheStep.lambda$executeWithCache$5(BuildCacheStep.java:104)
-	at org.gradle.internal.Try$Success.map(Try.java:170)
-	at org.gradle.internal.execution.steps.BuildCacheStep.executeWithCache(BuildCacheStep.java:88)
-	at org.gradle.internal.execution.steps.BuildCacheStep.lambda$execute$0(BuildCacheStep.java:75)
-	at org.gradle.internal.Either$Left.fold(Either.java:116)
-	at org.gradle.internal.execution.caching.CachingState.fold(CachingState.java:62)
-	at org.gradle.internal.execution.steps.BuildCacheStep.execute(BuildCacheStep.java:74)
-	at org.gradle.internal.execution.steps.BuildCacheStep.execute(BuildCacheStep.java:49)
-	at org.gradle.internal.execution.steps.StoreExecutionStateStep.executeMutable(StoreExecutionStateStep.java:46)
-	at org.gradle.internal.execution.steps.StoreExecutionStateStep.executeMutable(StoreExecutionStateStep.java:35)
-	at org.gradle.internal.execution.steps.MutableStep.execute(MutableStep.java:26)
-	at org.gradle.internal.execution.steps.SkipUpToDateStep.executeBecause(SkipUpToDateStep.java:75)
-	at org.gradle.internal.execution.steps.SkipUpToDateStep.lambda$execute$2(SkipUpToDateStep.java:53)
-	at org.gradle.internal.execution.steps.SkipUpToDateStep.execute(SkipUpToDateStep.java:53)
-	at org.gradle.internal.execution.steps.SkipUpToDateStep.execute(SkipUpToDateStep.java:35)
-	at org.gradle.internal.execution.steps.legacy.MarkSnapshottingInputsFinishedStep.execute(MarkSnapshottingInputsFinishedStep.java:37)
-	at org.gradle.internal.execution.steps.legacy.MarkSnapshottingInputsFinishedStep.execute(MarkSnapshottingInputsFinishedStep.java:27)
-	at org.gradle.internal.execution.steps.ResolveMutableCachingStateStep.executeDelegate(ResolveMutableCachingStateStep.java:70)
-	at org.gradle.internal.execution.steps.ResolveMutableCachingStateStep.executeDelegate(ResolveMutableCachingStateStep.java:32)
-	at org.gradle.internal.execution.steps.AbstractResolveCachingStateStep.execute(AbstractResolveCachingStateStep.java:69)
-	at org.gradle.internal.execution.steps.AbstractResolveCachingStateStep.execute(AbstractResolveCachingStateStep.java:37)
-	at org.gradle.internal.execution.steps.ResolveChangesStep.executeMutable(ResolveChangesStep.java:63)
-	at org.gradle.internal.execution.steps.ResolveChangesStep.executeMutable(ResolveChangesStep.java:34)
-	at org.gradle.internal.execution.steps.MutableStep.execute(MutableStep.java:26)
-	at org.gradle.internal.execution.steps.ValidateStep$Mutable.executeDelegate(ValidateStep.java:79)
-	at org.gradle.internal.execution.steps.ValidateStep$Mutable.executeDelegate(ValidateStep.java:65)
-	at org.gradle.internal.execution.steps.ValidateStep.execute(ValidateStep.java:105)
-	at org.gradle.internal.execution.steps.ValidateStep$Mutable.execute(ValidateStep.java:65)
-	at org.gradle.internal.execution.steps.CaptureMutableStateBeforeExecutionStep.executeMutable(CaptureMutableStateBeforeExecutionStep.java:86)
-	at org.gradle.internal.execution.steps.CaptureMutableStateBeforeExecutionStep.execute(CaptureMutableStateBeforeExecutionStep.java:65)
-	at org.gradle.internal.execution.steps.CaptureMutableStateBeforeExecutionStep.execute(CaptureMutableStateBeforeExecutionStep.java:45)
-	at org.gradle.internal.execution.steps.SkipEmptyMutableWorkStep.executeWithNonEmptySources(SkipEmptyMutableWorkStep.java:210)
-	at org.gradle.internal.execution.steps.SkipEmptyMutableWorkStep.executeMutable(SkipEmptyMutableWorkStep.java:90)
-	at org.gradle.internal.execution.steps.SkipEmptyMutableWorkStep.executeMutable(SkipEmptyMutableWorkStep.java:53)
-	at org.gradle.internal.execution.steps.MutableStep.execute(MutableStep.java:26)
-	at org.gradle.internal.execution.steps.legacy.MarkSnapshottingInputsStartedStep.execute(MarkSnapshottingInputsStartedStep.java:38)
-	at org.gradle.internal.execution.steps.LoadPreviousExecutionStateStep.executeMutable(LoadPreviousExecutionStateStep.java:36)
-	at org.gradle.internal.execution.steps.LoadPreviousExecutionStateStep.executeMutable(LoadPreviousExecutionStateStep.java:23)
-	at org.gradle.internal.execution.steps.MutableStep.execute(MutableStep.java:26)
-	at org.gradle.internal.execution.steps.HandleStaleOutputsStep.executeMutable(HandleStaleOutputsStep.java:77)
-	at org.gradle.internal.execution.steps.HandleStaleOutputsStep.executeMutable(HandleStaleOutputsStep.java:43)
-	at org.gradle.internal.execution.steps.MutableStep.execute(MutableStep.java:26)
-	at org.gradle.internal.execution.steps.AssignMutableWorkspaceStep.lambda$executeMutable$0(AssignMutableWorkspaceStep.java:34)
-	at org.gradle.api.internal.tasks.execution.TaskExecution$4.withWorkspace(TaskExecution.java:305)
-	at org.gradle.internal.execution.steps.AssignMutableWorkspaceStep.executeMutable(AssignMutableWorkspaceStep.java:30)
-	at org.gradle.internal.execution.steps.AssignMutableWorkspaceStep.executeMutable(AssignMutableWorkspaceStep.java:21)
-	at org.gradle.internal.execution.steps.MutableStep.execute(MutableStep.java:26)
-	at org.gradle.internal.execution.steps.ChoosePipelineStep.execute(ChoosePipelineStep.java:40)
-	at org.gradle.internal.execution.steps.ChoosePipelineStep.execute(ChoosePipelineStep.java:23)
-	at org.gradle.internal.execution.steps.ExecuteWorkBuildOperationFiringStep.lambda$execute$2(ExecuteWorkBuildOperationFiringStep.java:67)
-	at org.gradle.internal.execution.steps.ExecuteWorkBuildOperationFiringStep.execute(ExecuteWorkBuildOperationFiringStep.java:67)
-	at org.gradle.internal.execution.steps.ExecuteWorkBuildOperationFiringStep.execute(ExecuteWorkBuildOperationFiringStep.java:39)
-	at org.gradle.internal.execution.steps.IdentityCacheStep.execute(IdentityCacheStep.java:46)
-	at org.gradle.internal.execution.steps.IdentityCacheStep.execute(IdentityCacheStep.java:34)
-	at org.gradle.internal.execution.steps.IdentifyStep.execute(IdentifyStep.java:56)
-	at org.gradle.internal.execution.steps.IdentifyStep.execute(IdentifyStep.java:38)
-	at org.gradle.internal.execution.impl.DefaultExecutionEngine$1.execute(DefaultExecutionEngine.java:68)
-	at org.gradle.api.internal.tasks.execution.ExecuteActionsTaskExecuter.executeIfValid(ExecuteActionsTaskExecuter.java:132)
-	... 30 more
+> Task :core-model:compileJava NO-SOURCE
+> Task :core-model:classes UP-TO-DATE
+> Task :core-model:jar
+> Task :core-model:compileTestKotlin
+> Task :core-model:compileTestJava NO-SOURCE
+> Task :core-model:testClasses UP-TO-DATE
+> Task :wear-protocol:compileKotlin
+> Task :wear-protocol:compileJava NO-SOURCE
+> Task :wear-protocol:classes UP-TO-DATE
+> Task :wear-protocol:jar
+> Task :core-model:test
+> Task :data-source-api:compileKotlin
+> Task :data-source-api:compileJava NO-SOURCE
+> Task :data-source-api:classes UP-TO-DATE
+> Task :data-source-api:jar
+> Task :wear-storage:compileDebugKotlin
+> Task :wear-storage:compileDebugJavaWithJavac NO-SOURCE
+> Task :wear-storage:bundleLibCompileToJarDebug
+> Task :data-source-aaps:compileDebugKotlin
+> Task :wear-storage:bundleLibRuntimeToJarDebug
+> Task :wear-storage:processDebugJavaRes
+> Task :data-source-aaps:compileDebugJavaWithJavac NO-SOURCE
+> Task :app-mobile:mergeExtDexDebug
+> Task :app-wear:mergeExtDexDebug
+> Task :complications:compileDebugKotlin
+> Task :complications:compileDebugJavaWithJavac NO-SOURCE
+> Task :data-source-aaps:bundleLibCompileToJarDebug
+> Task :complications:bundleLibCompileToJarDebug
+> Task :complications:bundleLibRuntimeToJarDebug
+> Task :complications:processDebugJavaRes
+> Task :complications:compileDebugUnitTestKotlin
+> Task :complications:compileDebugUnitTestJavaWithJavac NO-SOURCE
+> Task :complications:processDebugUnitTestJavaRes
+> Task :data-source-xdrip:compileDebugKotlin
+> Task :data-source-xdrip:compileDebugJavaWithJavac NO-SOURCE
+> Task :data-source-xdrip:bundleLibCompileToJarDebug
+> Task :data-source-aaps:bundleLibRuntimeToJarDebug
+> Task :data-source-aaps:processDebugJavaRes
+> Task :data-source-xdrip:bundleLibRuntimeToJarDebug
+> Task :data-source-xdrip:processDebugJavaRes
+> Task :data-source-aaps:bundleLibRuntimeToDirDebug
+> Task :data-source-xdrip:bundleLibRuntimeToDirDebug
+> Task :wear-storage:bundleLibRuntimeToDirDebug
+> Task :app-mobile:mergeLibDexDebug
+> Task :app-mobile:mergeDebugNativeLibs
+> Task :app-mobile:stripDebugDebugSymbols
+> Task :complications:testDebugUnitTest
+> Task :complications:bundleLibRuntimeToDirDebug
+> Task :app-wear:mergeLibDexDebug
+> Task :app-wear:mergeDebugNativeLibs
+> Task :app-wear:stripDebugDebugSymbols
+> Task :app-wear:compileDebugKotlin
+> Task :app-wear:compileDebugJavaWithJavac NO-SOURCE
+> Task :app-wear:bundleDebugClassesToRuntimeJar
+> Task :app-wear:processDebugJavaRes
+> Task :app-wear:bundleDebugClassesToCompileJar
+> Task :app-wear:compileDebugUnitTestKotlin
+> Task :app-wear:compileDebugUnitTestJavaWithJavac NO-SOURCE
+> Task :app-wear:processDebugUnitTestJavaRes
+> Task :app-wear:mergeDebugJavaResource
+> Task :app-mobile:compileDebugKotlin
+> Task :app-mobile:compileDebugJavaWithJavac NO-SOURCE
+> Task :app-mobile:bundleDebugClassesToRuntimeJar
+> Task :app-wear:dexBuilderDebug
+> Task :app-mobile:processDebugJavaRes
+> Task :app-mobile:bundleDebugClassesToCompileJar
+> Task :app-mobile:mergeDebugJavaResource
 
+> Task :app-mobile:compileDebugUnitTestKotlin
+w: file:///home/runner/work/aaps_wearable-suite/aaps_wearable-suite/app-mobile/src/test/kotlin/app/aapswear/mobile/PersistentBridgeServiceTest.kt:84:36 'field contentView: RemoteViews!' is deprecated. Deprecated in Java.
+w: file:///home/runner/work/aaps_wearable-suite/aaps_wearable-suite/app-mobile/src/test/kotlin/app/aapswear/mobile/PersistentBridgeServiceTest.kt:85:36 'field bigContentView: RemoteViews!' is deprecated. Deprecated in Java.
+w: file:///home/runner/work/aaps_wearable-suite/aaps_wearable-suite/app-mobile/src/test/kotlin/app/aapswear/mobile/PersistentBridgeServiceTest.kt:86:40 'fun <T : Parcelable!> getParcelable(p0: String?): T?' is deprecated. Deprecated in Java.
+
+> Task :app-mobile:compileDebugUnitTestJavaWithJavac NO-SOURCE
+> Task :app-mobile:processDebugUnitTestJavaRes
+> Task :app-mobile:dexBuilderDebug
+> Task :app-mobile:mergeProjectDexDebug
+> Task :app-wear:mergeProjectDexDebug
+> Task :app-wear:packageDebug
+> Task :app-wear:createDebugApkListingFileRedirect
+> Task :app-wear:assembleDebug
+> Task :app-wear:testDebugUnitTest
+> Task :app-mobile:packageDebug
+> Task :app-mobile:assembleDebug
+> Task :app-mobile:createDebugApkListingFileRedirect
+> Task :app-mobile:testDebugUnitTest
+
+[Incubating] Problems report is available at: file:///home/runner/work/aaps_wearable-suite/aaps_wearable-suite/build/reports/problems/problems-report.html
 
 Deprecated Gradle features were used in this build, making it incompatible with Gradle 10.
 
@@ -172,6 +160,7 @@ You can use '--warning-mode all' to show the individual deprecation warnings and
 
 For more on this, please refer to https://docs.gradle.org/9.6.1/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
 
-BUILD FAILED in 4m 31s
+BUILD SUCCESSFUL in 3m 40s
 190 actionable tasks: 167 executed, 23 from cache
 Configuration cache entry stored.
+BUILD_OK
