@@ -1,5 +1,6 @@
 package app.aapswear.mobile
 
+import android.content.SharedPreferences
 import android.widget.Toast
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -15,7 +16,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -74,9 +78,33 @@ internal fun SugarliciousWatchScreen(
     onNavigate: (DashboardScreen) -> Unit,
 ) {
     val context = LocalContext.current
-    val runtimeStatus = remember { WatchRuntimeStatusStore.read(context) }
-    var activePreset by remember { mutableStateOf(runtimeStatus.activeComplicationIds.ifEmpty { loadComplicationPreset(context) }) }
-    var activeFaceIndex by remember { mutableStateOf(runtimeStatus.activeSugarliciousFaceIndex ?: preferences.watchFaceIndex) }
+    val appContext = context.applicationContext
+    var runtimeStatus by remember { mutableStateOf(WatchRuntimeStatusStore.read(appContext)) }
+    var activeFaceIndex by remember {
+        mutableStateOf<Int?>(runtimeStatus.activeSugarliciousFaceIndex ?: preferences.watchFaceIndex)
+    }
+    var editingFaceIndex by remember {
+        mutableStateOf(runtimeStatus.activeSugarliciousFaceIndex ?: preferences.watchFaceIndex)
+    }
+    var facePresets by remember { mutableStateOf(WatchFacePresetStore.readAll(appContext)) }
+
+    DisposableEffect(appContext) {
+        val listener =
+            SharedPreferences.OnSharedPreferenceChangeListener { _, _ ->
+                val updated = WatchRuntimeStatusStore.read(appContext)
+                runtimeStatus = updated
+                activeFaceIndex = updated.activeSugarliciousFaceIndex
+            }
+        WatchRuntimeStatusStore.registerListener(appContext, listener)
+        onDispose {
+            WatchRuntimeStatusStore.unregisterListener(appContext, listener)
+        }
+    }
+
+    LaunchedEffect(appContext) {
+        runCatching { requestWatchRuntimeStatus(appContext) }
+    }
+
     Column(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 2.dp, vertical = 4.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -92,9 +120,14 @@ internal fun SugarliciousWatchScreen(
                         face = sugarliciousWatchFaceCards[index],
                         index = index,
                         state = state,
-                        activeComplicationIds = activePreset,
+                        activeComplicationIds = facePresets[index],
                         selected = activeFaceIndex == index,
-                        onSelected = { activeFaceIndex = index; onSelectedFace(index) },
+                        onSelected = {
+                            editingFaceIndex = index
+                            val activated = WatchFacePresetStore.activate(appContext, index)
+                            facePresets = facePresets.toMutableList().also { it[index] = activated }
+                            onSelectedFace(index)
+                        },
                     )
                 }
 
@@ -104,7 +137,18 @@ internal fun SugarliciousWatchScreen(
             }
         }
 
-        ComplicationStudio(state = state, onPresetChanged = { activePreset = it })
+        key(editingFaceIndex) {
+            ComplicationStudio(
+                state = state,
+                onPresetChanged = { updated ->
+                    WatchFacePresetStore.save(appContext, editingFaceIndex, updated)
+                    facePresets =
+                        facePresets.toMutableList().also { presets ->
+                            presets[editingFaceIndex] = updated
+                        }
+                },
+            )
+        }
     }
 }
 
@@ -139,10 +183,16 @@ private fun WatchFaceTile(
                 .clickable {
                     onSelected()
                     scope.launch {
+                        val appContext = context.applicationContext
+                        val preset = WatchFacePresetStore.activate(appContext, index)
+                        runCatching {
+                            syncComplicationPreset(appContext, preset)
+                        }
+
                         val nodes =
                             runCatching {
                                 requestWatchFaceApply(
-                                    context.applicationContext,
+                                    appContext,
                                     index,
                                 )
                             }.getOrDefault(0)

@@ -29,7 +29,7 @@ class OverviewWatchFaceTileTest {
     }
 
     @Test
-    fun `preview hand angles follow wall clock time`() {
+    fun `wall clock helper still calculates physical clock angles`() {
         val utc = TimeZone.getTimeZone("UTC")
         val calendar = Calendar.getInstance(utc).apply {
             set(2026, Calendar.AUGUST, 14, 10, 10, 30)
@@ -41,6 +41,13 @@ class OverviewWatchFaceTileTest {
         assertEquals(305.25f, angles.hour, 0.001f)
         assertEquals(63f, angles.minute, 0.001f)
         assertEquals(180f, angles.second, 0.001f)
+    }
+
+    @Test
+    fun `mobile watch previews are permanently fixed to ten two and six`() {
+        assertEquals(300f, fixedWatchPreviewHandAngles.hour, 0.001f)
+        assertEquals(60f, fixedWatchPreviewHandAngles.minute, 0.001f)
+        assertEquals(180f, fixedWatchPreviewHandAngles.second, 0.001f)
     }
 
     @Test

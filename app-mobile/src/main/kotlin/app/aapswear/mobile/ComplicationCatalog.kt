@@ -390,27 +390,53 @@ private fun CompactComplicationPreview(
     state: TherapyDisplayState?,
     graphHours: Int,
 ) {
-    if (entry.id == 9) {
+    if (entry.id == SugarliciousComplicationIds.GRAPH) {
         MiniGlucosePreview(
             samples = state?.glucoseHistory.orEmpty(),
             current = state?.glucose?.let { GlucoseSample(it.valueMgDl, it.measuredAtEpochMs) },
-            hours = graphHours,
+            windowMinutes = 90,
         )
         return
     }
+
     val preview = previewFor(entry.id, state)
-    if (preview.trend != null && entry.id == SugarliciousComplicationIds.TREND_ONLY) {
-        SugarliciousTrendIndicator(preview.trend, arrowSize = 20.dp, color = preview.color)
-    } else {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(3.dp)) {
-            Text(preview.primary, color = preview.color, fontSize = 10.sp, lineHeight = 11.sp,
-                fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis,
-                textAlign = androidx.compose.ui.text.style.TextAlign.Center)
-            preview.trend?.let { SugarliciousTrendIndicator(it, arrowSize = 12.dp, color = preview.color) }
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        if (preview.trend != null && entry.id == SugarliciousComplicationIds.TREND_ONLY) {
+            SugarliciousTrendIndicator(preview.trend, arrowSize = 25.dp, color = preview.color)
+        } else {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(2.dp),
+            ) {
+                Text(
+                    preview.primary,
+                    color = preview.color,
+                    fontSize = 14.sp,
+                    lineHeight = 14.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                )
+                preview.trend?.let {
+                    SugarliciousTrendIndicator(it, arrowSize = 17.dp, color = preview.color)
+                }
+            }
         }
-    }
-    if (preview.secondary.isNotBlank()) {
-        Text(preview.secondary, color = SugarliciousColors.TextSecondary, fontSize = 6.5.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        if (preview.secondary.isNotBlank()) {
+            Text(
+                preview.secondary,
+                modifier = Modifier.offset(y = (-2).dp),
+                color = SugarliciousColors.TextSecondary,
+                fontSize = 9.sp,
+                lineHeight = 9.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
     }
 }
 
@@ -540,6 +566,7 @@ private fun ComplicationDataPreview(
     }
 
     if (entry.id == 9 || entry.id == 10) {
+        val windowMinutes = if (entry.id == 9) 90 else 360
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -548,7 +575,7 @@ private fun ComplicationDataPreview(
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    if (entry.id == 9) "3h Datenvorschau" else "6h Datenvorschau",
+                    if (entry.id == 9) "1,5h Datenvorschau" else "6h Datenvorschau",
                     color = SugarliciousColors.TextSecondary,
                     fontSize = 8.sp,
                 )
@@ -566,7 +593,7 @@ private fun ComplicationDataPreview(
                 current = state?.glucose?.let {
                     GlucoseSample(it.valueMgDl, it.measuredAtEpochMs)
                 },
-                hours = if (entry.id == 9) 3 else 6,
+                windowMinutes = windowMinutes,
             )
         }
         return
@@ -695,18 +722,27 @@ private fun CircularGlucoseComplicationPreview(
         }
     }
 }
+
 @Composable
-private fun MiniGlucosePreview(samples: List<GlucoseSample>, current: GlucoseSample?, hours: Int) {
+private fun MiniGlucosePreview(
+    samples: List<GlucoseSample>,
+    current: GlucoseSample?,
+    windowMinutes: Int,
+) {
     val context = LocalContext.current
     val preferences = remember { context.getSharedPreferences("dashboard_ui", Context.MODE_PRIVATE) }
     val now = System.currentTimeMillis()
-    val cutoff = now - hours * 60L * 60_000L
+    val windowMs = windowMinutes * 60_000L
+    val cutoff = now - windowMs
+    val demoHours = maxOf(1, (windowMinutes + 59) / 60)
     val merged = (samples + listOfNotNull(current))
         .filter { it.measuredAtEpochMs in cutoff..(now + 5 * 60_000L) && it.valueMgDl in 20.0..1000.0 }
         .distinctBy { it.measuredAtEpochMs }
         .sortedBy { it.measuredAtEpochMs }
-        .ifEmpty { demoHistory(now, hours) }
-    val dotRadiusDp = preferences.getFloat("cgm.dotRadiusDp", 2.4f).coerceIn(1.5f, 6f)
+        .ifEmpty { demoHistory(now, demoHours).filter { it.measuredAtEpochMs >= cutoff } }
+    val dotRadiusDp =
+        (preferences.getFloat("cgm.dotRadiusDp", 2.4f) - 0.5f)
+            .coerceIn(1.0f, 5.5f)
     val outlineEnabled = preferences.getBoolean("cgm.dotOutlineEnabled", true)
     val outlineWidthDp = preferences.getFloat("cgm.dotOutlineWidthDp", 0.95f).coerceIn(0.25f, 3f)
     Canvas(
@@ -717,7 +753,7 @@ private fun MiniGlucosePreview(samples: List<GlucoseSample>, current: GlucoseSam
         val right = size.width - 3.dp.toPx()
         val top = 3.dp.toPx()
         val bottom = size.height - 3.dp.toPx()
-        fun x(timestamp: Long) = left + (((timestamp - cutoff).toDouble() / (hours * 60L * 60_000L).toDouble()).coerceIn(0.0, 1.0) * (right - left)).toFloat()
+        fun x(timestamp: Long) = left + (((timestamp - cutoff).toDouble() / windowMs.toDouble()).coerceIn(0.0, 1.0) * (right - left)).toFloat()
         fun y(value: Double) = bottom - (GlucoseGraphScale.ratio(value) * (bottom - top)).toFloat()
         val low = 80.0
         val high = 160.0
