@@ -1,0 +1,49 @@
+name: Fix complication smart cast
+
+on:
+  push:
+    branches:
+      - agent/complication-watch-refactor-v6
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Apply exact guarded source edit
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('complications/src/main/kotlin/app/aapswear/complications/TherapyComplications.kt')
+          text = path.read_text()
+          old = '''                    if (presentation?.title != null) {
+                        builder.setTitle(
+                            PlainComplicationText.Builder(presentation.title).build(),
+                        )
+                    }
+'''
+          new = '''                    presentation?.title?.let { title ->
+                        builder.setTitle(
+                            PlainComplicationText.Builder(title).build(),
+                        )
+                    }
+'''
+          if text.count(old) != 1:
+              raise SystemExit(f'expected exactly one smart-cast block, found {text.count(old)}')
+          path.write_text(text.replace(old, new))
+          PY
+          rm .github/workflows/fix-complication-smart-cast.yml
+          git diff --check
+          git diff -- complications/src/main/kotlin/app/aapswear/complications/TherapyComplications.kt
+      - name: Commit source fix and remove temporary workflow
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add complications/src/main/kotlin/app/aapswear/complications/TherapyComplications.kt .github/workflows/fix-complication-smart-cast.yml
+          git commit -m "Fix complication title smart cast"
+          git push origin HEAD:agent/complication-watch-refactor-v6
