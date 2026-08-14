@@ -49,11 +49,17 @@ function Test-WatchFacePushAssetsStale {
         if (-not (Test-Path (Join-Path $generated $name))) { return $true }
     }
 
-    $sourceNewest = @(
+    $watchFaceSources = @(
         Get-ChildItem .\watchfaces\sugarlicious-analog -Recurse -File
         Get-ChildItem .\watchfaces\sugarlicious-orbit -Recurse -File
         Get-ChildItem .\watchfaces\sugarlicious-rings -Recurse -File
         Get-ChildItem .\watchfaces\sugarlicious-graph -Recurse -File
+    ) | Where-Object {
+        $_.FullName -notmatch '[\\/](build|\.gradle)[\\/]'
+    }
+
+    $sourceNewest = @(
+        $watchFaceSources
         Get-Item .\tools\watchface-push\Prepare-WatchFacePushAssets.ps1
     ) |
         Sort-Object LastWriteTime -Descending |
