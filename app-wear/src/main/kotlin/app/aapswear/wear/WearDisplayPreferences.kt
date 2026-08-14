@@ -5,6 +5,7 @@ import app.aapswear.protocol.WatchConfig
 import app.aapswear.protocol.WatchGlucoseUnit
 import app.aapswear.protocol.WatchGraphColors
 import app.aapswear.protocol.WatchGraphStyle
+import app.aapswear.protocol.WatchUiColors
 
 internal data class WearDisplayPreferences(
     val graphHours: Int = 3,
@@ -14,6 +15,7 @@ internal data class WearDisplayPreferences(
     val syncedAtEpochMs: Long = 0L,
     val graphColors: WatchGraphColors = WatchGraphColors(),
     val graphStyle: WatchGraphStyle = WatchGraphStyle(),
+    val uiColors: WatchUiColors = WatchUiColors(),
 ) {
     companion object {
         const val PREFS = "watch_display"
@@ -23,9 +25,12 @@ internal data class WearDisplayPreferences(
         private const val KEY_SHOW_THERAPY_STATS = "show_therapy_stats"
         private const val KEY_SYNCED_AT = "synced_at"
         private const val COLOR_PREFIX = "graph_color_"
+        private const val UI_PREFIX = "ui_color_"
         private const val STYLE_DOT_RADIUS = "cgm_dot_radius_dp"
         private const val STYLE_OUTLINE_ENABLED = "cgm_dot_outline_enabled"
         private const val STYLE_OUTLINE_WIDTH = "cgm_dot_outline_width_dp"
+
+        val allowedGraphHours = listOf(1, 2, 3, 6, 12, 24)
 
         fun read(context: Context): WearDisplayPreferences {
             val preferences =
@@ -33,8 +38,9 @@ internal data class WearDisplayPreferences(
                     PREFS,
                     Context.MODE_PRIVATE,
                 )
-            val defaults = WatchGraphColors()
+            val graphDefaults = WatchGraphColors()
             val styleDefaults = WatchGraphStyle()
+            val uiDefaults = WatchUiColors()
 
             val unit =
                 runCatching {
@@ -50,7 +56,7 @@ internal data class WearDisplayPreferences(
                 graphHours =
                     preferences
                         .getInt(KEY_GRAPH_HOURS, 3)
-                        .takeIf { it in listOf(3, 6, 12, 24) }
+                        .takeIf { it in allowedGraphHours }
                         ?: 3,
                 showPredictions =
                     preferences.getBoolean(KEY_SHOW_PREDICTIONS, false),
@@ -59,31 +65,49 @@ internal data class WearDisplayPreferences(
                     preferences.getBoolean(KEY_SHOW_THERAPY_STATS, true),
                 syncedAtEpochMs =
                     preferences.getLong(KEY_SYNCED_AT, 0L),
-                graphColors = WatchGraphColors(
-                    graphBackground = preferences.getInt(COLOR_PREFIX + "background", defaults.graphBackground),
-                    rangeLow = preferences.getInt(COLOR_PREFIX + "range_low", defaults.rangeLow),
-                    rangeInRange = preferences.getInt(COLOR_PREFIX + "range_in", defaults.rangeInRange),
-                    rangeHigh = preferences.getInt(COLOR_PREFIX + "range_high", defaults.rangeHigh),
-                    cgmLow = preferences.getInt(COLOR_PREFIX + "cgm_low", defaults.cgmLow),
-                    cgmInRange = preferences.getInt(COLOR_PREFIX + "cgm_in", defaults.cgmInRange),
-                    cgmHigh = preferences.getInt(COLOR_PREFIX + "cgm_high", defaults.cgmHigh),
-                    divider = preferences.getInt(COLOR_PREFIX + "divider", defaults.divider),
-                    outline = preferences.getInt(COLOR_PREFIX + "outline", defaults.outline),
-                    predictionIob = preferences.getInt(COLOR_PREFIX + "prediction_iob", defaults.predictionIob),
-                    predictionCob = preferences.getInt(COLOR_PREFIX + "prediction_cob", defaults.predictionCob),
-                    predictionUam = preferences.getInt(COLOR_PREFIX + "prediction_uam", defaults.predictionUam),
-                    predictionZeroTemp = preferences.getInt(COLOR_PREFIX + "prediction_zero_temp", defaults.predictionZeroTemp),
-                ),
-                graphStyle = WatchGraphStyle(
-                    cgmDotRadiusDp =
-                        preferences.getFloat(STYLE_DOT_RADIUS, styleDefaults.cgmDotRadiusDp)
-                            .coerceIn(1.5f, 6.0f),
-                    cgmDotOutlineEnabled =
-                        preferences.getBoolean(STYLE_OUTLINE_ENABLED, styleDefaults.cgmDotOutlineEnabled),
-                    cgmDotOutlineWidthDp =
-                        preferences.getFloat(STYLE_OUTLINE_WIDTH, styleDefaults.cgmDotOutlineWidthDp)
-                            .coerceIn(0.25f, 3.0f),
-                ),
+                graphColors =
+                    WatchGraphColors(
+                        graphBackground = preferences.getInt(COLOR_PREFIX + "background", graphDefaults.graphBackground),
+                        rangeLow = preferences.getInt(COLOR_PREFIX + "range_low", graphDefaults.rangeLow),
+                        rangeInRange = preferences.getInt(COLOR_PREFIX + "range_in", graphDefaults.rangeInRange),
+                        rangeHigh = preferences.getInt(COLOR_PREFIX + "range_high", graphDefaults.rangeHigh),
+                        cgmLow = preferences.getInt(COLOR_PREFIX + "cgm_low", graphDefaults.cgmLow),
+                        cgmInRange = preferences.getInt(COLOR_PREFIX + "cgm_in", graphDefaults.cgmInRange),
+                        cgmHigh = preferences.getInt(COLOR_PREFIX + "cgm_high", graphDefaults.cgmHigh),
+                        divider = preferences.getInt(COLOR_PREFIX + "divider", graphDefaults.divider),
+                        outline = preferences.getInt(COLOR_PREFIX + "outline", graphDefaults.outline),
+                        predictionIob = preferences.getInt(COLOR_PREFIX + "prediction_iob", graphDefaults.predictionIob),
+                        predictionCob = preferences.getInt(COLOR_PREFIX + "prediction_cob", graphDefaults.predictionCob),
+                        predictionUam = preferences.getInt(COLOR_PREFIX + "prediction_uam", graphDefaults.predictionUam),
+                        predictionZeroTemp = preferences.getInt(COLOR_PREFIX + "prediction_zero_temp", graphDefaults.predictionZeroTemp),
+                    ),
+                graphStyle =
+                    WatchGraphStyle(
+                        cgmDotRadiusDp =
+                            preferences
+                                .getFloat(STYLE_DOT_RADIUS, styleDefaults.cgmDotRadiusDp)
+                                .coerceIn(1.5f, 6.0f),
+                        cgmDotOutlineEnabled =
+                            preferences.getBoolean(STYLE_OUTLINE_ENABLED, styleDefaults.cgmDotOutlineEnabled),
+                        cgmDotOutlineWidthDp =
+                            preferences
+                                .getFloat(STYLE_OUTLINE_WIDTH, styleDefaults.cgmDotOutlineWidthDp)
+                                .coerceIn(0.25f, 3.0f),
+                    ),
+                uiColors =
+                    WatchUiColors(
+                        background = preferences.getInt(UI_PREFIX + "background", uiDefaults.background),
+                        tileBackground = preferences.getInt(UI_PREFIX + "tile_background", uiDefaults.tileBackground),
+                        tileBorder = preferences.getInt(UI_PREFIX + "tile_border", uiDefaults.tileBorder),
+                        textPrimary = preferences.getInt(UI_PREFIX + "text_primary", uiDefaults.textPrimary),
+                        textSecondary = preferences.getInt(UI_PREFIX + "text_secondary", uiDefaults.textSecondary),
+                        accent = preferences.getInt(UI_PREFIX + "accent", uiDefaults.accent),
+                        glucoseLow = preferences.getInt(UI_PREFIX + "glucose_low", uiDefaults.glucoseLow),
+                        glucoseInRange = preferences.getInt(UI_PREFIX + "glucose_in_range", uiDefaults.glucoseInRange),
+                        glucoseHigh = preferences.getInt(UI_PREFIX + "glucose_high", uiDefaults.glucoseHigh),
+                        iob = preferences.getInt(UI_PREFIX + "iob", uiDefaults.iob),
+                        cob = preferences.getInt(UI_PREFIX + "cob", uiDefaults.cob),
+                    ),
             )
         }
 
@@ -91,39 +115,77 @@ internal data class WearDisplayPreferences(
             context: Context,
             config: WatchConfig,
         ) {
+            saveLocal(
+                context,
+                WearDisplayPreferences(
+                    graphHours = config.graphHours,
+                    showPredictions = config.showPredictions,
+                    glucoseUnit = config.glucoseUnit,
+                    showTherapyStats = config.showTherapyStats,
+                    syncedAtEpochMs =
+                        config.sentAtEpochMs.takeIf { it > 0L }
+                            ?: System.currentTimeMillis(),
+                    graphColors = config.graphColors,
+                    graphStyle = config.graphStyle,
+                    uiColors = config.uiColors,
+                ),
+            )
+        }
+
+        fun saveLocal(
+            context: Context,
+            value: WearDisplayPreferences,
+        ) {
+            val graphHours =
+                value.graphHours.takeIf { it in allowedGraphHours } ?: 3
+            val style =
+                value.graphStyle.copy(
+                    cgmDotRadiusDp = value.graphStyle.cgmDotRadiusDp.coerceIn(1.5f, 6.0f),
+                    cgmDotOutlineWidthDp = value.graphStyle.cgmDotOutlineWidthDp.coerceIn(0.25f, 3.0f),
+                )
+
             context
                 .getSharedPreferences(
                     PREFS,
                     Context.MODE_PRIVATE,
                 )
                 .edit()
-                .putInt(
-                    KEY_GRAPH_HOURS,
-                    config.graphHours.takeIf { it in listOf(3, 6, 12, 24) } ?: 3,
-                )
-                .putBoolean(KEY_SHOW_PREDICTIONS, config.showPredictions)
-                .putString(KEY_GLUCOSE_UNIT, config.glucoseUnit.name)
-                .putBoolean(KEY_SHOW_THERAPY_STATS, config.showTherapyStats)
+                .putInt(KEY_GRAPH_HOURS, graphHours)
+                .putBoolean(KEY_SHOW_PREDICTIONS, value.showPredictions)
+                .putString(KEY_GLUCOSE_UNIT, value.glucoseUnit.name)
+                .putBoolean(KEY_SHOW_THERAPY_STATS, value.showTherapyStats)
                 .putLong(
                     KEY_SYNCED_AT,
-                    if (config.sentAtEpochMs > 0L) config.sentAtEpochMs else System.currentTimeMillis(),
+                    value.syncedAtEpochMs.takeIf { it > 0L }
+                        ?: System.currentTimeMillis(),
                 )
-                .putInt(COLOR_PREFIX + "background", config.graphColors.graphBackground)
-                .putInt(COLOR_PREFIX + "range_low", config.graphColors.rangeLow)
-                .putInt(COLOR_PREFIX + "range_in", config.graphColors.rangeInRange)
-                .putInt(COLOR_PREFIX + "range_high", config.graphColors.rangeHigh)
-                .putInt(COLOR_PREFIX + "cgm_low", config.graphColors.cgmLow)
-                .putInt(COLOR_PREFIX + "cgm_in", config.graphColors.cgmInRange)
-                .putInt(COLOR_PREFIX + "cgm_high", config.graphColors.cgmHigh)
-                .putInt(COLOR_PREFIX + "divider", config.graphColors.divider)
-                .putInt(COLOR_PREFIX + "outline", config.graphColors.outline)
-                .putInt(COLOR_PREFIX + "prediction_iob", config.graphColors.predictionIob)
-                .putInt(COLOR_PREFIX + "prediction_cob", config.graphColors.predictionCob)
-                .putInt(COLOR_PREFIX + "prediction_uam", config.graphColors.predictionUam)
-                .putInt(COLOR_PREFIX + "prediction_zero_temp", config.graphColors.predictionZeroTemp)
-                .putFloat(STYLE_DOT_RADIUS, config.graphStyle.cgmDotRadiusDp.coerceIn(1.5f, 6.0f))
-                .putBoolean(STYLE_OUTLINE_ENABLED, config.graphStyle.cgmDotOutlineEnabled)
-                .putFloat(STYLE_OUTLINE_WIDTH, config.graphStyle.cgmDotOutlineWidthDp.coerceIn(0.25f, 3.0f))
+                .putInt(COLOR_PREFIX + "background", value.graphColors.graphBackground)
+                .putInt(COLOR_PREFIX + "range_low", value.graphColors.rangeLow)
+                .putInt(COLOR_PREFIX + "range_in", value.graphColors.rangeInRange)
+                .putInt(COLOR_PREFIX + "range_high", value.graphColors.rangeHigh)
+                .putInt(COLOR_PREFIX + "cgm_low", value.graphColors.cgmLow)
+                .putInt(COLOR_PREFIX + "cgm_in", value.graphColors.cgmInRange)
+                .putInt(COLOR_PREFIX + "cgm_high", value.graphColors.cgmHigh)
+                .putInt(COLOR_PREFIX + "divider", value.graphColors.divider)
+                .putInt(COLOR_PREFIX + "outline", value.graphColors.outline)
+                .putInt(COLOR_PREFIX + "prediction_iob", value.graphColors.predictionIob)
+                .putInt(COLOR_PREFIX + "prediction_cob", value.graphColors.predictionCob)
+                .putInt(COLOR_PREFIX + "prediction_uam", value.graphColors.predictionUam)
+                .putInt(COLOR_PREFIX + "prediction_zero_temp", value.graphColors.predictionZeroTemp)
+                .putFloat(STYLE_DOT_RADIUS, style.cgmDotRadiusDp)
+                .putBoolean(STYLE_OUTLINE_ENABLED, style.cgmDotOutlineEnabled)
+                .putFloat(STYLE_OUTLINE_WIDTH, style.cgmDotOutlineWidthDp)
+                .putInt(UI_PREFIX + "background", value.uiColors.background)
+                .putInt(UI_PREFIX + "tile_background", value.uiColors.tileBackground)
+                .putInt(UI_PREFIX + "tile_border", value.uiColors.tileBorder)
+                .putInt(UI_PREFIX + "text_primary", value.uiColors.textPrimary)
+                .putInt(UI_PREFIX + "text_secondary", value.uiColors.textSecondary)
+                .putInt(UI_PREFIX + "accent", value.uiColors.accent)
+                .putInt(UI_PREFIX + "glucose_low", value.uiColors.glucoseLow)
+                .putInt(UI_PREFIX + "glucose_in_range", value.uiColors.glucoseInRange)
+                .putInt(UI_PREFIX + "glucose_high", value.uiColors.glucoseHigh)
+                .putInt(UI_PREFIX + "iob", value.uiColors.iob)
+                .putInt(UI_PREFIX + "cob", value.uiColors.cob)
                 .apply()
         }
     }
