@@ -2,7 +2,6 @@ package app.aapswear.mobile
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -47,13 +46,14 @@ internal fun SugarliciousFacePreview(
     complicationIds: List<Int>,
     modifier: Modifier = Modifier,
 ) {
+    val faceIndex = index.coerceIn(0, 3)
     BoxWithConstraints(
         modifier = modifier.clip(CircleShape).background(Color.Black),
         contentAlignment = Alignment.Center,
     ) {
         Canvas(Modifier.fillMaxSize()) {
             val r = size.minDimension / 2f
-            when (index.coerceIn(0, 3)) {
+            when (faceIndex) {
                 0 -> {
                     drawCircle(Color(0xFF050B10), r)
                     repeat(12) { tick ->
@@ -68,10 +68,13 @@ internal fun SugarliciousFacePreview(
                             cap = StrokeCap.Round,
                         )
                     }
-                    drawPreviewCard(0.26f, 0.10f, 0.48f, 0.20f)
-                    drawPreviewCard(0.08f, 0.37f, 0.25f, 0.17f)
-                    drawPreviewCard(0.67f, 0.37f, 0.25f, 0.17f)
-                    drawPreviewCard(0.34f, 0.76f, 0.32f, 0.13f)
+                    // Mirrors the activeDetails card geometry from sugarlicious-analog/watchface.xml.
+                    drawPreviewCard(115f / 450f, 42f / 450f, 220f / 450f, 86f / 450f)
+                    drawPreviewCard(39f / 450f, 163f / 450f, 105f / 450f, 70f / 450f)
+                    drawPreviewCard(306f / 450f, 163f / 450f, 105f / 450f, 70f / 450f)
+                    drawPreviewCard(48f / 450f, 281f / 450f, 113f / 450f, 66f / 450f)
+                    drawPreviewCard(289f / 450f, 281f / 450f, 113f / 450f, 66f / 450f)
+                    drawPreviewCard(169f / 450f, 365f / 450f, 112f / 450f, 50f / 450f)
                 }
                 1 -> {
                     drawCircle(Color(0xFF050505), r)
@@ -85,14 +88,14 @@ internal fun SugarliciousFacePreview(
                         size = Size(size.width - 16.dp.toPx(), size.height - 16.dp.toPx()),
                         style = Stroke(3.dp.toPx(), cap = StrokeCap.Round),
                     )
-                    drawCircle(Color(0xFF343434), r * 0.47f, style = Stroke(7.dp.toPx()))
+                    drawCircle(Color(0xFF343434), r * 0.453f, style = Stroke(7.dp.toPx()))
                     drawArc(
                         Color(0xFF54DF30),
                         130f,
                         205f,
                         false,
-                        Offset(center.x - r * 0.47f, center.y - r * 0.47f),
-                        Size(r * 0.94f, r * 0.94f),
+                        Offset(center.x - r * 0.453f, center.y - r * 0.453f),
+                        Size(r * 0.906f, r * 0.906f),
                         style = Stroke(7.dp.toPx(), cap = StrokeCap.Round),
                     )
                 }
@@ -123,21 +126,17 @@ internal fun SugarliciousFacePreview(
                     drawCircle(Color(0xFF19D7E8), r - 5.dp.toPx(), style = Stroke(2.5.dp.toPx()))
                     drawRoundRect(
                         Color(0xFF151515),
-                        topLeft = Offset(size.width * 0.105f, size.height * 0.115f),
-                        size = Size(size.width * 0.79f, size.height * 0.235f),
-                        cornerRadius = androidx.compose.ui.geometry.CornerRadius(8.dp.toPx()),
+                        topLeft = Offset(size.width * (47f / 450f), size.height * (53f / 450f)),
+                        size = Size(size.width * (356f / 450f), size.height * (106f / 450f)),
+                        cornerRadius = androidx.compose.ui.geometry.CornerRadius(size.minDimension * (28f / 450f)),
                     )
-                    drawPreviewCard(0.08f, 0.39f, 0.27f, 0.14f)
-                    drawPreviewCard(0.65f, 0.39f, 0.27f, 0.14f)
-                    drawPreviewCard(0.08f, 0.56f, 0.84f, 0.30f)
                 }
             }
         }
 
-        val ids = complicationIds.take(4)
-        val slots = previewSlots(index.coerceIn(0, 3), maxWidth, maxHeight)
-        ids.forEachIndexed { slotIndex, id ->
-            val slot = slots.getOrNull(slotIndex) ?: return@forEachIndexed
+        val slots = previewSlots(faceIndex, maxWidth, maxHeight)
+        complicationIds.take(slots.size).forEachIndexed { slotIndex, id ->
+            val slot = slots[slotIndex]
             PreviewComplication(
                 id = id,
                 state = state,
@@ -196,33 +195,47 @@ private fun previewSlots(
     index: Int,
     width: Dp,
     height: Dp,
-): List<PreviewSlot> =
-    when (index) {
+): List<PreviewSlot> {
+    fun slot(x: Float, y: Float, w: Float, h: Float) =
+        PreviewSlot(
+            x = width * (x / 450f),
+            y = height * (y / 450f),
+            width = width * (w / 450f),
+            height = height * (h / 450f),
+        )
+
+    return when (index) {
+        // Exact ComplicationSlot bounds from the four WFF watchface.xml files.
         0 -> listOf(
-            PreviewSlot(width * 0.27f, height * 0.11f, width * 0.46f, height * 0.19f),
-            PreviewSlot(width * 0.08f, height * 0.37f, width * 0.25f, height * 0.17f),
-            PreviewSlot(width * 0.67f, height * 0.37f, width * 0.25f, height * 0.17f),
-            PreviewSlot(width * 0.34f, height * 0.76f, width * 0.32f, height * 0.13f),
+            slot(127f, 49f, 196f, 73f),
+            slot(330f, 54f, 58f, 38f),
+            slot(58f, 60f, 78f, 46f),
+            slot(46f, 170f, 91f, 56f),
+            slot(313f, 170f, 91f, 56f),
+            slot(55f, 288f, 99f, 52f),
+            slot(296f, 288f, 99f, 52f),
+            slot(155f, 365f, 140f, 50f),
         )
         1 -> listOf(
-            PreviewSlot(width * 0.29f, height * 0.31f, width * 0.42f, height * 0.25f),
-            PreviewSlot(width * 0.02f, height * 0.38f, width * 0.25f, height * 0.15f),
-            PreviewSlot(width * 0.73f, height * 0.38f, width * 0.25f, height * 0.15f),
-            PreviewSlot(width * 0.17f, height * 0.72f, width * 0.66f, height * 0.15f),
+            slot(112f, 110f, 226f, 226f),
+            slot(32f, 165f, 90f, 58f),
+            slot(328f, 165f, 90f, 58f),
+            slot(75f, 322f, 300f, 92f),
         )
         2 -> listOf(
-            PreviewSlot(width * 0.33f, height * 0.61f, width * 0.34f, height * 0.24f),
-            PreviewSlot(width * 0.08f, height * 0.23f, width * 0.28f, height * 0.16f),
-            PreviewSlot(width * 0.64f, height * 0.23f, width * 0.28f, height * 0.16f),
-            PreviewSlot(width * 0.16f, height * 0.43f, width * 0.68f, height * 0.16f),
+            slot(145f, 260f, 160f, 160f),
+            slot(43f, 105f, 125f, 72f),
+            slot(282f, 105f, 125f, 72f),
+            slot(70f, 188f, 310f, 74f),
         )
         else -> listOf(
-            PreviewSlot(width * 0.15f, height * 0.13f, width * 0.70f, height * 0.20f),
-            PreviewSlot(width * 0.08f, height * 0.56f, width * 0.84f, height * 0.28f),
-            PreviewSlot(width * 0.08f, height * 0.39f, width * 0.27f, height * 0.14f),
-            PreviewSlot(width * 0.65f, height * 0.39f, width * 0.27f, height * 0.14f),
+            slot(62f, 62f, 326f, 88f),
+            slot(30f, 238f, 390f, 150f),
+            slot(44f, 170f, 112f, 60f),
+            slot(294f, 170f, 112f, 60f),
         )
     }
+}
 
 @Composable
 private fun PreviewComplication(
@@ -240,6 +253,7 @@ private fun PreviewComplication(
     Column(
         modifier = modifier,
         horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = androidx.compose.foundation.layout.Arrangement.Center,
     ) {
         Text(
             text = presentation.text,
@@ -271,9 +285,10 @@ private fun MiniPreviewGraph(
 ) {
     val now = System.currentTimeMillis()
     val cutoff = now - 90L * 60_000L
+    val effectiveState = state ?: previewFaceState(now)
     val points =
-        (state?.glucoseHistory.orEmpty() +
-            listOfNotNull(state?.glucose?.let { GlucoseSample(it.valueMgDl, it.measuredAtEpochMs) }))
+        (effectiveState.glucoseHistory +
+            listOfNotNull(effectiveState.glucose?.let { GlucoseSample(it.valueMgDl, it.measuredAtEpochMs) }))
             .filter { it.measuredAtEpochMs in cutoff..now + 5 * 60_000L }
             .sortedBy { it.measuredAtEpochMs }
 
@@ -285,14 +300,22 @@ private fun MiniPreviewGraph(
             (((ts - cutoff).toFloat() / (90f * 60_000f)).coerceIn(0f, 1f)) * size.width
         fun y(value: Double): Float =
             size.height - (((value - 50.0) / 180.0).coerceIn(0.0, 1.0).toFloat() * size.height)
-        drawRoundRect(Color(0x2219D7E8), size = size, cornerRadius = androidx.compose.ui.geometry.CornerRadius(3.dp.toPx()))
+        drawRoundRect(
+            Color(0x2219D7E8),
+            size = size,
+            cornerRadius = androidx.compose.ui.geometry.CornerRadius(3.dp.toPx()),
+        )
         points.forEach { point ->
             val color = when {
                 point.valueMgDl < low -> Color(0xFFFF6464)
                 point.valueMgDl > high -> Color(0xFFFFA24B)
                 else -> Color(0xFF54DF30)
             }
-            drawCircle(color, radius = 1.2.dp.toPx(), center = Offset(x(point.measuredAtEpochMs), y(point.valueMgDl)))
+            drawCircle(
+                color,
+                radius = 1.2.dp.toPx(),
+                center = Offset(x(point.measuredAtEpochMs), y(point.valueMgDl)),
+            )
         }
     }
 }
@@ -311,8 +334,14 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawPreviewCard(
     )
 }
 
-private fun previewFaceState(now: Long): TherapyDisplayState =
-    TherapyDisplayState(
+private fun previewFaceState(now: Long): TherapyDisplayState {
+    val history = (0..18).map { index ->
+        GlucoseSample(
+            valueMgDl = 108.0 + ((index % 8) * 3.0),
+            measuredAtEpochMs = now - (18 - index) * 5L * 60_000L,
+        )
+    }
+    return TherapyDisplayState(
         receivedAtEpochMs = now,
         sourceVersion = "AndroidAPS",
         glucose = app.aapswear.model.GlucoseState(
@@ -322,7 +351,9 @@ private fun previewFaceState(now: Long): TherapyDisplayState =
             measuredAtEpochMs = now - 2 * 60_000L,
             deltaMgDl = 5.0,
         ),
+        glucoseHistory = history,
         insulin = app.aapswear.model.InsulinState(totalIob = 1.2, bolusIob = 0.8, basalIob = 0.4),
         carbs = app.aapswear.model.CarbState(cobGrams = 15.0),
         basal = app.aapswear.model.BasalState(currentUnitsPerHour = 0.70),
     )
+}
