@@ -10,10 +10,11 @@ internal object WatchRuntimeStatusStore {
     private const val SENT = "sent_at"
 
     fun save(context: Context, status: WatchRuntimeStatus) {
+        val activeFaceIndex = status.activeSugarliciousFaceIndex
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
             .apply {
-                if (status.activeSugarliciousFaceIndex == null) remove(FACE)
-                else putInt(FACE, status.activeSugarliciousFaceIndex)
+                if (activeFaceIndex == null) remove(FACE)
+                else putInt(FACE, activeFaceIndex)
             }
             .putString(IDS, status.activeComplicationIds.joinToString(","))
             .putLong(SENT, status.sentAtEpochMs)
