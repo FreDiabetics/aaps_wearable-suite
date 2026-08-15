@@ -1,7 +1,10 @@
 package app.aapswear.complications
 
 import androidx.wear.watchface.complications.data.ComplicationType
+import androidx.wear.watchface.complications.data.LongTextComplicationData
+import androidx.wear.watchface.complications.data.PhotoImageComplicationData
 import androidx.wear.watchface.complications.data.RangedValueComplicationData
+import androidx.wear.watchface.complications.data.SmallImageComplicationData
 import androidx.wear.watchface.complications.data.ShortTextComplicationData
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -18,9 +21,9 @@ class TherapyComplicationsTest {
 
     @Test
     fun `all documented providers remain active`() {
-        assertEquals(19, AllProviders.classes.distinct().size)
+        assertEquals(35, AllProviders.classes.distinct().size)
         assertEquals(GlucoseComplication::class.java, AllProviders.classes.first())
-        assertEquals(GlucoseGraphComplication::class.java, AllProviders.classes.last())
+        assertEquals(GlucoseGraphLargeComplication::class.java, AllProviders.classes.last())
     }
 
     @Test
@@ -51,7 +54,7 @@ class TherapyComplicationsTest {
     fun `glucose trend ranged complication separates value and trend for renderers`() {
         val service =
             Robolectric
-                .buildService(GlucoseTrendComplication::class.java)
+                .buildService(GlucoseTrendRangedValueComplication::class.java)
                 .create()
                 .get()
 
@@ -144,26 +147,34 @@ class TherapyComplicationsTest {
     }
 
     @Test
-    fun `both graph providers return image complications`() {
-        listOf(
-            GlucoseGraphComplication::class.java,
-            GlucoseGraphLargeComplication::class.java,
-        ).forEach { provider ->
-            val service =
-                Robolectric
-                    .buildService(provider)
-                    .create()
-                    .get()
+    fun `graph providers each return only their declared image type`() {
+        val small = Robolectric.buildService(GlucoseGraphComplication::class.java).create().get()
+        val large = Robolectric.buildService(GlucoseGraphLargeComplication::class.java).create().get()
 
-            val data =
-                service.getPreviewData(
-                    ComplicationType.PHOTO_IMAGE,
-                )
+        assertEquals(
+            ComplicationType.SMALL_IMAGE,
+            (small.getPreviewData(ComplicationType.PHOTO_IMAGE) as SmallImageComplicationData).type,
+        )
+        assertEquals(
+            ComplicationType.PHOTO_IMAGE,
+            (large.getPreviewData(ComplicationType.SMALL_IMAGE) as PhotoImageComplicationData).type,
+        )
+    }
 
-            assertEquals(
-                ComplicationType.PHOTO_IMAGE,
-                data.type,
-            )
-}
+    @Test
+    fun `glucose providers keep short long and ranged data in separate services`() {
+        val short = Robolectric.buildService(GlucoseComplication::class.java).create().get()
+        val long = Robolectric.buildService(GlucoseLongTextComplication::class.java).create().get()
+        val ranged = Robolectric.buildService(GlucoseRangedValueComplication::class.java).create().get()
+
+        assertEquals(ComplicationType.SHORT_TEXT, short.getPreviewData(ComplicationType.LONG_TEXT).type)
+        assertEquals(
+            ComplicationType.LONG_TEXT,
+            (long.getPreviewData(ComplicationType.SHORT_TEXT) as LongTextComplicationData).type,
+        )
+        assertEquals(
+            ComplicationType.RANGED_VALUE,
+            (ranged.getPreviewData(ComplicationType.SHORT_TEXT) as RangedValueComplicationData).type,
+        )
     }
 }

@@ -93,10 +93,12 @@ enum class ProviderKind {
 
 abstract class TherapyComplicationService(
     private val kind: ProviderKind,
+    private val declaredType: ComplicationType? = null,
+    private val declaredCatalogId: Int? = null,
 ) : SuspendingComplicationDataSourceService() {
 
     private val catalogId: Int?
-        get() = when (kind) {
+        get() = declaredCatalogId ?: when (kind) {
             ProviderKind.GLUCOSE -> SugarliciousComplicationIds.GLUCOSE
             ProviderKind.TREND_ONLY -> SugarliciousComplicationIds.TREND_ONLY
             ProviderKind.DELTA_ONLY -> SugarliciousComplicationIds.DELTA_ONLY
@@ -130,13 +132,13 @@ abstract class TherapyComplicationService(
     }
 
     override fun getPreviewData(type: ComplicationType): ComplicationData =
-        build(type, preview())
+        build(declaredType ?: type, preview())
 
     override suspend fun onComplicationRequest(
         request: ComplicationRequest,
     ): ComplicationData {
         ActiveComplicationRegistry.activate(this, request.complicationInstanceId, catalogId)
-        return build(request.complicationType, TherapyStateStore(this).state.first())
+        return build(declaredType ?: request.complicationType, TherapyStateStore(this).state.first())
     }
 
     private fun build(
@@ -862,27 +864,87 @@ abstract class TherapyComplicationService(
 }
 
 class GlucoseComplication :
-    TherapyComplicationService(ProviderKind.GLUCOSE)
+    TherapyComplicationService(ProviderKind.GLUCOSE, ComplicationType.SHORT_TEXT)
+class GlucoseLongTextComplication :
+    TherapyComplicationService(
+        ProviderKind.GLUCOSE,
+        ComplicationType.LONG_TEXT,
+        SugarliciousComplicationIds.GLUCOSE_LONG,
+    )
+class GlucoseRangedValueComplication :
+    TherapyComplicationService(
+        ProviderKind.GLUCOSE,
+        ComplicationType.RANGED_VALUE,
+        SugarliciousComplicationIds.GLUCOSE_RANGED,
+    )
 class TrendOnlyComplication :
     TherapyComplicationService(ProviderKind.TREND_ONLY)
 class DeltaOnlyComplication :
     TherapyComplicationService(ProviderKind.DELTA_ONLY)
 
 class GlucosePlusDeltaComplication :
-    TherapyComplicationService(ProviderKind.GLUCOSE_PLUS_DELTA)
+    TherapyComplicationService(ProviderKind.GLUCOSE_PLUS_DELTA, ComplicationType.SHORT_TEXT)
+class GlucosePlusDeltaLongTextComplication :
+    TherapyComplicationService(
+        ProviderKind.GLUCOSE_PLUS_DELTA,
+        ComplicationType.LONG_TEXT,
+        SugarliciousComplicationIds.GLUCOSE_PLUS_DELTA_LONG,
+    )
 class GlucoseTrendDeltaAgeComplication :
-    TherapyComplicationService(ProviderKind.GLUCOSE_TREND_DELTA_AGE)
+    TherapyComplicationService(ProviderKind.GLUCOSE_TREND_DELTA_AGE, ComplicationType.SHORT_TEXT)
+class GlucoseTrendDeltaAgeLongTextComplication :
+    TherapyComplicationService(
+        ProviderKind.GLUCOSE_TREND_DELTA_AGE,
+        ComplicationType.LONG_TEXT,
+        SugarliciousComplicationIds.GLUCOSE_TREND_DELTA_AGE_LONG,
+    )
 class GlucoseTrendAgeComplication :
-    TherapyComplicationService(ProviderKind.GLUCOSE_TREND_AGE)
+    TherapyComplicationService(ProviderKind.GLUCOSE_TREND_AGE, ComplicationType.SHORT_TEXT)
+class GlucoseTrendAgeLongTextComplication :
+    TherapyComplicationService(
+        ProviderKind.GLUCOSE_TREND_AGE,
+        ComplicationType.LONG_TEXT,
+        SugarliciousComplicationIds.GLUCOSE_TREND_AGE_LONG,
+    )
 class SensorAgeComplication :
-    TherapyComplicationService(ProviderKind.SENSOR_AGE)
+    TherapyComplicationService(ProviderKind.SENSOR_AGE, ComplicationType.SHORT_TEXT)
+class SensorAgeRangedValueComplication :
+    TherapyComplicationService(
+        ProviderKind.SENSOR_AGE,
+        ComplicationType.RANGED_VALUE,
+        SugarliciousComplicationIds.SENSOR_AGE_RANGED,
+    )
 class TirComplication :
-    TherapyComplicationService(ProviderKind.TIR)
+    TherapyComplicationService(ProviderKind.TIR, ComplicationType.SHORT_TEXT)
+class TirGoalProgressComplication :
+    TherapyComplicationService(
+        ProviderKind.TIR,
+        ComplicationType.GOAL_PROGRESS,
+        SugarliciousComplicationIds.TIR_GOAL,
+    )
+class TirWeightedElementsComplication :
+    TherapyComplicationService(
+        ProviderKind.TIR,
+        ComplicationType.WEIGHTED_ELEMENTS,
+        SugarliciousComplicationIds.TIR_WEIGHTED,
+    )
 
 class GlucoseTrendComplication :
-    TherapyComplicationService(ProviderKind.GLUCOSE_TREND)
+    TherapyComplicationService(ProviderKind.GLUCOSE_TREND, ComplicationType.SHORT_TEXT)
+class GlucoseTrendLongTextComplication :
+    TherapyComplicationService(
+        ProviderKind.GLUCOSE_TREND,
+        ComplicationType.LONG_TEXT,
+        SugarliciousComplicationIds.GLUCOSE_TREND_LONG,
+    )
+class GlucoseTrendRangedValueComplication :
+    TherapyComplicationService(
+        ProviderKind.GLUCOSE_TREND,
+        ComplicationType.RANGED_VALUE,
+        SugarliciousComplicationIds.GLUCOSE_TREND_RANGED,
+    )
 class GlucoseTrendTextComplication :
-    TherapyComplicationService(ProviderKind.GLUCOSE_TREND)
+    TherapyComplicationService(ProviderKind.GLUCOSE_TREND, ComplicationType.SHORT_TEXT)
 
 class GlucoseDeltaComplication :
     TherapyComplicationService(ProviderKind.GLUCOSE_DELTA)
@@ -903,13 +965,23 @@ class GlucoseRangedComplication :
     TherapyComplicationService(ProviderKind.GLUCOSE_RANGED)
 
 class GlucoseGraphComplication :
-    TherapyComplicationService(ProviderKind.GRAPH)
+    TherapyComplicationService(ProviderKind.GRAPH, ComplicationType.SMALL_IMAGE)
 
 class GlucoseGraphLargeComplication :
-    TherapyComplicationService(ProviderKind.GRAPH_LARGE)
+    TherapyComplicationService(
+        ProviderKind.GRAPH_LARGE,
+        ComplicationType.PHOTO_IMAGE,
+        SugarliciousComplicationIds.GRAPH_LARGE,
+    )
 
 class IobComplication :
-    TherapyComplicationService(ProviderKind.IOB)
+    TherapyComplicationService(ProviderKind.IOB, ComplicationType.SHORT_TEXT)
+class IobRangedValueComplication :
+    TherapyComplicationService(
+        ProviderKind.IOB,
+        ComplicationType.RANGED_VALUE,
+        SugarliciousComplicationIds.IOB_RANGED,
+    )
 
 class BolusIobComplication :
     TherapyComplicationService(ProviderKind.BOLUS_IOB)
@@ -918,13 +990,25 @@ class BasalIobComplication :
     TherapyComplicationService(ProviderKind.BASAL_IOB)
 
 class CobComplication :
-    TherapyComplicationService(ProviderKind.COB)
+    TherapyComplicationService(ProviderKind.COB, ComplicationType.SHORT_TEXT)
+class CobRangedValueComplication :
+    TherapyComplicationService(
+        ProviderKind.COB,
+        ComplicationType.RANGED_VALUE,
+        SugarliciousComplicationIds.COB_RANGED,
+    )
 
 class IobCobComplication :
     TherapyComplicationService(ProviderKind.IOB_COB)
 
 class IobCobBasalComplication :
-    TherapyComplicationService(ProviderKind.IOB_COB_BASAL)
+    TherapyComplicationService(ProviderKind.IOB_COB_BASAL, ComplicationType.SHORT_TEXT)
+class IobCobBasalLongTextComplication :
+    TherapyComplicationService(
+        ProviderKind.IOB_COB_BASAL,
+        ComplicationType.LONG_TEXT,
+        SugarliciousComplicationIds.IOB_COB_BASAL_LONG,
+    )
 
 class BasalComplication :
     TherapyComplicationService(ProviderKind.BASAL)
@@ -936,7 +1020,13 @@ class TempTargetComplication :
     TherapyComplicationService(ProviderKind.TEMP_TARGET)
 
 class LoopComplication :
-    TherapyComplicationService(ProviderKind.LOOP)
+    TherapyComplicationService(ProviderKind.LOOP, ComplicationType.SHORT_TEXT)
+class LoopIconComplication :
+    TherapyComplicationService(
+        ProviderKind.LOOP,
+        ComplicationType.MONOCHROMATIC_IMAGE,
+        SugarliciousComplicationIds.LOOP_ICON,
+    )
 
 class LastLoopComplication :
     TherapyComplicationService(ProviderKind.LOOP_LAST)
@@ -945,7 +1035,13 @@ class ProfileComplication :
     TherapyComplicationService(ProviderKind.PROFILE)
 
 class ReservoirComplication :
-    TherapyComplicationService(ProviderKind.RESERVOIR)
+    TherapyComplicationService(ProviderKind.RESERVOIR, ComplicationType.SHORT_TEXT)
+class ReservoirRangedValueComplication :
+    TherapyComplicationService(
+        ProviderKind.RESERVOIR,
+        ComplicationType.RANGED_VALUE,
+        SugarliciousComplicationIds.RESERVOIR_RANGED,
+    )
 
 class PumpBatteryComplication :
     TherapyComplicationService(ProviderKind.PUMP_BATTERY)
@@ -965,23 +1061,39 @@ class LongStatusComplication :
 object AllProviders {
     val classes = listOf(
         GlucoseComplication::class.java,
+        GlucoseLongTextComplication::class.java,
+        GlucoseRangedValueComplication::class.java,
         TrendOnlyComplication::class.java,
         DeltaOnlyComplication::class.java,
         GlucoseAgeComplication::class.java,
         BasalComplication::class.java,
         IobComplication::class.java,
+        IobRangedValueComplication::class.java,
         CobComplication::class.java,
+        CobRangedValueComplication::class.java,
         GlucoseTrendComplication::class.java,
+        GlucoseTrendLongTextComplication::class.java,
+        GlucoseTrendRangedValueComplication::class.java,
         GlucosePlusDeltaComplication::class.java,
+        GlucosePlusDeltaLongTextComplication::class.java,
         GlucoseDeltaComplication::class.java,
         GlucoseTrendAgeComplication::class.java,
+        GlucoseTrendAgeLongTextComplication::class.java,
         GlucoseTrendDeltaComplication::class.java,
         GlucoseTrendDeltaAgeComplication::class.java,
+        GlucoseTrendDeltaAgeLongTextComplication::class.java,
         IobCobBasalComplication::class.java,
+        IobCobBasalLongTextComplication::class.java,
         LoopComplication::class.java,
+        LoopIconComplication::class.java,
         ReservoirComplication::class.java,
+        ReservoirRangedValueComplication::class.java,
         SensorAgeComplication::class.java,
+        SensorAgeRangedValueComplication::class.java,
         TirComplication::class.java,
+        TirGoalProgressComplication::class.java,
+        TirWeightedElementsComplication::class.java,
         GlucoseGraphComplication::class.java,
+        GlucoseGraphLargeComplication::class.java,
     )
 }

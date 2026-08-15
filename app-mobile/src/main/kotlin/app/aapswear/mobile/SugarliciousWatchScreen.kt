@@ -152,7 +152,10 @@ internal fun SugarliciousWatchScreen(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 2.dp, vertical = 4.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        OverviewInlineHeader(onSettings = { onNavigate(DashboardScreen.SETTINGS) })
+        WatchMenuHeader(
+            onBack = { onNavigate(DashboardScreen.OVERVIEW) },
+            onSettings = { onNavigate(DashboardScreen.SETTINGS) },
+        )
 
         Text(
             text = "Ziffernblätter",
@@ -173,12 +176,15 @@ internal fun SugarliciousWatchScreen(
                         face = sugarliciousWatchFaceCards[index],
                         index = index,
                         state = state,
-                        activeComplicationIds = facePresets[index],
+                        activeComplicationIds = facePresets.getOrElse(index) { emptyList() },
                         selected = activeFaceIndex == index,
                         onSelected = {
                             editingFaceIndex = index
                             val activated = WatchFacePresetStore.activate(appContext, index)
-                            facePresets = facePresets.toMutableList().also { it[index] = activated }
+                            facePresets =
+                                WatchFacePresetStore.readAll(appContext).toMutableList().also {
+                                    it[index] = activated
+                                }
                             onSelectedFace(index)
                         },
                     )

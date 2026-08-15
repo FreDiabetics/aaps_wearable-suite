@@ -56,6 +56,23 @@ object SugarliciousComplicationIds {
     const val TREND_ONLY = 35
     const val DELTA_ONLY = 36
 
+    const val GLUCOSE_LONG = 37
+    const val GLUCOSE_RANGED = 38
+    const val IOB_RANGED = 39
+    const val COB_RANGED = 40
+    const val GLUCOSE_TREND_LONG = 41
+    const val GLUCOSE_TREND_RANGED = 42
+    const val GLUCOSE_PLUS_DELTA_LONG = 43
+    const val GLUCOSE_TREND_AGE_LONG = 44
+    const val GLUCOSE_TREND_DELTA_AGE_LONG = 45
+    const val IOB_COB_BASAL_LONG = 46
+    const val LOOP_ICON = 47
+    const val RESERVOIR_RANGED = 48
+    const val SENSOR_AGE_RANGED = 49
+    const val TIR_GOAL = 50
+    const val TIR_WEIGHTED = 51
+    const val GRAPH_LARGE = 52
+
     val ordered = listOf(
         GLUCOSE,
         TREND_ONLY,
@@ -77,6 +94,28 @@ object SugarliciousComplicationIds {
         TIR,
         GRAPH,
     )
+
+    val variantsByBase = mapOf(
+        GLUCOSE to listOf(GLUCOSE, GLUCOSE_LONG, GLUCOSE_RANGED),
+        IOB to listOf(IOB, IOB_RANGED),
+        COB to listOf(COB, COB_RANGED),
+        GLUCOSE_TREND to listOf(GLUCOSE_TREND, GLUCOSE_TREND_LONG, GLUCOSE_TREND_RANGED),
+        GLUCOSE_PLUS_DELTA to listOf(GLUCOSE_PLUS_DELTA, GLUCOSE_PLUS_DELTA_LONG),
+        GLUCOSE_TREND_AGE to listOf(GLUCOSE_TREND_AGE, GLUCOSE_TREND_AGE_LONG),
+        GLUCOSE_TREND_DELTA_AGE to listOf(GLUCOSE_TREND_DELTA_AGE, GLUCOSE_TREND_DELTA_AGE_LONG),
+        IOB_COB_BASAL to listOf(IOB_COB_BASAL, IOB_COB_BASAL_LONG),
+        LOOP to listOf(LOOP, LOOP_ICON),
+        RESERVOIR to listOf(RESERVOIR, RESERVOIR_RANGED),
+        SENSOR_AGE to listOf(SENSOR_AGE, SENSOR_AGE_RANGED),
+        TIR to listOf(TIR, TIR_GOAL, TIR_WEIGHTED),
+        GRAPH to listOf(GRAPH, GRAPH_LARGE),
+    )
+
+    val all: List<Int> =
+        ordered.flatMap { base -> variantsByBase[base] ?: listOf(base) }
+
+    fun baseId(id: Int): Int =
+        variantsByBase.entries.firstOrNull { (_, variants) -> id in variants }?.key ?: id
 }
 
 object ComplicationPresentationFormatter {
@@ -94,7 +133,7 @@ object ComplicationPresentationFormatter {
         val age = TherapyDisplayFormatter.ageMinutes(glucose?.measuredAtEpochMs, nowEpochMs)
         val trend = liveGlucose?.trend?.takeUnless { it == Trend.UNKNOWN }
 
-        return when (id) {
+        return when (SugarliciousComplicationIds.baseId(id)) {
             SugarliciousComplicationIds.GLUCOSE ->
                 p(glucoseText, desc = "Glukose $glucoseText")
 

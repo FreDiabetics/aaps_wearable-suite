@@ -29,21 +29,21 @@ private val SettingsIconGray = Color(0xFF4A4A4A)
 @Composable
 internal fun OverviewInlineHeader(onSettings: () -> Unit) {
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().offset(y = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(
-            modifier = Modifier.size(width = 30.dp, height = 38.dp),
+            modifier = Modifier.size(width = 30.dp, height = 44.dp),
             contentAlignment = Alignment.CenterStart,
         ) {
             Image(
                 painter = painterResource(R.drawable.ic_foreground),
                 contentDescription = null,
-                modifier = Modifier.size(25.dp),
+                modifier = Modifier.size(44.dp).offset(x = (-10).dp),
             )
         }
 
-        Spacer(Modifier.width(5.dp))
+        Spacer(Modifier.width(1.dp))
 
         Text(
             text = buildAnnotatedString {
@@ -60,16 +60,55 @@ internal fun OverviewInlineHeader(onSettings: () -> Unit) {
 
         Spacer(Modifier.weight(1f))
 
+        SettingsHeaderButton(onSettings)
+    }
+}
+
+@Composable
+internal fun WatchMenuHeader(
+    onBack: () -> Unit,
+    onSettings: () -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth().offset(y = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
         Box(
-            modifier = Modifier.size(38.dp).clickable(onClick = onSettings),
-            contentAlignment = Alignment.Center,
+            modifier = Modifier.size(width = 30.dp, height = 44.dp).clickable(onClick = onBack),
+            contentAlignment = Alignment.CenterStart,
         ) {
             Image(
-                painter = painterResource(R.drawable.ic_settings),
-                contentDescription = "Einstellungen",
-                modifier = Modifier.size(23.dp).offset(x = 5.dp),
-                colorFilter = ColorFilter.tint(SettingsIconGray),
+                painter = painterResource(R.drawable.ic_arrow_back),
+                contentDescription = "Zurück",
+                modifier = Modifier.size(30.dp).offset(x = (-3).dp),
             )
         }
+
+        Spacer(Modifier.width(1.dp))
+
+        Text(
+            text = "Watch",
+            color = SugarliciousColors.TextPrimary,
+            fontSize = 21.sp,
+            fontWeight = FontWeight.Bold,
+        )
+
+        Spacer(Modifier.weight(1f))
+        SettingsHeaderButton(onSettings)
+    }
+}
+
+@Composable
+private fun SettingsHeaderButton(onSettings: () -> Unit) {
+    Box(
+        modifier = Modifier.size(38.dp).clickable(onClick = onSettings),
+        contentAlignment = Alignment.Center,
+    ) {
+        Image(
+            painter = painterResource(R.drawable.ic_settings),
+            contentDescription = "Einstellungen",
+            modifier = Modifier.size(23.dp).offset(x = 7.dp),
+            colorFilter = ColorFilter.tint(SettingsIconGray),
+        )
     }
 }

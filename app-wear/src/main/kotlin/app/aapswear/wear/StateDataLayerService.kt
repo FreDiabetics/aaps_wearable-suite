@@ -5,6 +5,7 @@ import android.content.Context
 import androidx.wear.watchface.complications.datasource.ComplicationDataSourceUpdateRequester
 import app.aapswear.complications.ActiveComplicationRegistry
 import app.aapswear.complications.AllProviders
+import app.aapswear.model.SugarliciousComplicationIds
 import app.aapswear.model.GlucoseSample
 import app.aapswear.protocol.WatchRuntimeStatus
 import app.aapswear.protocol.WearProtocol
@@ -118,7 +119,7 @@ class StateDataLayerService : WearableListenerService() {
             dataMap
                 .getIntegerArrayList("ids")
                 .orEmpty()
-                .filter { it in 1..36 }
+                .filter { it in SugarliciousComplicationIds.all }
                 .distinct()
                 .take(MAX_PRESET_ITEMS)
         val graphHours =
