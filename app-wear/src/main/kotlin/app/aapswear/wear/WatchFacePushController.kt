@@ -33,7 +33,7 @@ internal object SugarliciousWatchFacePush {
     private const val DIRECT_ACTIVATION_ATTEMPTED = "direct_activation_attempted"
     private const val SETTLING_WINDOW_MS = 15_000L
     private const val MANUAL_ACTIVATION_MESSAGE =
-        "Watchface geladen - auf der Uhr lange drücken und auswählen"
+        "Geladen - Uhr: lange drücken, ganz rechts +, Ziffernblatt auswählen"
     private const val TAG = "WatchFacePush"
 
     private data class FaceSpec(
@@ -181,6 +181,13 @@ internal object SugarliciousWatchFacePush {
             val installed =
                 manager.listWatchFaces()
                     .installedWatchFaceDetails
+            Log.i(
+                TAG,
+                "Installed slots before update: " +
+                    installed.joinToString { details ->
+                        "${details.slotId}=${details.packageName}"
+                    },
+            )
 
             val managed =
                 installed.filter { details ->
@@ -233,6 +240,7 @@ internal object SugarliciousWatchFacePush {
                         )
                     }
                 }
+            Log.i(TAG, "Updated slot ${details.slotId}=${details.packageName}; wasActive=$targetWasActive")
 
             when {
                 // An update of the active slot stays active after the asynchronous package swap.

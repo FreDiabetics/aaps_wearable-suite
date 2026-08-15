@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Text
@@ -40,7 +41,7 @@ internal fun OverviewInlineHeader(onSettings: () -> Unit) {
             Image(
                 painter = painterResource(R.drawable.ic_foreground),
                 contentDescription = null,
-                modifier = Modifier.size(60.dp).offset(x = (-12).dp),
+                modifier = Modifier.requiredSize(60.dp).offset(x = 1.dp),
             )
         }
 
@@ -73,15 +74,17 @@ internal fun WatchMenuHeader(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(
-            modifier = Modifier.size(width = 34.dp, height = 38.dp).clickable(onClick = onBack),
-            contentAlignment = Alignment.CenterStart,
+            modifier = Modifier.size(36.dp).clickable(onClick = onBack),
+            contentAlignment = Alignment.Center,
         ) {
             Image(
                 painter = painterResource(R.drawable.ic_arrow_back),
                 contentDescription = "Zurück",
-                modifier = Modifier.size(30.dp).offset(x = (-4).dp),
+                modifier = Modifier.size(22.dp),
             )
         }
+
+        Spacer(Modifier.width(7.dp))
 
         Text(
             text = "Watch",

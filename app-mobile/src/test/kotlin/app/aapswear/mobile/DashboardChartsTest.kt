@@ -85,6 +85,46 @@ class DashboardChartsTest {
         assertTrue("activity=$activityPixels", activityPixels > 4)
     }
 
+    @Test fun `metabolic chart renders the current time divider through iob and cob`() {
+        val now = System.currentTimeMillis()
+        val state =
+            TherapyDisplayState(
+                receivedAtEpochMs = now,
+                insulin = InsulinState(totalIob = 1.2),
+                carbs = CarbState(cobGrams = 18.0),
+                therapyHistory =
+                    listOf(
+                        TherapyHistorySample(now - 30 * 60_000L, totalIob = 1.4, cobGrams = 24.0),
+                        TherapyHistorySample(now, totalIob = 1.2, cobGrams = 18.0),
+                    ),
+            )
+        val viewport =
+            ChartViewport(6).apply {
+                setFutureWindow(60L * 60_000L)
+            }
+        val bitmap =
+            render(
+                MetabolicDashboardChart(context, sharedViewport = viewport).apply {
+                    bind(state, 6)
+                },
+                260,
+            )
+        val dividerX = (bitmap.width * 5f / 6f).toInt()
+        fun dividerPixels(yRange: IntRange): Int =
+            yRange.sumOf { y ->
+                ((dividerX - 3)..(dividerX + 3)).count { x ->
+                    val color = bitmap.getPixel(x, y)
+                    val red = Color.red(color)
+                    val green = Color.green(color)
+                    val blue = Color.blue(color)
+                    red in 130..170 && green in 130..170 && blue in 130..170
+                }
+            }
+
+        assertTrue("iobDivider=${dividerPixels(8..118)}", dividerPixels(8..118) > 12)
+        assertTrue("cobDivider=${dividerPixels(140..250)}", dividerPixels(140..250) > 12)
+    }
+
     @Test fun `toolkit metabolic scaling adds headroom aligns zero and uses fixed smb sizes`() {
         val iob = toolkitMetabolicRange(listOf(0.5, 2.0))
         val cob = toolkitMetabolicRange(listOf(10.0, 30.0), iob.zeroRatio)

@@ -1,12 +1,20 @@
 $ErrorActionPreference = 'Stop'
 
 $root = (Get-Location).Path
-$generated = Join-Path $root 'app-wear\build\generated\watchfacePushAssets\watchfaces'
-$toolDir = Join-Path $root 'build\watchface-push\tools'
+$generatedRoot = Join-Path $root 'app-wear/build/generated/watchfacePushAssets'
+$generated = Join-Path $generatedRoot 'watchfaces'
+$generatedValues = Join-Path $root 'app-wear/build/generated/watchfacePushRes/values'
+$toolDir = Join-Path $root 'build/watchface-push/tools'
+$gradle =
+    if ($env:OS -eq 'Windows_NT') {
+        Join-Path $root 'gradlew.bat'
+    } else {
+        Join-Path $root 'gradlew'
+    }
 
 Write-Host 'Building Sugarlicious Watch Face Push packages...'
 
-& .\gradlew `
+& $gradle `
     :watchfaces:sugarlicious-analog:assembleRelease `
     :watchfaces:sugarlicious-orbit:assembleRelease `
     :watchfaces:sugarlicious-rings:assembleRelease `
@@ -39,8 +47,10 @@ if (-not $validator) {
     throw "Validator CLI not found in $toolDir"
 }
 
-Remove-Item $generated -Recurse -Force -ErrorAction SilentlyContinue
+Remove-Item $generatedRoot -Recurse -Force -ErrorAction SilentlyContinue
+Remove-Item (Split-Path $generatedValues -Parent) -Recurse -Force -ErrorAction SilentlyContinue
 New-Item -ItemType Directory -Path $generated -Force | Out-Null
+New-Item -ItemType Directory -Path $generatedValues -Force | Out-Null
 
 $faces = @(
     @{ Module='sugarlicious-analog'; Out='sugarlicious_analog' },
@@ -75,7 +85,7 @@ $faces = @(
 
 foreach ($face in $faces) {
     $apk =
-        Get-ChildItem ".\watchfaces\$($face.Module)\build\outputs\apk\release\*.apk" |
+        Get-ChildItem (Join-Path $root "watchfaces/$($face.Module)/build/outputs/apk/release") -Filter '*.apk' |
             Sort-Object LastWriteTime -Descending |
             Select-Object -First 1
 
@@ -124,6 +134,21 @@ foreach ($face in $faces) {
     Write-Host "Prepared $($face.Out)"
 }
 
+# Wear OS registers this representative face in the system picker when the marketplace app is
+# installed. Once the user activates it, all later variants can replace the same active Push slot.
+$defaultApk = Join-Path $generatedRoot 'default_watchface.apk'
+$defaultToken = Get-Content (Join-Path $generated 'sugarlicious_analog_token.txt') -Raw
+$escapedDefaultToken = [System.Security.SecurityElement]::Escape($defaultToken.Trim())
+$defaultTokenResource = Join-Path $generatedValues 'default_watchface_token.xml'
+
+Copy-Item (Join-Path $generated 'sugarlicious_analog.apk') $defaultApk -Force
+[System.IO.File]::WriteAllText(
+    $defaultTokenResource,
+    "<resources>`n    <string name=`"default_wf_token`" translatable=`"false`">$escapedDefaultToken</string>`n</resources>`n",
+    (New-Object System.Text.UTF8Encoding($false))
+)
+
 Write-Host ''
 Write-Host 'OK: Watch Face Push assets prepared.'
 Write-Host "Assets: $generated"
+Write-Host "Default picker watchface: $defaultApk"
