@@ -63,7 +63,7 @@ internal fun SugarliciousOverviewScreen(
         LocalWindowInfo.current.containerSize.height.toDp().value.roundToInt()
     }
     val metrics = DashboardLayoutMetrics.forScreenHeight(screenHeightDp)
-    val gap = if (preferences.compact) 6.dp else 9.dp
+    val gap = if (preferences.compact) 5.dp else 8.dp
     val graphHeightDp = maxOf(
         metrics.metabolicChartHeight - 18,
         96,
@@ -187,8 +187,6 @@ internal fun SugarliciousOverviewScreen(
             onSelectedFace = callbacks.setWatchFaceIndex,
             onEdit = { callbacks.navigate(DashboardScreen.WATCH) },
         )
-
-        Spacer(Modifier.height(8.dp))
 
         OverviewInlineHeader(onSettings = { callbacks.navigate(DashboardScreen.SETTINGS) })
 

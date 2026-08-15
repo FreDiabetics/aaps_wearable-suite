@@ -223,7 +223,7 @@ internal fun OverviewWatchFaceTile(
     val error = syncStatus !in listOf(null, "ok", "pending")
 
     Column(
-        modifier = Modifier.fillMaxWidth().padding(top = 2.dp, bottom = 5.dp),
+        modifier = Modifier.fillMaxWidth(),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(3.dp),
     ) {

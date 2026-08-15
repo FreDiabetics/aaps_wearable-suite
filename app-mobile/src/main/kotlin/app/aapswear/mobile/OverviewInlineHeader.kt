@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -29,21 +30,19 @@ private val SettingsIconGray = Color(0xFF4A4A4A)
 @Composable
 internal fun OverviewInlineHeader(onSettings: () -> Unit) {
     Row(
-        modifier = Modifier.fillMaxWidth().offset(y = 4.dp),
+        modifier = Modifier.fillMaxWidth().height(38.dp).offset(y = (-2).dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(
-            modifier = Modifier.size(width = 30.dp, height = 44.dp),
+            modifier = Modifier.size(width = 34.dp, height = 38.dp),
             contentAlignment = Alignment.CenterStart,
         ) {
             Image(
                 painter = painterResource(R.drawable.ic_foreground),
                 contentDescription = null,
-                modifier = Modifier.size(44.dp).offset(x = (-10).dp),
+                modifier = Modifier.size(60.dp).offset(x = (-12).dp),
             )
         }
-
-        Spacer(Modifier.width(1.dp))
 
         Text(
             text = buildAnnotatedString {
@@ -70,21 +69,19 @@ internal fun WatchMenuHeader(
     onSettings: () -> Unit,
 ) {
     Row(
-        modifier = Modifier.fillMaxWidth().offset(y = 4.dp),
+        modifier = Modifier.fillMaxWidth().height(38.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(
-            modifier = Modifier.size(width = 30.dp, height = 44.dp).clickable(onClick = onBack),
+            modifier = Modifier.size(width = 34.dp, height = 38.dp).clickable(onClick = onBack),
             contentAlignment = Alignment.CenterStart,
         ) {
             Image(
                 painter = painterResource(R.drawable.ic_arrow_back),
                 contentDescription = "Zurück",
-                modifier = Modifier.size(30.dp).offset(x = (-3).dp),
+                modifier = Modifier.size(30.dp).offset(x = (-4).dp),
             )
         }
-
-        Spacer(Modifier.width(1.dp))
 
         Text(
             text = "Watch",

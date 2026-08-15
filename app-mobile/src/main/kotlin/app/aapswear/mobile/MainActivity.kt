@@ -20,7 +20,6 @@ import android.view.MotionEvent
 import android.view.View
 import android.widget.ImageView
 import android.widget.LinearLayout
-import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.ComponentActivity
@@ -45,7 +44,7 @@ class MainActivity : ComponentActivity() {
     private val diagnostics by lazy { getSharedPreferences("diagnostics", MODE_PRIVATE) }
     private val uiPreferences by lazy { getSharedPreferences("dashboard_ui", MODE_PRIVATE) }
     private lateinit var content: LinearLayout
-    private lateinit var scroll: ScrollView
+    private lateinit var scroll: DashboardScrollView
     private lateinit var factory: DashboardViewFactory
     private var state: app.aapswear.model.TherapyDisplayState? = null
     private var screen = DashboardScreen.OVERVIEW
@@ -340,8 +339,10 @@ class MainActivity : ComponentActivity() {
                 bar.visibility = View.GONE
             }
             DashboardScreen.WATCH -> {
-                bar.visibility = View.VISIBLE
-                back.visibility = View.VISIBLE
+                // The Watch screen has its own inline back/title row below the connected-watch
+                // summary. Hiding the native bar avoids the duplicated header.
+                bar.visibility = View.GONE
+                back.visibility = View.GONE
                 brand.visibility = View.GONE
                 settings.visibility = View.GONE
                 title.text = "Watch"
@@ -354,6 +355,16 @@ class MainActivity : ComponentActivity() {
                 title.text = "Einstellungen"
             }
         }
+
+        scroll.isUserScrollEnabled = screen != DashboardScreen.OVERVIEW
+        findViewById<View>(R.id.scroll_fade).visibility =
+            if (screen == DashboardScreen.OVERVIEW) View.GONE else View.VISIBLE
+        content.setPadding(
+            content.paddingLeft,
+            content.paddingTop,
+            content.paddingRight,
+            if (screen == DashboardScreen.OVERVIEW) 0 else 24.dp,
+        )
     }
 
     private fun renderFixedWatchHeader(
