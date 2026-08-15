@@ -627,31 +627,6 @@ internal class GlucoseDashboardChart @JvmOverloads constructor(
         start: Long,
         end: Long,
     ) {
-        val zeroY =
-            mapGlucoseY(
-                0.0,
-                plot,
-            )
-
-        linePaint.color =
-            withAlpha(
-                SugarliciousColors.argb(
-                    SugarliciousColorRole.GRAPH_GRID,
-                ),
-                185,
-            )
-        linePaint.strokeWidth =
-            0.8f.dp
-        linePaint.pathEffect =
-            null
-
-        canvas.drawLine(
-            plot.left,
-            zeroY,
-            plot.right,
-            zeroY,
-            linePaint,
-        )
         linePaint.color =
             SugarliciousColors.argb(
                 SugarliciousColorRole.GRAPH_GRID,
@@ -666,22 +641,6 @@ internal class GlucoseDashboardChart @JvmOverloads constructor(
                 ),
                 0f,
             )
-
-        for (index in 1..3) {
-            val y =
-                plot.top +
-                    plot.height() *
-                    index /
-                    4f
-
-            canvas.drawLine(
-                plot.left,
-                y,
-                plot.right,
-                y,
-                linePaint,
-            )
-        }
 
         val interval =
             timeGridIntervalMs(
@@ -1185,27 +1144,6 @@ internal class MetabolicDashboardChart @JvmOverloads constructor(
                 ),
                 0f,
             )
-
-        listOf(
-            iob,
-            cob,
-        ).forEach { lane ->
-            for (index in 1..2) {
-                val y =
-                    lane.top +
-                        lane.height() *
-                        index /
-                        3f
-
-                canvas.drawLine(
-                    lane.left,
-                    y,
-                    lane.right,
-                    y,
-                    linePaint,
-                )
-            }
-        }
 
         val interval =
             timeGridIntervalMs(

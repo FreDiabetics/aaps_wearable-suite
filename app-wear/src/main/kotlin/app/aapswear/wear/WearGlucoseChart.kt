@@ -216,18 +216,7 @@ class WearGlucoseChart @JvmOverloads constructor(
         )
 
         linePaint.color = colors.divider
-        linePaint.strokeWidth = 0.55f.dp
-        linePaint.pathEffect =
-            DashPathEffect(
-                floatArrayOf(3f.dp, 3f.dp),
-                0f,
-            )
-        for (index in 1..3) {
-            val y = top + (bottom - top) * index / 4f
-            canvas.drawLine(left, y, right, y, linePaint)
-        }
         linePaint.pathEffect = null
-
         linePaint.strokeWidth = 0.7f.dp
         canvas.drawLine(left, targetTop, right, targetTop, linePaint)
         canvas.drawLine(left, targetBottom, right, targetBottom, linePaint)
