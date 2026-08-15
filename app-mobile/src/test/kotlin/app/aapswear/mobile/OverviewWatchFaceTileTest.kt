@@ -56,4 +56,20 @@ class OverviewWatchFaceTileTest {
         assertEquals(5, sugarliciousWatchFaceCards.size)
         assertTrue(sugarliciousWatchFaceCards.all { it.slots > 0 && "AOD" in it.features })
     }
+
+    @Test
+    fun `multi type complications expose one selectable provider per type`() {
+        val variants = SugarliciousComplicationCatalog.flatMap { it.variants }
+
+        assertEquals(35, variants.size)
+        assertEquals(35, variants.map { it.id }.distinct().size)
+        assertEquals(
+            listOf(
+                ComplicationVariantType.SHORT_TEXT,
+                ComplicationVariantType.LONG_TEXT,
+                ComplicationVariantType.RANGED_VALUE,
+            ),
+            SugarliciousComplicationCatalog.first { it.name == "Glukose + Trend" }.variants.map { it.type },
+        )
+    }
 }

@@ -6,7 +6,7 @@
 - [x] read-only Broadcastadapter ohne private Datenbank/API
 - [x] versioniertes Modell, Capability-Erkennung und Payloadvalidierung
 - [x] DataClient/MessageClient/CapabilityClient und Watch-DataStore
-- [x] 27 Complication-Provider
+- [x] 35 Complication-Provider mit jeweils genau einem Ausgabetyp
 - [x] 28 codefreie WFF-Pakete und offizieller Validator
 - [x] AOD-Emulator-Goldens für den bis 0.5.1 veröffentlichten Stand
 - [x] 19 offizielle Community-Quellen inventarisiert und zugeordnet

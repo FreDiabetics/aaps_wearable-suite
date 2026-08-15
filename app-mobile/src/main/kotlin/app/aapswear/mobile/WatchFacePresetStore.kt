@@ -8,11 +8,14 @@ internal object WatchFacePresetStore {
     private const val GLOBAL_PRESET_PREFS = "complication_setup"
     private const val GLOBAL_PRESET_KEY = "selected_ids"
 
+    internal val supportedFaceIndices: IntRange
+        get() = sugarliciousWatchFaceCards.indices
+
     fun read(
         context: Context,
         faceIndex: Int,
     ): List<Int> {
-        val normalized = faceIndex.coerceIn(0, 3)
+        val normalized = normalizeFaceIndex(faceIndex)
         val stored =
             context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
                 .getString(key(normalized), null)
@@ -22,14 +25,14 @@ internal object WatchFacePresetStore {
     }
 
     fun readAll(context: Context): List<List<Int>> =
-        (0..3).map { faceIndex -> read(context, faceIndex) }
+        supportedFaceIndices.map { faceIndex -> read(context, faceIndex) }
 
     fun save(
         context: Context,
         faceIndex: Int,
         complicationIds: List<Int>,
     ) {
-        val normalized = faceIndex.coerceIn(0, 3)
+        val normalized = normalizeFaceIndex(faceIndex)
         val ids = complicationIds.validPresetIds()
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
             .edit()
@@ -55,13 +58,16 @@ internal object WatchFacePresetStore {
 
     private fun key(faceIndex: Int): String = "face_${faceIndex}_complications"
 
+    private fun normalizeFaceIndex(faceIndex: Int): Int =
+        faceIndex.coerceIn(supportedFaceIndices.first, supportedFaceIndices.last)
+
     private fun decode(value: String): List<Int> =
         value.split(',')
             .mapNotNull(String::toIntOrNull)
             .validPresetIds()
 
     private fun List<Int>.validPresetIds(): List<Int> =
-        filter { id -> SugarliciousComplicationCatalog.any { entry -> entry.id == id } }
+        filter { id -> id in SugarliciousComplicationVariantIds }
             .distinct()
             .take(4)
 }

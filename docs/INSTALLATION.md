@@ -4,7 +4,7 @@
 
 Sie zeigt lokal von AndroidAPS gesendete Glukose-, Trend-, Delta-, IOB-, COB-,
 Basal-, Profil-, Pumpen- und Batteriedaten auf Wear OS an. Sie kann keine
-Therapie auslösen oder ändern. Die 27 Provider lassen sich auch in fremden
+Therapie auslösen oder ändern. Die 35 Provider lassen sich auch in fremden
 Watchfaces verwenden; deren Layout wird dann vom jeweiligen Watchface bestimmt.
 xDrip+ kann alternativ lokale Glukose-, Trend- und Zeitdaten liefern;
 Therapieinformationen bleiben ausschließlich AndroidAPS-Daten.

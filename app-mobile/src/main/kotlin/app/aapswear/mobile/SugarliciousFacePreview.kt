@@ -157,24 +157,34 @@ internal fun SugarliciousFacePreview(
 
             withTransform({ rotate(handAngles.hour, center) }) {
                 drawRoundRect(
-                    Color.Red,
+                    Color.White,
                     Offset(sx(243f), sy(113.57f)),
-                    Size(26f * scale, 140f * scale),
+                    Size(26f * scale, 114f * scale),
                     androidx.compose.ui.geometry.CornerRadius(13f * scale),
+                )
+                drawRect(
+                    Color.White,
+                    Offset(sx(252.75f), sy(224.44f)),
+                    Size(6.5f * scale, 29.56f * scale),
                 )
             }
             withTransform({ rotate(handAngles.minute, center) }) {
                 drawRoundRect(
                     Color.White,
                     Offset(sx(243f), sy(34.47f)),
-                    Size(26f * scale, 219.5f * scale),
+                    Size(26f * scale, 193.1f * scale),
                     androidx.compose.ui.geometry.CornerRadius(13f * scale),
                 )
-            }
-            drawCircle(Color(0xFFBCBCBC), 12f * scale, center)
-            withTransform({ rotate(handAngles.second, center) }) {
                 drawRect(
                     Color.White,
+                    Offset(sx(252.75f), sy(224.44f)),
+                    Size(6.5f * scale, 29.56f * scale),
+                )
+                drawCircle(Color(0xFFBCBCBC), 12f * scale, center)
+            }
+            withTransform({ rotate(handAngles.second, center) }) {
+                drawRect(
+                    Color.Red,
                     Offset(sx(254f), sy(6f)),
                     Size(4f * scale, 290f * scale),
                 )

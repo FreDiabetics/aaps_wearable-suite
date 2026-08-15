@@ -5,6 +5,16 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNull
 
 class ComplicationPresentationTest {
+    @Test
+    fun `typed provider ids remain unique and resolve to their presentation family`() {
+        assertEquals(35, SugarliciousComplicationIds.all.size)
+        assertEquals(35, SugarliciousComplicationIds.all.distinct().size)
+        assertEquals(
+            SugarliciousComplicationIds.GLUCOSE_TREND,
+            SugarliciousComplicationIds.baseId(SugarliciousComplicationIds.GLUCOSE_TREND_RANGED),
+        )
+    }
+
     private val now = 1_700_000_000_000L
     private val state = TherapyDisplayState(
         receivedAtEpochMs = now,
