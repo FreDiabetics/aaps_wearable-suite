@@ -210,6 +210,27 @@ class MainActivityTest {
         controller.pause().stop().destroy()
     }
 
+    @Test fun `overview is fixed and watch menu has only its inline header`() {
+        val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
+        val activity = controller.get()
+        val scroll = activity.findViewById<DashboardScrollView>(R.id.dashboard_scroll)
+
+        assertFalse(scroll.isUserScrollEnabled)
+        assertEquals(View.GONE, activity.findViewById<View>(R.id.scroll_fade).visibility)
+
+        activity.findViewById<View>(R.id.watch_fixed_header)
+        activity.javaClass.getDeclaredMethod("navigate", DashboardScreen::class.java).apply {
+            isAccessible = true
+            invoke(activity, DashboardScreen.WATCH)
+        }
+        shadowOf(android.os.Looper.getMainLooper()).idle()
+
+        assertTrue(scroll.isUserScrollEnabled)
+        assertEquals(View.GONE, activity.findViewById<View>(R.id.top_app_bar).visibility)
+        assertEquals(View.VISIBLE, activity.findViewById<View>(R.id.watch_fixed_header).visibility)
+        controller.pause().stop().destroy()
+    }
+
     @Test
     @Config(sdk = [36])
     fun `live notification switch opens the Android 16 promotion permission when needed`() {
