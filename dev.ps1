@@ -42,8 +42,13 @@ function Test-WatchFacePushAssetsStale {
         "sugarlicious_rings.apk",
         "sugarlicious_rings_token.txt",
         "sugarlicious_graph.apk",
-        "sugarlicious_graph_token.txt"
+        "sugarlicious_graph_token.txt",
+        "..\default_watchface.apk"
     )
+
+    $defaultTokenResource =
+        ".\app-wear\build\generated\watchfacePushRes\values\default_watchface_token.xml"
+    if (-not (Test-Path $defaultTokenResource)) { return $true }
 
     foreach ($name in $required) {
         if (-not (Test-Path (Join-Path $generated $name))) { return $true }
@@ -65,8 +70,10 @@ function Test-WatchFacePushAssetsStale {
         Sort-Object LastWriteTime -Descending |
         Select-Object -First 1
 
-    $assetOldest = $required |
-        ForEach-Object { Get-Item (Join-Path $generated $_) } |
+    $assetOldest = @(
+        $required | ForEach-Object { Get-Item (Join-Path $generated $_) }
+        Get-Item $defaultTokenResource
+    ) |
         Sort-Object LastWriteTime |
         Select-Object -First 1
 

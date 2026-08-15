@@ -62,4 +62,14 @@ class WatchFacePushControllerTest {
 
         assertTrue(SugarliciousWatchFacePush.directActivationWasAttempted(context))
     }
+
+    @Test
+    fun `default watchface is bundled for the system picker`() {
+        assertTrue(context.getString(R.string.default_wf_token).isNotBlank())
+
+        context.assets.open("default_watchface.apk").use { apk ->
+            assertEquals('P'.code, apk.read())
+            assertEquals('K'.code, apk.read())
+        }
+    }
 }

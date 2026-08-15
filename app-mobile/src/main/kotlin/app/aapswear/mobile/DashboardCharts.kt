@@ -1096,6 +1096,15 @@ internal class MetabolicDashboardChart @JvmOverloads constructor(
             val projectionNow =
                 System.currentTimeMillis()
 
+            if (projectionNow in start..end) {
+                val dividerX = mapX(projectionNow, start, end, iobPlot)
+                linePaint.color = SugarliciousColors.argb(SugarliciousColorRole.GRAPH_DIVIDER)
+                linePaint.strokeWidth = 1f.dp
+                linePaint.pathEffect = DashPathEffect(floatArrayOf(4f.dp, 4f.dp), 0f)
+                canvas.drawLine(dividerX, iobPlot.top, dividerX, cobPlot.bottom, linePaint)
+                linePaint.pathEffect = null
+            }
+
             drawFutureLane(
                 canvas = canvas,
                 plot = iobPlot,
