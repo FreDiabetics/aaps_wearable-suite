@@ -3,10 +3,37 @@ param()
 $ErrorActionPreference = "Stop"
 Set-StrictMode -Version 2.0
 
+$root = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
+$faces = @("analog", "orbit", "rings", "graph")
+$expectedHashes = @{
+    "hour" = "425626CEF7F447E534093847F1C1CCD550BB5DE99B431F23BBF90C964DDA550D"
+    "minute" = "42DE64216494F37E8DAFE0C881C2B97F5D34CE1F4126EE5916565FB097F6FA5D"
+    "second" = "564765ADBD67C3A5343358720E625E7564819F0A2B9DC5CA156BE38CB5F31D9C"
+}
+
+# PresentationCore is Windows-only. Linux CI consumes the checked-in renderings, but verifies
+# their exact hashes so an old or incomplete hand set cannot silently enter a Push package.
+if ($env:OS -ne "Windows_NT") {
+    foreach ($face in $faces) {
+        $destination = Join-Path $root "watchfaces/sugarlicious-$face/src/main/res/drawable-nodpi"
+        foreach ($kind in $expectedHashes.Keys) {
+            $path = Join-Path $destination "${kind}_hand.png"
+            if (-not (Test-Path $path)) {
+                throw "Sugarlicious hand asset missing: $path"
+            }
+            $actualHash = (Get-FileHash $path -Algorithm SHA256).Hash
+            if ($actualHash -ne $expectedHashes[$kind]) {
+                throw "Sugarlicious $kind hand hash mismatch for $face"
+            }
+        }
+    }
+    Write-Host "Verified checked-in Sugarlicious hand geometry for all analog faces."
+    return
+}
+
 Add-Type -AssemblyName PresentationCore
 Add-Type -AssemblyName WindowsBase
 
-$root = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 $size = 450
 $sourceSize = 512.0
 $scale = $size / $sourceSize
@@ -76,9 +103,8 @@ function Write-HandPng {
     }
 }
 
-$faces = @("analog", "orbit", "rings", "graph")
 foreach ($face in $faces) {
-    $destination = Join-Path $root "watchfaces\sugarlicious-$face\src\main\res\drawable-nodpi"
+    $destination = Join-Path $root "watchfaces/sugarlicious-$face/src/main/res/drawable-nodpi"
     Write-HandPng -Path (Join-Path $destination "hour_hand.png") -Kind hour
     Write-HandPng -Path (Join-Path $destination "minute_hand.png") -Kind minute
     Write-HandPng -Path (Join-Path $destination "second_hand.png") -Kind second
