@@ -29,6 +29,7 @@ class MobileDataLayerService : WearableListenerService() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     override fun onMessageReceived(event: MessageEvent) {
+        recordWatchContact(applicationContext)
         when (event.path) {
             WearProtocol.REQUEST_PATH -> {
                 scope.launch {
@@ -166,9 +167,9 @@ internal suspend fun publishWatchConfig(context: Context) {
 }
 
 internal suspend fun requestWatchRuntimeStatus(context: Context) {
-    Wearable.getNodeClient(context).connectedNodes.await().forEach { node ->
+    refreshReachableWatchNodeIds(context).forEach { nodeId ->
         Wearable.getMessageClient(context)
-            .sendMessage(node.id, WearProtocol.WATCH_RUNTIME_REQUEST_PATH, byteArrayOf())
+            .sendMessage(nodeId, WearProtocol.WATCH_RUNTIME_REQUEST_PATH, byteArrayOf())
             .await()
     }
 }

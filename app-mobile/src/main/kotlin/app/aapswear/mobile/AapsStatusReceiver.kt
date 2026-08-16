@@ -111,14 +111,7 @@ suspend fun publishState(context: Context, state: TherapyDisplayState) {
         .setData(WearProtocol.encode(state))
         .setUrgent()
     Wearable.getDataClient(context).putDataItem(request).await()
-    val nodes = Wearable.getCapabilityClient(context)
-        .getCapability(
-            WearProtocol.CAPABILITY,
-            com.google.android.gms.wearable.CapabilityClient.FILTER_REACHABLE,
-        )
-        .await()
-        .nodes
-    context.diagnostics().edit { putInt("reachableWatches", nodes.size) }
+    refreshReachableWatchNodeIds(context)
 }
 
 private fun Context.diagnostics() = getSharedPreferences("diagnostics", Context.MODE_PRIVATE)
