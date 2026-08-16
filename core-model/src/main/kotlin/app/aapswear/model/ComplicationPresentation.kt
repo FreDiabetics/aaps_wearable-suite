@@ -1,9 +1,8 @@
 package app.aapswear.model
 
+import java.time.DayOfWeek
 import java.time.Instant
 import java.time.ZoneId
-import java.time.format.DateTimeFormatter
-import java.util.Locale
 import kotlin.math.roundToInt
 
 /**
@@ -221,7 +220,7 @@ object ComplicationPresentationFormatter {
 
             SugarliciousComplicationIds.DATE -> {
                 val localDate = Instant.ofEpochMilli(nowEpochMs).atZone(ZoneId.systemDefault())
-                val weekday = localDate.format(DAY_OF_WEEK_FORMATTER).uppercase(Locale.ENGLISH)
+                val weekday = germanWeekday(localDate.dayOfWeek)
                 p(localDate.dayOfMonth.toString(), weekday, desc = "$weekday ${localDate.dayOfMonth}")
             }
 
@@ -246,6 +245,15 @@ object ComplicationPresentationFormatter {
         desc: String,
     ) = ComplicationPresentation(text = text, title = title, trend = trend, contentDescription = desc)
 
+    internal fun germanWeekday(dayOfWeek: DayOfWeek): String = when (dayOfWeek) {
+        DayOfWeek.MONDAY -> "MON"
+        DayOfWeek.TUESDAY -> "DIE"
+        DayOfWeek.WEDNESDAY -> "MIT"
+        DayOfWeek.THURSDAY -> "DON"
+        DayOfWeek.FRIDAY -> "FRE"
+        DayOfWeek.SATURDAY -> "SAM"
+        DayOfWeek.SUNDAY -> "SON"
+    }
+
     private const val DASH = "—"
-    private val DAY_OF_WEEK_FORMATTER = DateTimeFormatter.ofPattern("EEE", Locale.ENGLISH)
 }

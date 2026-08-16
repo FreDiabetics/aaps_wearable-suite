@@ -1,5 +1,6 @@
 package app.aapswear.model
 
+import java.time.DayOfWeek
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -53,5 +54,10 @@ class ComplicationPresentationTest {
         assertEquals(-45f, TrendVisuals.spec(Trend.FORTY_FIVE_UP)!!.rotationDegrees)
         assertEquals(2, TrendVisuals.spec(Trend.DOUBLE_DOWN)!!.arrowCount)
         assertNull(TrendVisuals.spec(Trend.UNKNOWN))
+    }
+
+    @Test fun `date weekdays always use the requested German abbreviations`() {
+        val expected = listOf("MON", "DIE", "MIT", "DON", "FRE", "SAM", "SON")
+        assertEquals(expected, DayOfWeek.entries.map(ComplicationPresentationFormatter::germanWeekday))
     }
 }
