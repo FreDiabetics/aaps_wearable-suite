@@ -568,6 +568,18 @@ class DashboardViewFactory(
                 addView(actionRow("Gesundheitsdaten aktualisieren", "Synchronisieren") { callbacks.syncHealthConnect() })
                 addView(divider())
                 addView(actionRow("Zugriff verwalten", "Öffnen") { callbacks.manageHealthConnect() })
+                addView(
+                    LinearLayout(context).apply {
+                        orientation = LinearLayout.HORIZONTAL
+                        gravity = Gravity.END
+                        setPadding(0, 8.dp, 0, 4.dp)
+                        addView(
+                            chip("Alle Health-Daten", true) {
+                                HealthConnectDataDialog.show(context)
+                            },
+                        )
+                    },
+                )
                 addView(helper(HealthConnectIntegration.detailLabel(context), 3))
                 addView(helper("Liest nach deiner Freigabe Aktivität, Puls/HRV, Bewegung, Training, Schlaf, Ernährung/Trinken, Körperwerte und Vitaldaten. Sugarlicious schreibt ausschließlich eigene CGM-Werte als Blutzucker; IOB, COB und Basal haben in Health Connect keinen passenden Datentyp.", 3))
             },

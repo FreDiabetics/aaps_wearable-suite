@@ -188,6 +188,7 @@ class G7CollectorService : Service() {
         )
         return Notification.Builder(this, CHANNEL)
             .setSmallIcon(R.drawable.ic_g7_notification)
+            .setColor(0xFF6DE892.toInt())
             .setContentTitle("G7 Direct to Watch")
             .setContentText(message)
             .setContentIntent(openApp)
