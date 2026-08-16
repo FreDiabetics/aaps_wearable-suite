@@ -29,7 +29,20 @@ class G7SessionManager(initial: G7PersistedState = G7PersistedState()) {
         private set
 
     fun beginInitialSetup(sensor: G7Sensor): G7PersistedState = transition(
-        state.copy(sensor = sensor, collectorEnabled = true, collectorOwner = CollectorOwner.WATCH, sessionState = G7SessionState.INITIAL_SETUP, authenticationState = G7AuthenticationState.REQUIRED),
+        state.copy(
+            sensor = sensor,
+            collectorEnabled = true,
+            collectorOwner = CollectorOwner.WATCH,
+            connectionState = G7ConnectionState.SCANNING,
+            protocolState = G7ProtocolState.SCANNING,
+            sessionState = G7SessionState.INITIAL_SETUP,
+            authenticationState = G7AuthenticationState.REQUIRED,
+            lastReading = null,
+            lastSuccessfulConnectionEpochMs = null,
+            nextReconnectEpochMs = null,
+            retryCount = 0,
+            lastError = null,
+        ),
     )
 
     fun authenticationStarted(reconnect: Boolean): G7PersistedState = transition(
