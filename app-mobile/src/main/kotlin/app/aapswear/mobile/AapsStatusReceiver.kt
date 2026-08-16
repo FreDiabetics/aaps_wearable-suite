@@ -11,6 +11,7 @@ import app.aapswear.model.Trend
 import app.aapswear.model.DataSourceId
 import app.aapswear.model.Freshness
 import app.aapswear.model.FreshnessPolicy
+import app.aapswear.model.DiagnosticSeverity
 import app.aapswear.protocol.WearProtocol
 import app.aapswear.storage.TherapyStateStore
 import com.google.android.gms.wearable.PutDataRequest
@@ -39,13 +40,17 @@ class AapsStatusReceiver : BroadcastReceiver() {
                             .getString("dataSource", "AUTOMATIC")!!,
                     )
                 }.getOrDefault(DataSourcePreference.AUTOMATIC)
-                if (sourcePreference in setOf(DataSourcePreference.XDRIP_PLUS, DataSourcePreference.DEXCOM_G7_WATCH)) return@launch
+                if (sourcePreference in setOf(DataSourcePreference.XDRIP_PLUS, DataSourcePreference.DEXCOM_G7_WATCH)) {
+                    app.recordMobileDiagnostic("SOURCE", "SRC-AAPS-102", "AAPS payload ignored by explicit source selection")
+                    return@launch
+                }
                 val parsedState = intent.extras?.let { AapsPayloadAdapter.parse(it, now) }
                 if (parsedState == null) {
                     app.diagnostics().edit {
                         putLong("invalidReceived", now)
                         putString("lastSyncStatus", "invalid_payload")
                     }
+                    app.recordMobileDiagnostic("SOURCE", "SRC-AAPS-401", "AAPS payload could not be decoded", DiagnosticSeverity.WARNING)
                     return@launch
                 }
                 val installation = AapsCapabilityDetector.detectInstallation(app)
@@ -55,9 +60,22 @@ class AapsStatusReceiver : BroadcastReceiver() {
                 val g7IsCurrent = previous?.source == DataSourceId.DEXCOM_G7_WATCH &&
                     FreshnessPolicy.classify(previous.glucose?.measuredAtEpochMs, now) in
                     setOf(Freshness.CURRENT, Freshness.DELAYED)
-                if (sourcePreference == DataSourcePreference.AUTOMATIC && g7IsCurrent) return@launch
+                if (sourcePreference == DataSourcePreference.AUTOMATIC && g7IsCurrent) {
+                    app.recordMobileDiagnostic("SOURCE", "SRC-AAPS-103", "AAPS payload deferred to current direct G7 reading")
+                    return@launch
+                }
 
                 var displayState = DisplayHistoryAccumulator.merge(previous, state, now)
+                app.recordMobileDiagnostic(
+                    "PREDICTION",
+                    if (state.glucosePredictions.isEmpty() && displayState.glucosePredictions.isNotEmpty()) "PRED-CACHE-201" else "PRED-DATA-200",
+                    if (state.glucosePredictions.isEmpty() && displayState.glucosePredictions.isNotEmpty()) "Cached predictions retained after an empty AAPS update" else "AAPS state merged",
+                    metadata = mapOf(
+                        "incomingPredictions" to state.glucosePredictions.size,
+                        "displayPredictions" to displayState.glucosePredictions.size,
+                        "historyCount" to displayState.glucoseHistory.size,
+                    ),
+                )
 
                 val glucose = displayState.glucose
                 if (glucose != null && glucose.trend == Trend.UNKNOWN) {
@@ -100,11 +118,19 @@ class AapsStatusReceiver : BroadcastReceiver() {
                         putString("lastSyncStatus", "ok")
                         remove("lastSyncError")
                     }
+                    app.recordMobileDiagnostic("SYNC", "SYNC-WATCH-200", "State published to Watch")
                 }.onFailure { error ->
                     app.diagnostics().edit {
                         putString("lastSyncStatus", "unavailable")
                         putString("lastSyncError", error.javaClass.simpleName)
                     }
+                    app.recordMobileDiagnostic(
+                        "SYNC",
+                        "SYNC-WATCH-503",
+                        "State could not be published to Watch",
+                        DiagnosticSeverity.WARNING,
+                        mapOf("error" to error.javaClass.simpleName),
+                    )
                 }
             } finally {
                 pending.finish()

@@ -23,10 +23,10 @@ class G7GlucosePacketParser : G7PacketParser {
         require(packet.size >= MIN_PACKET_SIZE) { "G7 glucose packet is too short" }
         val data = ByteBuffer.wrap(packet).order(ByteOrder.LITTLE_ENDIAN)
         require(data.get() == OPCODE) { "Unexpected G7 glucose opcode" }
-        data.get() // status
+        val protocolStatus = data.get().toInt() and 0xff
         val sensorClockSeconds = data.int.toLong() and 0xffff_ffffL
         val sequence = data.short.toLong() and 0xffffL
-        data.short // reserved
+        val reserved = data.short.toInt() and 0xffff
         val ageSeconds = data.short.toLong() and 0xffffL
         val glucoseField = data.short.toInt() and 0xffff
         val glucose = glucoseField and 0x0fff
@@ -37,6 +37,7 @@ class G7GlucosePacketParser : G7PacketParser {
         require(glucose in 14..1000) { "G7 packet does not contain a usable glucose value" }
         require(ageSeconds <= MAX_READING_AGE_SECONDS) { "G7 packet reading age is invalid" }
         val measuredAt = receivedAtEpochMs - ageSeconds * 1_000L
+        val sensorStart = receivedAtEpochMs - sensorClockSeconds * 1_000L
         return G7Reading(
             sensorId = sensor.sensorId,
             sessionId = sensor.sessionId ?: sensor.sensorId,
@@ -50,6 +51,12 @@ class G7GlucosePacketParser : G7PacketParser {
             sensorState = stateCode.toSensorState(),
             displayOnly = displayOnly,
             sensorClockSeconds = sensorClockSeconds,
+            sensorStartEpochMs = sensorStart,
+            sensorEndEpochMs = sensorStart + G7_SENSOR_LIFETIME_MS,
+            graceEndEpochMs = sensorStart + G7_SENSOR_LIFETIME_MS + G7_GRACE_PERIOD_MS,
+            protocolStatusCode = protocolStatus,
+            calibrationStateCode = stateCode,
+            reservedField = reserved,
         )
     }
 
@@ -65,6 +72,8 @@ class G7GlucosePacketParser : G7PacketParser {
         const val OPCODE: Byte = 0x4e
         const val MIN_PACKET_SIZE = 19
         const val MAX_READING_AGE_SECONDS = 30 * 60L
+        const val G7_SENSOR_LIFETIME_MS = 10L * 24L * 60L * 60_000L
+        const val G7_GRACE_PERIOD_MS = 12L * 60L * 60_000L
     }
 }
 

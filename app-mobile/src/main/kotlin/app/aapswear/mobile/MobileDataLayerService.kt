@@ -12,9 +12,11 @@ import app.aapswear.protocol.WatchGraphStyle
 import app.aapswear.protocol.WatchUiColors
 import app.aapswear.protocol.WatchDataSource
 import app.aapswear.model.DataSourceId
+import app.aapswear.model.DiagnosticSeverity
 import app.aapswear.mobile.ui.theme.SugarliciousColorRole
 import app.aapswear.mobile.ui.theme.SugarliciousColorStore
 import app.aapswear.storage.TherapyStateStore
+import app.aapswear.storage.DiagnosticEventStore
 import com.google.android.gms.wearable.MessageEvent
 import com.google.android.gms.wearable.PutDataRequest
 import com.google.android.gms.wearable.Wearable
@@ -35,6 +37,7 @@ class MobileDataLayerService : WearableListenerService() {
         when (event.path) {
             WearProtocol.REQUEST_PATH -> {
                 scope.launch {
+                    applicationContext.recordMobileDiagnostic("SYNC", "SYNC-WATCH-100", "Watch requested current state")
                     TherapyStateStore(this@MobileDataLayerService)
                         .state
                         .first()
@@ -46,6 +49,7 @@ class MobileDataLayerService : WearableListenerService() {
 
             WearProtocol.WATCH_CONFIG_REQUEST_PATH -> {
                 scope.launch {
+                    applicationContext.recordMobileDiagnostic("SYNC", "SYNC-CONFIG-101", "Watch requested display configuration")
                     publishWatchConfig(this@MobileDataLayerService)
                 }
             }
@@ -61,7 +65,22 @@ class MobileDataLayerService : WearableListenerService() {
             }
             WearProtocol.WATCH_RUNTIME_STATUS_PATH -> {
                 runCatching { WearProtocol.decodeRuntimeStatus(event.data) }
-                    .onSuccess { WatchRuntimeStatusStore.save(applicationContext, it) }
+                    .onSuccess {
+                        WatchRuntimeStatusStore.save(applicationContext, it)
+                        scope.launch {
+                            applicationContext.recordMobileDiagnostic(
+                                "WATCH",
+                                "WATCH-STATUS-200",
+                                "Watch runtime status received",
+                                metadata = mapOf("complications" to it.activeComplicationIds.size, "watchface" to it.activeSugarliciousFaceIndex),
+                            )
+                        }
+                    }
+                    .onFailure {
+                        scope.launch {
+                            applicationContext.recordMobileDiagnostic("WATCH", "WATCH-STATUS-401", "Invalid Watch runtime status", DiagnosticSeverity.WARNING)
+                        }
+                    }
             }
             WearProtocol.G7_READING_PATH -> {
                 scope.launch {
@@ -79,9 +98,37 @@ class MobileDataLayerService : WearableListenerService() {
                     val previous = store.state.first()
                     val merged = DisplayHistoryAccumulator.merge(previous, incoming, System.currentTimeMillis())
                     store.save(merged)
+                    applicationContext.recordMobileDiagnostic(
+                        "G7",
+                        "G7-DATA-200",
+                        "Direct G7 reading received from Watch",
+                        metadata = mapOf("historyCount" to merged.glucoseHistory.size, "predictionCount" to merged.glucosePredictions.size),
+                    )
                     runCatching { HealthConnectIntegration.exportCgmReading(this@MobileDataLayerService, merged) }
                     SugarliciousWidgets.update(this@MobileDataLayerService)
                     PersistentBridgeService.refresh(this@MobileDataLayerService)
+                }
+            }
+            WearProtocol.DIAGNOSTICS_BATCH_PATH -> {
+                scope.launch {
+                    runCatching { WearProtocol.decodeDiagnostics(event.data) }
+                        .onSuccess { batch ->
+                            DiagnosticEventStore(applicationContext).append(batch.events)
+                            applicationContext.recordMobileDiagnostic(
+                                "DIAGNOSTICS",
+                                "DIAG-SYNC-200",
+                                "Watch diagnostics received",
+                                metadata = mapOf("eventCount" to batch.events.size),
+                            )
+                        }
+                        .onFailure {
+                            applicationContext.recordMobileDiagnostic(
+                                "DIAGNOSTICS",
+                                "DIAG-SYNC-401",
+                                "Watch diagnostics could not be decoded",
+                                DiagnosticSeverity.WARNING,
+                            )
+                        }
                 }
             }
         }

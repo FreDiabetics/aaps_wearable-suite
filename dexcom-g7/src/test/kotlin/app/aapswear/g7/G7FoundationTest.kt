@@ -68,8 +68,8 @@ class G7FoundationTest {
 
     @Test fun `G7 packet parser accepts validated glucose framing and rejects malformed data`() {
         val packet = ByteBuffer.allocate(19).order(ByteOrder.LITTLE_ENDIAN).apply {
-            put(0x4e); put(0)
-            putInt(1234); putShort(17); putShort(0); putShort(20)
+            put(0x4e); put(7)
+            putInt(1234); putShort(17); putShort(42); putShort(20)
             putShort(112); put(0x06); put(12); putShort(118); put(0)
         }.array()
         val reading = G7GlucosePacketParser().parse(packet, G7Sensor("sensor", "session"), now)
@@ -77,6 +77,12 @@ class G7FoundationTest {
         assertEquals(1.2, reading.trendRateMgDlPerMinute)
         assertEquals(118.0, reading.predictedMgDl)
         assertEquals(now - 20_000L, reading.sensorTimestampEpochMs)
+        assertEquals(now - 1_234_000L, reading.sensorStartEpochMs)
+        assertEquals(reading.sensorStartEpochMs!! + 10L * 24L * 60L * 60_000L, reading.sensorEndEpochMs)
+        assertEquals(reading.sensorEndEpochMs!! + 12L * 60L * 60_000L, reading.graceEndEpochMs)
+        assertEquals(7, reading.protocolStatusCode)
+        assertEquals(6, reading.calibrationStateCode)
+        assertEquals(42, reading.reservedField)
         assertFailsWith<IllegalArgumentException> { G7GlucosePacketParser().parse(byteArrayOf(1), G7Sensor("sensor"), now) }
     }
 

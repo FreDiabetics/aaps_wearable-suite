@@ -24,6 +24,7 @@ import app.aapswear.model.GlucoseUnit
 import app.aapswear.model.PredictionKind
 import app.aapswear.model.TherapyDisplayState
 import app.aapswear.model.TherapyHistorySample
+import app.aapswear.storage.PredictionDisplayTimeline
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -511,7 +512,7 @@ internal class GlucoseDashboardChart @JvmOverloads constructor(
             }.sortedBy { it.measuredAtEpochMs }
                 .distinctBy { it.measuredAtEpochMs to it.source }
                 .filter { it.measuredAtEpochMs in start..min(end, now) }
-            val visiblePredictions = predictions.map { series ->
+            val visiblePredictions = PredictionDisplayTimeline.anchor(predictions, now).map { series ->
                 series.copy(samples = series.samples.filter { it.measuredAtEpochMs in start..end })
             }.filter { it.samples.isNotEmpty() }
             val targetTop = mapGlucoseY(targetHigh, plot)
@@ -557,8 +558,11 @@ internal class GlucoseDashboardChart @JvmOverloads constructor(
             if (showTargetValue) {
                 val targetValue = (targetLow + targetHigh) / 2.0
                 val targetY = mapGlucoseY(targetValue, plot)
-                linePaint.color = SugarliciousColors.argb(SugarliciousColorRole.GRAPH_LABEL)
-                linePaint.strokeWidth = 1f.dp
+                val targetValueColor = luminousTargetValueColor(
+                    SugarliciousColors.argb(SugarliciousColorRole.TARGET_BAND),
+                )
+                linePaint.color = targetValueColor
+                linePaint.strokeWidth = 2f.dp
                 linePaint.pathEffect = DashPathEffect(floatArrayOf(5f.dp, 4f.dp), 0f)
                 canvas.drawLine(plot.left, targetY, plot.right, targetY, linePaint)
                 linePaint.pathEffect = null
@@ -568,7 +572,7 @@ internal class GlucoseDashboardChart @JvmOverloads constructor(
                     plot.right - 1f.dp,
                     (targetY - 4f.dp).coerceAtLeast(plot.top + 12f.dp),
                     10f,
-                    SugarliciousColors.argb(SugarliciousColorRole.GRAPH_LABEL),
+                    targetValueColor,
                     Paint.Align.RIGHT,
                 )
             }
@@ -2278,6 +2282,14 @@ private fun mapX(time: Long, start: Long, end: Long, plot: RectF): Float =
 
 private fun withAlpha(color: Int, alpha: Int): Int =
     Color.argb(alpha.coerceIn(0, 255), Color.red(color), Color.green(color), Color.blue(color))
+
+internal fun luminousTargetValueColor(targetBandColor: Int): Int {
+    val hsv = FloatArray(3)
+    Color.colorToHSV(targetBandColor, hsv)
+    hsv[1] = hsv[1].coerceAtLeast(0.58f)
+    hsv[2] = hsv[2].coerceAtLeast(0.94f)
+    return Color.HSVToColor(255, hsv)
+}
 
 private fun View.drawText(canvas: Canvas, value: String, x: Float, y: Float, sizeSp: Float, color: Int, align: Paint.Align) {
     val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {

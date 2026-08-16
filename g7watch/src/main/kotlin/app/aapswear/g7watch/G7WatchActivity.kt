@@ -24,6 +24,7 @@ import app.aapswear.g7.G7SessionManager
 import app.aapswear.g7.G7SetupPayload
 import java.text.DateFormat
 import java.util.Date
+import java.util.Locale
 import java.util.UUID
 
 class G7WatchActivity : Activity() {
@@ -42,6 +43,7 @@ class G7WatchActivity : Activity() {
 
     private fun render() {
         val state = G7SensorStateStore(this).read()
+        val credentials = G7CredentialStore(this).read()
         val content = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER_HORIZONTAL
@@ -67,6 +69,38 @@ class G7WatchActivity : Activity() {
             },
             cardParams(),
         )
+
+        if (state.sensor != null || credentials != null || reading != null) {
+            val sensor = state.sensor
+            content.addView(
+                card().apply {
+                    addView(sectionLabel("SENSOR-DOKUMENTATION"))
+                    addView(valueRow("Sensorcode", credentials?.pairingCode ?: "—"))
+                    addView(valueRow("GTIN", credentials?.gtin ?: "—"))
+                    addView(valueRow("Seriennummer", credentials?.sensorSerial ?: "—"))
+                    addView(valueRow("Sensor-ID", sensor?.sensorId ?: reading?.sensorId ?: "—"))
+                    addView(valueRow("Session-ID", sensor?.sessionId ?: reading?.sessionId ?: "—"))
+                    addView(valueRow("BLE-Name", sensor?.deviceName ?: "—"))
+                    addView(valueRow("BLE-Adresse", sensor?.deviceAddress ?: "—"))
+                    addView(valueRow("Sensorstatus", sensor?.state?.name ?: "—"))
+                    addView(divider())
+                    addView(valueRow("Abgeleiteter Start", formatTimestamp(sensor?.sensorStartEpochMs ?: reading?.sensorStartEpochMs)))
+                    addView(valueRow("Reguläres Ende", formatTimestamp(sensor?.sensorEndEpochMs ?: reading?.sensorEndEpochMs)))
+                    addView(valueRow("Kulanzende", formatTimestamp(sensor?.graceEndEpochMs ?: reading?.graceEndEpochMs)))
+                    addView(valueRow("Letzter Sensorzähler", reading?.rawSourceTimestamp?.let { "$it s" } ?: "—"))
+                    addView(valueRow("Alter des Werts", reading?.sensorAgeSeconds?.let { "$it s" } ?: "—"))
+                    addView(valueRow("Sequenz", reading?.sequenceNumber?.toString() ?: "—"))
+                    addView(valueRow("Trendrate", reading?.trendRateMgDlPerMinute?.let { String.format(Locale.US, "%.1f mg/dL/min", it) } ?: "—"))
+                    addView(valueRow("Vorhersage", reading?.predictedMgDl?.let { "${it.toInt()} mg/dL" } ?: "—"))
+                    addView(valueRow("Nur Anzeige", reading?.displayOnly?.toString() ?: "—"))
+                    addView(valueRow("Protokollstatus", reading?.protocolStatusCode?.toString() ?: "—"))
+                    addView(valueRow("Kalibrierstatus", reading?.calibrationStateCode?.toString() ?: "—"))
+                    addView(valueRow("Reserviertes Feld", reading?.reservedField?.toString() ?: "—"))
+                    addView(label("Sensorcode und Sessiondaten sind nur lokal gespeichert; der Sensorcode liegt verschlüsselt im Android Keystore.", 9f, TEXT_SECONDARY).apply { gravity = Gravity.START })
+                },
+                cardParams(),
+            )
+        }
 
         content.addView(
             card().apply {
@@ -257,6 +291,9 @@ class G7WatchActivity : Activity() {
 
     private fun app.aapswear.g7.G7SessionState.displayName(): String =
         name.lowercase().replace('_', ' ').replaceFirstChar(Char::uppercase)
+
+    private fun formatTimestamp(timestamp: Long?): String =
+        timestamp?.let { DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT).format(Date(it)) } ?: "—"
 
     private val Int.dp: Int get() = (this * resources.displayMetrics.density).toInt()
 

@@ -256,6 +256,7 @@ data class DashboardCallbacks(
     val setUnit: (DisplayUnitPreference) -> Unit,
     val setDataSource: (DataSourcePreference) -> Unit,
     val openG7Setup: () -> Unit,
+    val openDiagnostics: () -> Unit,
     val setThemeMode: (DashboardThemeMode) -> Unit,
     val setShowDetails: (Boolean) -> Unit,
     val setShowCgmGraph: (Boolean) -> Unit,
@@ -778,6 +779,15 @@ class DashboardViewFactory(
         )
 
         parent.addView(notificationGraphCustomization, cardParams(top = 4))
+
+        parent.addView(settingsGroupLabel("DIAGNOSE"), fullWidth())
+        parent.addView(
+            tile(null).apply {
+                addView(actionRow("Ereignisse & Fehlercodes", "Öffnen") { callbacks.openDiagnostics() })
+                addView(helper("Lokale, begrenzte Ablaufdiagnose von Smartphone und Watch. Sensor- und Authentifizierungs-Rohdaten werden nicht exportiert.", 3))
+            },
+            cardParams(top = 4),
+        )
 
         parent.addView(settingsGroupLabel("ÜBER"), fullWidth())
         parent.addView(aboutCard(), cardParams(top = 4, bottom = 10))

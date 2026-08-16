@@ -2,6 +2,11 @@ package app.aapswear.protocol
 import app.aapswear.model.*
 import kotlin.test.*
 class WearProtocolTest {
+ @Test fun diagnosticBatchRoundTripsStableErrorCodes() {
+  val event=DiagnosticEvent("id",123L,"WATCH","PREDICTION","PRED-201",DiagnosticSeverity.WARNING,"Cache retained")
+  val decoded=WearProtocol.decodeDiagnostics(WearProtocol.encodeDiagnostics(DiagnosticBatch(listOf(event),124L)))
+  assertEquals(listOf(event),decoded.events)
+ }
  @Test fun roundTrip() { val s=TherapyDisplayState(receivedAtEpochMs=2,glucose=GlucoseState(100.0,GlucoseUnit.MG_DL,measuredAtEpochMs=1)); assertEquals(s,WearProtocol.decode(WearProtocol.encode(s))) }
  @Test fun migratesProtocolOneContractStoredInVersionField() {
   val legacy="""{"protocolVersion":1,"state":{"schemaVersion":1,"source":"ANDROID_APS","sourceVersion":"AAPS_EXTENDED_STATUS_V1","receivedAtEpochMs":2}}"""

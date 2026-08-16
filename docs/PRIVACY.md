@@ -3,11 +3,15 @@
 - ausschließlich lokaler AndroidAPS-Broadcast und lokaler Wear Data Layer
 - keine Internet-Datenquelle, Cloud, Telemetrie, Werbung oder Analytics
 - keine Therapie-, Pumpen- oder Loopbefehle im Modell oder Protokoll
-- gespeichert wird nur der letzte normalisierte Zustand; die Uhr hält zusätzlich
-  höchstens sechs Stunden Glukoseverlauf für lokale Diagramme
+- gespeichert werden der letzte normalisierte Zustand sowie begrenzte lokale
+  Anzeigeverläufe; der eigenständige G7-Collector besitzt zusätzlich eine lokale
+  Messwertdatenbank
 - Backups und Klartext-Netzwerkverkehr sind für beide Apps deaktiviert
-- Diagnosedaten enthalten Status, Zeitpunkte, Version und Verbindungszahl, aber
-  keine vollständigen Gesundheits-Payloads
+- die Diagnose-Datenbank ist auf 1000 Ereignisse und sieben Tage begrenzt. Sie enthält
+  Ablaufstatus, stabile Fehlercodes, Zeitpunkte und Zählwerte von Smartphone und Watch,
+  aber keine vollständigen Gesundheits-Payloads, Rohpakete oder Authentifizierungsschlüssel
+- der G7-Sensorcode wird auf Wunsch in der lokalen Sensor-Dokumentation angezeigt,
+  liegt verschlüsselt im Android Keystore und wird nicht in exportierbare Ereignislogs übernommen
 - der Debug-Testdatenempfänger wird nur in Debug-Builds kompiliert; er enthält
   ausschließlich synthetische Daten und existiert nicht in Release-Varianten
 

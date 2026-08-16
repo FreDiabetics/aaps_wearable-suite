@@ -42,6 +42,7 @@ import app.aapswear.model.FreshnessPolicy
 import app.aapswear.model.GlucoseUnit
 import app.aapswear.model.TherapyDisplayState
 import app.aapswear.model.Trend
+import app.aapswear.storage.PredictionDisplayTimeline
 import java.util.Locale
 import kotlin.math.roundToInt
 
@@ -81,7 +82,7 @@ internal fun SugarliciousOverviewScreen(
             preferences.showCgmGraph &&
             preferences.anyCgmPredictionEnabled
         ) {
-            state?.glucosePredictions
+            val enabledPredictions = state?.glucosePredictions
                 .orEmpty()
                 .filter { series ->
                     when (
@@ -102,20 +103,7 @@ internal fun SugarliciousOverviewScreen(
                             preferences.showCgmPredictionZeroTemp
                     }
                 }
-                .flatMap {
-                    it.samples
-                }
-                .maxOfOrNull {
-                    it.measuredAtEpochMs
-                }
-                ?.minus(
-                    now,
-                )
-                ?.coerceIn(
-                    0L,
-                    2L * 60L * 60_000L,
-                )
-                ?: 0L
+            PredictionDisplayTimeline.futureWindowMs(enabledPredictions, now)
         } else {
             0L
         }

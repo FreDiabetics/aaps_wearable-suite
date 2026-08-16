@@ -22,6 +22,12 @@ data class CgmReading(
     val sequenceNumber: Long? = null,
     val displayOnly: Boolean = false,
     val rawSourceTimestamp: Long? = null,
+    val sensorStartEpochMs: Long? = null,
+    val sensorEndEpochMs: Long? = null,
+    val graceEndEpochMs: Long? = null,
+    val protocolStatusCode: Int? = null,
+    val calibrationStateCode: Int? = null,
+    val reservedField: Int? = null,
 )
 
 @Serializable enum class CgmReadingStatus { VALID, SENSOR_ERROR, INVALID }
@@ -85,6 +91,8 @@ data class G7Sensor(
     val deviceName: String? = null,
     val deviceAddress: String? = null,
     val sensorStartEpochMs: Long? = null,
+    val sensorEndEpochMs: Long? = null,
+    val graceEndEpochMs: Long? = null,
     val state: G7SensorState = G7SensorState.UNKNOWN,
 )
 
@@ -102,6 +110,12 @@ data class G7Reading(
     val sensorState: G7SensorState = G7SensorState.UNKNOWN,
     val displayOnly: Boolean = false,
     val sensorClockSeconds: Long? = null,
+    val sensorStartEpochMs: Long? = null,
+    val sensorEndEpochMs: Long? = null,
+    val graceEndEpochMs: Long? = null,
+    val protocolStatusCode: Int? = null,
+    val calibrationStateCode: Int? = null,
+    val reservedField: Int? = null,
 )
 
 @Serializable

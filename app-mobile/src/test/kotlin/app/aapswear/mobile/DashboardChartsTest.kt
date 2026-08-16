@@ -105,7 +105,7 @@ class DashboardChartsTest {
         SugarliciousColors.apply(SugarliciousPalette.defaults())
     }
 
-    @Test fun `glucose chart keeps cached predictions visible behind now divider`() {
+    @Test fun `glucose chart keeps cached predictions visible right of now divider`() {
         val now = System.currentTimeMillis()
         val state =
             TherapyDisplayState(
@@ -132,9 +132,10 @@ class DashboardChartsTest {
                         ),
                     ),
             )
+        val viewport = ChartViewport(1).apply { setFutureWindow(15 * 60_000L) }
         val bitmap =
             render(
-                GlucoseDashboardChart(context, sharedViewport = ChartViewport(1)).apply {
+                GlucoseDashboardChart(context, sharedViewport = viewport).apply {
                     bind(
                         state = state,
                         unit = GlucoseUnit.MG_DL,
@@ -153,6 +154,15 @@ class DashboardChartsTest {
                     Color.green(it) > 120
             }
         assertTrue("cached prediction=$predictionPixels", predictionPixels > 2)
+    }
+
+    @Test fun `target value color is opaque and brighter than a transparent target band`() {
+        val translucentGreen = Color.argb(18, 12, 90, 30)
+
+        val result = luminousTargetValueColor(translucentGreen)
+
+        assertEquals(255, Color.alpha(result))
+        assertTrue(Color.green(result) > Color.green(translucentGreen))
     }
 
     @Test fun `metabolic chart renders independent iob and cob areas`() {
