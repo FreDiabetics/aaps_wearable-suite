@@ -255,6 +255,7 @@ data class DashboardCallbacks(
     val navigate: (DashboardScreen) -> Unit,
     val setUnit: (DisplayUnitPreference) -> Unit,
     val setDataSource: (DataSourcePreference) -> Unit,
+    val openG7Setup: () -> Unit,
     val setThemeMode: (DashboardThemeMode) -> Unit,
     val setShowDetails: (Boolean) -> Unit,
     val setShowCgmGraph: (Boolean) -> Unit,
@@ -474,9 +475,16 @@ class DashboardViewFactory(
                             Triple("xDrip+", preferences.dataSource == DataSourcePreference.XDRIP_PLUS) {
                                 callbacks.setDataSource(DataSourcePreference.XDRIP_PLUS)
                             },
+                            Triple("Dexcom G7 Watch", preferences.dataSource == DataSourcePreference.DEXCOM_G7_WATCH) {
+                                callbacks.setDataSource(DataSourcePreference.DEXCOM_G7_WATCH)
+                            },
                         ),
                     ),
                 )
+                if (preferences.dataSource == DataSourcePreference.DEXCOM_G7_WATCH) {
+                    addView(divider())
+                    addView(actionRow("G7-Sensor auf der Watch einrichten", "Öffnen") { callbacks.openG7Setup() })
+                }
                 addView(divider())
                 addView(
                     choiceRow(

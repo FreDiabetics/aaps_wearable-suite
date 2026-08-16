@@ -6,11 +6,13 @@ import app.aapswear.protocol.WatchGlucoseUnit
 import app.aapswear.protocol.WatchGraphColors
 import app.aapswear.protocol.WatchGraphStyle
 import app.aapswear.protocol.WatchUiColors
+import app.aapswear.protocol.WatchDataSource
 
 internal data class WearDisplayPreferences(
     val graphHours: Int = 3,
     val showPredictions: Boolean = false,
     val glucoseUnit: WatchGlucoseUnit = WatchGlucoseUnit.AAPS,
+    val dataSource: WatchDataSource = WatchDataSource.AUTOMATIC,
     val showTherapyStats: Boolean = true,
     val syncedAtEpochMs: Long = 0L,
     val graphColors: WatchGraphColors = WatchGraphColors(),
@@ -22,6 +24,7 @@ internal data class WearDisplayPreferences(
         private const val KEY_GRAPH_HOURS = "graph_hours"
         private const val KEY_SHOW_PREDICTIONS = "show_predictions"
         private const val KEY_GLUCOSE_UNIT = "glucose_unit"
+        private const val KEY_DATA_SOURCE = "data_source"
         private const val KEY_SHOW_THERAPY_STATS = "show_therapy_stats"
         private const val KEY_SYNCED_AT = "synced_at"
         private const val KEY_LOCAL_CUSTOMIZED = "local_customized"
@@ -62,6 +65,11 @@ internal data class WearDisplayPreferences(
                 showPredictions =
                     preferences.getBoolean(KEY_SHOW_PREDICTIONS, false),
                 glucoseUnit = unit,
+                dataSource = runCatching {
+                    WatchDataSource.valueOf(
+                        preferences.getString(KEY_DATA_SOURCE, WatchDataSource.AUTOMATIC.name)!!,
+                    )
+                }.getOrDefault(WatchDataSource.AUTOMATIC),
                 showTherapyStats =
                     preferences.getBoolean(KEY_SHOW_THERAPY_STATS, true),
                 syncedAtEpochMs =
@@ -134,6 +142,7 @@ internal data class WearDisplayPreferences(
             if (preferences.getBoolean(KEY_LOCAL_CUSTOMIZED, false)) {
                 preferences.edit()
                     .putLong(KEY_SYNCED_AT, syncedAt)
+                    .putString(KEY_DATA_SOURCE, config.dataSource.name)
                     .apply()
                 return
             }
@@ -145,6 +154,7 @@ internal data class WearDisplayPreferences(
                         graphHours = config.graphHours,
                         showPredictions = config.showPredictions,
                         glucoseUnit = config.glucoseUnit,
+                        dataSource = config.dataSource,
                         showTherapyStats = config.showTherapyStats,
                         syncedAtEpochMs = syncedAt,
                         graphColors = config.graphColors,
@@ -188,6 +198,7 @@ internal data class WearDisplayPreferences(
                 .putInt(KEY_GRAPH_HOURS, graphHours)
                 .putBoolean(KEY_SHOW_PREDICTIONS, value.showPredictions)
                 .putString(KEY_GLUCOSE_UNIT, value.glucoseUnit.name)
+                .putString(KEY_DATA_SOURCE, value.dataSource.name)
                 .putBoolean(KEY_SHOW_THERAPY_STATS, value.showTherapyStats)
                 .putLong(
                     KEY_SYNCED_AT,

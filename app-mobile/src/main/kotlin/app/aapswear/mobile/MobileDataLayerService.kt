@@ -10,6 +10,8 @@ import app.aapswear.protocol.WearProtocol
 import app.aapswear.protocol.WatchGraphColors
 import app.aapswear.protocol.WatchGraphStyle
 import app.aapswear.protocol.WatchUiColors
+import app.aapswear.protocol.WatchDataSource
+import app.aapswear.model.DataSourceId
 import app.aapswear.mobile.ui.theme.SugarliciousColorRole
 import app.aapswear.mobile.ui.theme.SugarliciousColorStore
 import app.aapswear.storage.TherapyStateStore
@@ -61,6 +63,27 @@ class MobileDataLayerService : WearableListenerService() {
                 runCatching { WearProtocol.decodeRuntimeStatus(event.data) }
                     .onSuccess { WatchRuntimeStatusStore.save(applicationContext, it) }
             }
+            WearProtocol.G7_READING_PATH -> {
+                scope.launch {
+                    val incoming = runCatching { WearProtocol.decode(event.data) }.getOrNull()
+                        ?.takeIf { it.source == DataSourceId.DEXCOM_G7_WATCH }
+                        ?: return@launch
+                    val preference = runCatching {
+                        DataSourcePreference.valueOf(
+                            getSharedPreferences("dashboard_ui", Context.MODE_PRIVATE)
+                                .getString("dataSource", DataSourcePreference.AUTOMATIC.name)!!,
+                        )
+                    }.getOrDefault(DataSourcePreference.AUTOMATIC)
+                    if (preference !in setOf(DataSourcePreference.AUTOMATIC, DataSourcePreference.DEXCOM_G7_WATCH)) return@launch
+                    val store = TherapyStateStore(this@MobileDataLayerService)
+                    val previous = store.state.first()
+                    val merged = DisplayHistoryAccumulator.merge(previous, incoming, System.currentTimeMillis())
+                    store.save(merged)
+                    runCatching { HealthConnectIntegration.exportCgmReading(this@MobileDataLayerService, merged) }
+                    SugarliciousWidgets.update(this@MobileDataLayerService)
+                    PersistentBridgeService.refresh(this@MobileDataLayerService)
+                }
+            }
         }
     }
 
@@ -100,6 +123,19 @@ internal fun readWatchConfig(context: Context): WatchConfig {
                 "cgm.prediction.zeroTemp",
             ).any { preferences.getBoolean(it, false) },
         glucoseUnit = unit,
+        dataSource = when (
+            runCatching {
+                DataSourcePreference.valueOf(
+                    preferences.getString("dataSource", DataSourcePreference.AUTOMATIC.name)!!,
+                )
+            }.getOrDefault(DataSourcePreference.AUTOMATIC)
+        ) {
+            DataSourcePreference.AUTOMATIC -> WatchDataSource.AUTOMATIC
+            DataSourcePreference.DEXCOM_G7_WATCH -> WatchDataSource.DEXCOM_G7_WATCH
+            DataSourcePreference.ANDROID_APS,
+            DataSourcePreference.XDRIP_PLUS,
+            -> WatchDataSource.PHONE
+        },
         showTherapyStats = preferences.getBoolean("showDetails", true),
         graphColors = WatchGraphColors(
             graphBackground = palette.argb(SugarliciousColorRole.GRAPH_BACKGROUND),

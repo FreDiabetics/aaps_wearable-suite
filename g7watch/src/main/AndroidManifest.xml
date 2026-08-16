@@ -8,7 +8,9 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="app.aapswear.g7watch.permission.READ_G7_DATA" />
+    <uses-permission android:name="app.aapswear.g7watch.permission.CONFIGURE_G7" />
     <permission android:name="app.aapswear.g7watch.permission.READ_G7_DATA" android:protectionLevel="signature" />
+    <permission android:name="app.aapswear.g7watch.permission.CONFIGURE_G7" android:protectionLevel="signature" />
 
     <application
         android:allowBackup="false"
@@ -31,6 +33,12 @@
             <intent-filter><action android:name="android.intent.action.BOOT_COMPLETED" /></intent-filter>
         </receiver>
         <receiver android:name=".G7ReconnectReceiver" android:exported="false" />
+        <receiver
+            android:name=".G7SetupReceiver"
+            android:exported="true"
+            android:permission="app.aapswear.g7watch.permission.CONFIGURE_G7">
+            <intent-filter><action android:name="app.aapswear.g7watch.CONFIGURE" /></intent-filter>
+        </receiver>
         <provider
             android:name=".G7ReadingProvider"
             android:authorities="app.aapswear.g7watch.readings"

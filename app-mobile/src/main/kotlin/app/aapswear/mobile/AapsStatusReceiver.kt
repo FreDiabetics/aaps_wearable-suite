@@ -8,6 +8,9 @@ import app.aapswear.datasource.aaps.AapsCapabilityDetector
 import app.aapswear.datasource.aaps.AapsPayloadAdapter
 import app.aapswear.model.TherapyDisplayState
 import app.aapswear.model.Trend
+import app.aapswear.model.DataSourceId
+import app.aapswear.model.Freshness
+import app.aapswear.model.FreshnessPolicy
 import app.aapswear.protocol.WearProtocol
 import app.aapswear.storage.TherapyStateStore
 import com.google.android.gms.wearable.PutDataRequest
@@ -36,7 +39,7 @@ class AapsStatusReceiver : BroadcastReceiver() {
                             .getString("dataSource", "AUTOMATIC")!!,
                     )
                 }.getOrDefault(DataSourcePreference.AUTOMATIC)
-                if (sourcePreference == DataSourcePreference.XDRIP_PLUS) return@launch
+                if (sourcePreference in setOf(DataSourcePreference.XDRIP_PLUS, DataSourcePreference.DEXCOM_G7_WATCH)) return@launch
                 val parsedState = intent.extras?.let { AapsPayloadAdapter.parse(it, now) }
                 if (parsedState == null) {
                     app.diagnostics().edit {
@@ -49,6 +52,10 @@ class AapsStatusReceiver : BroadcastReceiver() {
                 val state = parsedState.copy(sourceVersion = installation?.versionName)
                 val store = TherapyStateStore(app)
                 val previous = store.state.first()
+                val g7IsCurrent = previous?.source == DataSourceId.DEXCOM_G7_WATCH &&
+                    FreshnessPolicy.classify(previous.glucose?.measuredAtEpochMs, now) in
+                    setOf(Freshness.CURRENT, Freshness.DELAYED)
+                if (sourcePreference == DataSourcePreference.AUTOMATIC && g7IsCurrent) return@launch
 
                 var displayState = DisplayHistoryAccumulator.merge(previous, state, now)
 

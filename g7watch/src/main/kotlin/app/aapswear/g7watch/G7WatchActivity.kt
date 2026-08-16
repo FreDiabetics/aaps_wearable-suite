@@ -3,67 +3,273 @@ package app.aapswear.g7watch
 import android.Manifest
 import android.app.Activity
 import android.content.pm.PackageManager
+import android.content.res.ColorStateList
 import android.graphics.Color
+import android.graphics.Typeface
+import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
+import android.text.InputFilter
+import android.text.InputType
 import android.view.Gravity
+import android.view.View
 import android.view.ViewGroup
 import android.widget.Button
+import android.widget.EditText
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
+import app.aapswear.g7.G7Sensor
+import app.aapswear.g7.G7SessionManager
+import app.aapswear.g7.G7SetupPayload
+import java.text.DateFormat
+import java.util.Date
+import java.util.UUID
 
 class G7WatchActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        if (android.os.Build.VERSION.SDK_INT >= 33 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
-            requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS, Manifest.permission.BLUETOOTH_SCAN, Manifest.permission.BLUETOOTH_CONNECT), 7)
-        }
+        window.statusBarColor = BACKGROUND
+        window.navigationBarColor = BACKGROUND
+        requestMissingPermissions()
         render()
     }
 
-    override fun onResume() { super.onResume(); render() }
+    override fun onResume() {
+        super.onResume()
+        render()
+    }
 
     private fun render() {
         val state = G7SensorStateStore(this).read()
         val content = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER_HORIZONTAL
-            setPadding(34, 42, 34, 42)
-            setBackgroundColor(Color.rgb(5, 11, 16))
+            setPadding(22.dp, 24.dp, 22.dp, 34.dp)
+            setBackgroundColor(BACKGROUND)
         }
-        content.addView(label("Dexcom G7 Collector", 22f, Color.WHITE))
-        content.addView(label(if (state.collectorEnabled) "AKTIV" else "INAKTIV", 16f, Color.rgb(25, 215, 232)))
-        content.addView(tile("Sensor", state.sensor?.deviceName ?: "Noch nicht eingerichtet"))
-        content.addView(tile("Status", state.sessionState.name.replace('_', ' ')))
-        content.addView(tile("Glukose", state.lastReading?.let { "${it.glucoseMgDl.toInt()} mg/dL" } ?: "–"))
-        content.addView(tile("Pending Sync", G7ReadingDatabase(this).query("synced=0").size.toString()))
-        content.addView(tile("Letzter Fehler", state.lastError?.safeMessage ?: "Keiner"))
-        content.addView(Button(this).apply {
-            text = "Sensor einrichten"
-            isEnabled = false
-            setOnClickListener { }
+
+        content.addView(ImageView(this).apply {
+            setImageResource(R.drawable.ic_g7_collector)
+            imageTintList = ColorStateList.valueOf(ACCENT)
+            scaleType = ImageView.ScaleType.CENTER_INSIDE
+        }, LinearLayout.LayoutParams(44.dp, 44.dp))
+        content.addView(label("Sugarlicious", 11f, TEXT_SECONDARY, bold = true).apply { letterSpacing = 0.12f })
+        content.addView(label("G7 Watch Collector", 21f, TEXT_PRIMARY, bold = true))
+        content.addView(statusPill(state.collectorEnabled, state.lastError != null))
+
+        val reading = state.lastReading
+        content.addView(
+            card().apply {
+                addView(sectionLabel("AKTUELLER WERT"))
+                addView(label(reading?.let { "${it.glucoseMgDl.toInt()} mg/dL" } ?: "—", 28f, TEXT_PRIMARY, bold = true))
+                addView(label(reading?.let { "Empfangen ${DateFormat.getTimeInstance(DateFormat.SHORT).format(Date(it.receivedAtEpochMs))}" } ?: "Noch kein lokaler G7-Wert", 11f, TEXT_SECONDARY))
+            },
+            cardParams(),
+        )
+
+        content.addView(
+            card().apply {
+                addView(sectionLabel("VERBINDUNG"))
+                addView(valueRow("Sensor", state.sensor?.deviceName ?: "Nicht eingerichtet"))
+                addView(valueRow("Phase", state.protocolState.displayName()))
+                addView(valueRow("Status", state.sessionState.displayName()))
+                state.lastError?.let { error ->
+                    addView(divider())
+                    addView(label(error.code, 12f, ERROR, bold = true).apply { gravity = Gravity.START })
+                    addView(label(error.safeMessage, 12f, TEXT_PRIMARY).apply { gravity = Gravity.START })
+                }
+            },
+            cardParams(),
+        )
+
+        content.addView(
+            setupCard(state.sensor != null),
+            cardParams(),
+        )
+
+        content.addView(
+            actionButton(
+                if (state.collectorEnabled) "Collector stoppen" else "Collector starten",
+                primary = !state.collectorEnabled,
+            ) {
+                if (state.collectorEnabled) G7CollectorService.stop(this) else G7CollectorService.start(this)
+                content.postDelayed({ render() }, 350L)
+            },
+            buttonParams(),
+        )
+        content.addView(label("Nur einen direkten G7-Collector gleichzeitig verwenden. Juggluco oder xDrip vorher beenden.", 10f, TEXT_SECONDARY))
+
+        setContentView(ScrollView(this).apply {
+            isFillViewport = true
+            setBackgroundColor(BACKGROUND)
+            addView(content)
         })
-        content.addView(Button(this).apply {
-            text = if (state.collectorEnabled) "Collector stoppen" else "Collector starten"
-            setOnClickListener {
-                if (state.collectorEnabled) G7CollectorService.stop(this@G7WatchActivity) else G7CollectorService.start(this@G7WatchActivity)
-                postDelayed({ render() }, 300L)
+    }
+
+    private fun setupCard(configured: Boolean): LinearLayout = card().apply {
+        addView(sectionLabel(if (configured) "SENSOR NEU EINRICHTEN" else "SENSOR EINRICHTEN"))
+        addView(label("Vierstelliger Code vom G7-Applikator", 12f, TEXT_SECONDARY).apply { gravity = Gravity.START })
+        val codeInput = EditText(this@G7WatchActivity).apply {
+            hint = "0000"
+            inputType = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_VARIATION_PASSWORD
+            filters = arrayOf(InputFilter.LengthFilter(4))
+            setTextColor(TEXT_PRIMARY)
+            setHintTextColor(TEXT_SECONDARY)
+            textSize = 20f
+            gravity = Gravity.CENTER
+            setPadding(14.dp, 9.dp, 14.dp, 9.dp)
+            background = rounded(FIELD, BORDER, 16f)
+        }
+        addView(codeInput, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
+            topMargin = 8.dp
+        })
+        addView(actionButton(if (configured) "Neu verbinden" else "Verbinden", primary = true) {
+            val code = codeInput.text?.toString().orEmpty()
+            val payload = runCatching { G7SetupPayload(code) }.getOrNull()
+            if (payload == null) {
+                codeInput.error = "4 Ziffern erforderlich"
+                return@actionButton
             }
-        })
-        content.addView(label("G7-Ersteinrichtung und Authentifizierung sind noch durch TODO(G7-AUTH) blockiert. Es werden keine Messwerte simuliert.", 11f, Color.LTGRAY))
-        setContentView(ScrollView(this).apply { addView(content) })
+            G7CredentialStore(this@G7WatchActivity).saveSetup(payload)
+            val sensorId = "G7-${UUID.randomUUID().toString().take(8)}"
+            val sensor = G7Sensor(sensorId, sensorId, "Dexcom G7")
+            G7SensorStateStore(this@G7WatchActivity).save(
+                G7SessionManager(G7SensorStateStore(this@G7WatchActivity).read()).beginInitialSetup(sensor),
+            )
+            codeInput.text?.clear()
+            G7CollectorService.start(this@G7WatchActivity)
+            postDelayed({ render() }, 350L)
+        }, buttonParams(top = 10))
     }
 
-    private fun tile(title: String, value: String): LinearLayout = LinearLayout(this).apply {
+    private fun statusPill(active: Boolean, hasError: Boolean): TextView {
+        val color = when {
+            hasError -> ERROR
+            active -> ACCENT
+            else -> TEXT_SECONDARY
+        }
+        return label(
+            when {
+                hasError -> "●  PRÜFEN"
+                active -> "●  AKTIV"
+                else -> "○  INAKTIV"
+            },
+            11f,
+            color,
+            bold = true,
+        ).apply {
+            background = rounded(Color.argb(36, Color.red(color), Color.green(color), Color.blue(color)), color, 18f)
+            setPadding(14.dp, 6.dp, 14.dp, 6.dp)
+            layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
+                topMargin = 8.dp
+                bottomMargin = 4.dp
+            }
+        }
+    }
+
+    private fun card() = LinearLayout(this).apply {
         orientation = LinearLayout.VERTICAL
-        setPadding(20, 14, 20, 14)
-        setBackgroundColor(Color.rgb(18, 28, 34))
-        addView(label(title, 11f, Color.LTGRAY))
-        addView(label(value, 15f, Color.WHITE))
-        layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply { setMargins(0, 8, 0, 0) }
+        setPadding(16.dp, 14.dp, 16.dp, 14.dp)
+        background = rounded(SURFACE, BORDER, 22f)
     }
 
-    private fun label(textValue: String, size: Float, color: Int) = TextView(this).apply {
-        text = textValue; textSize = size; setTextColor(color); gravity = Gravity.CENTER; setPadding(4, 4, 4, 4)
+    private fun valueRow(title: String, value: String) = LinearLayout(this).apply {
+        orientation = LinearLayout.HORIZONTAL
+        gravity = Gravity.CENTER_VERTICAL
+        addView(label(title, 11f, TEXT_SECONDARY).apply { gravity = Gravity.START }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+        addView(label(value, 11f, TEXT_PRIMARY, bold = true).apply {
+            gravity = Gravity.END
+            maxLines = 2
+        }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1.25f))
+    }
+
+    private fun divider() = View(this).apply {
+        setBackgroundColor(BORDER)
+        layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 1.dp).apply {
+            setMargins(0, 8.dp, 0, 8.dp)
+        }
+    }
+
+    private fun sectionLabel(value: String) = label(value, 10f, ACCENT, bold = true).apply {
+        gravity = Gravity.START
+        letterSpacing = 0.11f
+    }
+
+    private fun actionButton(textValue: String, primary: Boolean, action: () -> Unit) = Button(this).apply {
+        text = textValue
+        isAllCaps = false
+        textSize = 13f
+        setTypeface(typeface, Typeface.BOLD)
+        setTextColor(if (primary) Color.rgb(9, 25, 15) else TEXT_PRIMARY)
+        backgroundTintList = ColorStateList.valueOf(if (primary) ACCENT else SURFACE_HIGH)
+        setOnClickListener { action() }
+    }
+
+    private fun label(textValue: String, size: Float, color: Int, bold: Boolean = false) = TextView(this).apply {
+        text = textValue
+        textSize = size
+        setTextColor(color)
+        gravity = Gravity.CENTER
+        setPadding(3.dp, 3.dp, 3.dp, 3.dp)
+        if (bold) setTypeface(typeface, Typeface.BOLD)
+    }
+
+    private fun rounded(fill: Int, stroke: Int, radiusDp: Float) = GradientDrawable().apply {
+        shape = GradientDrawable.RECTANGLE
+        setColor(fill)
+        setStroke(1.dp, stroke)
+        cornerRadius = radiusDp * resources.displayMetrics.density
+    }
+
+    private fun cardParams() = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
+        setMargins(0, 8.dp, 0, 0)
+    }
+
+    private fun buttonParams(top: Int = 8) = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 46.dp).apply {
+        setMargins(0, top.dp, 0, 0)
+    }
+
+    private fun requestMissingPermissions() {
+        val missing = buildList {
+            if (checkSelfPermission(Manifest.permission.BLUETOOTH_SCAN) != PackageManager.PERMISSION_GRANTED) add(Manifest.permission.BLUETOOTH_SCAN)
+            if (checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) add(Manifest.permission.BLUETOOTH_CONNECT)
+            if (checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) add(Manifest.permission.POST_NOTIFICATIONS)
+        }
+        if (missing.isNotEmpty()) requestPermissions(missing.toTypedArray(), PERMISSION_REQUEST)
+    }
+
+    private fun app.aapswear.g7.G7ProtocolState.displayName(): String = when (this) {
+        app.aapswear.g7.G7ProtocolState.SCANNING -> "Sensor suchen"
+        app.aapswear.g7.G7ProtocolState.CONNECTING -> "Verbinden"
+        app.aapswear.g7.G7ProtocolState.DISCOVERING_SERVICES -> "Dienste prüfen"
+        app.aapswear.g7.G7ProtocolState.ENABLING_NOTIFICATIONS -> "Datenkanäle öffnen"
+        app.aapswear.g7.G7ProtocolState.AUTHENTICATION_START,
+        app.aapswear.g7.G7ProtocolState.AUTHENTICATING,
+        -> "Authentifizieren"
+        app.aapswear.g7.G7ProtocolState.BONDING -> "Koppeln"
+        app.aapswear.g7.G7ProtocolState.REQUESTING_GLUCOSE -> "Wert anfordern"
+        app.aapswear.g7.G7ProtocolState.RECEIVING_GLUCOSE -> "Wert empfangen"
+        app.aapswear.g7.G7ProtocolState.WAITING_FOR_NEXT_READING -> "Nächsten Wert abwarten"
+        app.aapswear.g7.G7ProtocolState.ERROR -> "Fehler"
+        else -> name.lowercase().replace('_', ' ').replaceFirstChar(Char::uppercase)
+    }
+
+    private fun app.aapswear.g7.G7SessionState.displayName(): String =
+        name.lowercase().replace('_', ' ').replaceFirstChar(Char::uppercase)
+
+    private val Int.dp: Int get() = (this * resources.displayMetrics.density).toInt()
+
+    private companion object {
+        const val PERMISSION_REQUEST = 7
+        val BACKGROUND = Color.rgb(24, 24, 24)
+        val SURFACE = Color.rgb(36, 36, 36)
+        val SURFACE_HIGH = Color.rgb(48, 48, 48)
+        val FIELD = Color.rgb(30, 30, 30)
+        val BORDER = Color.rgb(64, 64, 64)
+        val TEXT_PRIMARY = Color.rgb(245, 245, 245)
+        val TEXT_SECONDARY = Color.rgb(181, 181, 181)
+        val ACCENT = Color.rgb(109, 232, 146)
+        val ERROR = Color.rgb(255, 92, 105)
     }
 }

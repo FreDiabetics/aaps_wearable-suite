@@ -16,7 +16,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
-enum class DataSourcePreference { AUTOMATIC, ANDROID_APS, XDRIP_PLUS }
+enum class DataSourcePreference { AUTOMATIC, ANDROID_APS, XDRIP_PLUS, DEXCOM_G7_WATCH }
 
 class XdripStatusReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
@@ -41,7 +41,7 @@ class XdripStatusReceiver : BroadcastReceiver() {
                 val preference = runCatching {
                     DataSourcePreference.valueOf(prefs.getString("dataSource", "AUTOMATIC")!!)
                 }.getOrDefault(DataSourcePreference.AUTOMATIC)
-                if (preference == DataSourcePreference.ANDROID_APS) return@launch
+                if (preference in setOf(DataSourcePreference.ANDROID_APS, DataSourcePreference.DEXCOM_G7_WATCH)) return@launch
 
                 val store = TherapyStateStore(app)
                 val previous = store.state.first()
@@ -49,6 +49,9 @@ class XdripStatusReceiver : BroadcastReceiver() {
                     FreshnessPolicy.classify(previous.glucose?.measuredAtEpochMs, now) != Freshness.STALE &&
                     FreshnessPolicy.classify(previous.glucose?.measuredAtEpochMs, now) != Freshness.NO_DATA
                 if (preference == DataSourcePreference.AUTOMATIC && aapsIsCurrent) return@launch
+                val g7IsCurrent = previous?.source == DataSourceId.DEXCOM_G7_WATCH &&
+                    FreshnessPolicy.classify(previous.glucose?.measuredAtEpochMs, now) in setOf(Freshness.CURRENT, Freshness.DELAYED)
+                if (preference == DataSourcePreference.AUTOMATIC && g7IsCurrent) return@launch
 
                 val preserved = parsed.copy(
                     insulin = previous?.insulin,

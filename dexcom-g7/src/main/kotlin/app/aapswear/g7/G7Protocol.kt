@@ -1,54 +1,74 @@
 package app.aapswear.g7
 
 import java.util.UUID
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
 
 object G7GattProfile {
-    /** RESEARCH_REFERENCE only; the remaining characteristic map is not yet validated. */
-    val researchServiceUuid: UUID = UUID.fromString("f8083532-849e-531c-c594-30f1f86a4ea5")
-}
+    val serviceUuid: UUID = UUID.fromString("f8083532-849e-531c-c594-30f1f86a4ea5")
+    val controlUuid: UUID = UUID.fromString("f8083534-849e-531c-c594-30f1f86a4ea5")
+    val authenticationUuid: UUID = UUID.fromString("f8083535-849e-531c-c594-30f1f86a4ea5")
+    val backfillUuid: UUID = UUID.fromString("f8083536-849e-531c-c594-30f1f86a4ea5")
+    val extraDataUuid: UUID = UUID.fromString("f8083538-849e-531c-c594-30f1f86a4ea5")
+    val clientConfigurationUuid: UUID = UUID.fromString("00002902-0000-1000-8000-00805f9b34fb")
 
-class G7ProtocolResearchRequired(message: String) : UnsupportedOperationException(message)
+}
 
 interface G7PacketParser {
     fun parse(packet: ByteArray, sensor: G7Sensor, receivedAtEpochMs: Long): G7Reading
 }
 
-class ResearchG7PacketParser : G7PacketParser {
+class G7GlucosePacketParser : G7PacketParser {
     override fun parse(packet: ByteArray, sensor: G7Sensor, receivedAtEpochMs: Long): G7Reading {
-        throw G7ProtocolResearchRequired("TODO(G7-PROTOCOL): validated G7 glucose packet framing and fields are not implemented")
+        require(packet.size >= MIN_PACKET_SIZE) { "G7 glucose packet is too short" }
+        val data = ByteBuffer.wrap(packet).order(ByteOrder.LITTLE_ENDIAN)
+        require(data.get() == OPCODE) { "Unexpected G7 glucose opcode" }
+        data.get() // status
+        val sensorClockSeconds = data.int.toLong() and 0xffff_ffffL
+        val sequence = data.short.toLong() and 0xffffL
+        data.short // reserved
+        val ageSeconds = data.short.toLong() and 0xffffL
+        val glucoseField = data.short.toInt() and 0xffff
+        val glucose = glucoseField and 0x0fff
+        val displayOnly = glucoseField and 0xf000 != 0
+        val stateCode = data.get().toInt() and 0xff
+        val trendRaw = data.get().toInt()
+        val predictedRaw = data.short.toInt() and 0x03ff
+        require(glucose in 14..1000) { "G7 packet does not contain a usable glucose value" }
+        require(ageSeconds <= MAX_READING_AGE_SECONDS) { "G7 packet reading age is invalid" }
+        val measuredAt = receivedAtEpochMs - ageSeconds * 1_000L
+        return G7Reading(
+            sensorId = sensor.sensorId,
+            sessionId = sensor.sessionId ?: sensor.sensorId,
+            sequenceNumber = sequence,
+            glucoseMgDl = glucose.toDouble(),
+            sensorTimestampEpochMs = measuredAt,
+            receivedAtEpochMs = receivedAtEpochMs,
+            trendRateMgDlPerMinute = trendRaw.takeUnless { it == 127 }?.div(10.0),
+            predictedMgDl = predictedRaw.takeUnless { it == 0x03ff }?.toDouble(),
+            sensorAgeSeconds = ageSeconds,
+            sensorState = stateCode.toSensorState(),
+            displayOnly = displayOnly,
+            sensorClockSeconds = sensorClockSeconds,
+        )
+    }
+
+    private fun Int.toSensorState(): G7SensorState = when (this) {
+        0x02, 0xc1 -> G7SensorState.WARMUP
+        0x06, 0x07 -> G7SensorState.ACTIVE
+        0x0f, 0x18, 0x1a, 0xc2 -> G7SensorState.ENDED
+        in 0x0b..0x17, 0x19, in 0x1b..0x1e -> G7SensorState.ERROR
+        else -> G7SensorState.UNKNOWN
+    }
+
+    private companion object {
+        const val OPCODE: Byte = 0x4e
+        const val MIN_PACKET_SIZE = 19
+        const val MAX_READING_AGE_SECONDS = 30 * 60L
     }
 }
 
-interface G7CryptoEngine {
-    fun generateRandom(size: Int): ByteArray
-    fun processAuthenticationRound(round: Int, packet: ByteArray): ByteArray
-    fun calculateSharedSecret(peerData: ByteArray): ByteArray
-    fun aesChallenge(challenge: ByteArray): ByteArray
-    fun createCertificateResponse(request: ByteArray): ByteArray
-    fun validateCertificate(certificate: ByteArray): Boolean
-    fun restoreSession(protectedSessionData: ByteArray): Boolean
-    fun resetSession()
-}
-
-class ResearchG7CryptoEngine : G7CryptoEngine {
-    private fun missing(): Nothing = throw G7ProtocolResearchRequired("TODO(G7-AUTH/G7-CRYPTO): the proprietary G7 authentication exchange is not implemented")
-    override fun generateRandom(size: Int): ByteArray = java.security.SecureRandom().let { random -> ByteArray(size).also(random::nextBytes) }
-    override fun processAuthenticationRound(round: Int, packet: ByteArray): ByteArray = missing()
-    override fun calculateSharedSecret(peerData: ByteArray): ByteArray = missing()
-    override fun aesChallenge(challenge: ByteArray): ByteArray = missing()
-    override fun createCertificateResponse(request: ByteArray): ByteArray = missing()
-    override fun validateCertificate(certificate: ByteArray): Boolean = missing()
-    override fun restoreSession(protectedSessionData: ByteArray): Boolean = missing()
-    override fun resetSession() = Unit
-}
-
 interface G7Scanner { suspend fun findKnownSensor(sensor: G7Sensor?, timeoutMs: Long): G7Sensor? }
-interface G7GattClient {
-    suspend fun connect(sensor: G7Sensor)
-    suspend fun discoverServices()
-    suspend fun enableNotifications()
-    suspend fun disconnect()
-}
 interface G7ConnectionManager { suspend fun collectNextReading(sensor: G7Sensor): G7Reading }
 interface G7BackfillManager { suspend fun requestBackfill(sensor: G7Sensor, gaps: List<CgmGap>): List<G7Reading> }
 

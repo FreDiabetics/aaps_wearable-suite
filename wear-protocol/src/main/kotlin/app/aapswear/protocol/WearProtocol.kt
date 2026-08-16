@@ -22,6 +22,24 @@ enum class WatchGlucoseUnit {
 }
 
 @Serializable
+enum class WatchDataSource {
+    AUTOMATIC,
+    PHONE,
+    DEXCOM_G7_WATCH,
+}
+
+@Serializable
+data class G7SetupCommand(
+    val pairingCode: String,
+    val sensorSerial: String? = null,
+    val gtin: String? = null,
+) {
+    init {
+        require(pairingCode.length == 4 && pairingCode.all(Char::isDigit))
+    }
+}
+
+@Serializable
 data class WatchGraphColors(
     val graphBackground: Int = 0xFF202020.toInt(),
     val rangeLow: Int = 0xFFFF5C69.toInt(),
@@ -76,6 +94,7 @@ data class WatchConfig(
     val graphHours: Int = 3,
     val showPredictions: Boolean = false,
     val glucoseUnit: WatchGlucoseUnit = WatchGlucoseUnit.AAPS,
+    val dataSource: WatchDataSource = WatchDataSource.AUTOMATIC,
     val showTherapyStats: Boolean = true,
     val graphColors: WatchGraphColors = WatchGraphColors(),
     val graphStyle: WatchGraphStyle = WatchGraphStyle(),
@@ -83,7 +102,7 @@ data class WatchConfig(
     val sentAtEpochMs: Long = 0L,
 ) {
     companion object {
-        const val CURRENT_SCHEMA = 5
+        const val CURRENT_SCHEMA = 6
     }
 }
 
@@ -97,6 +116,8 @@ object WearProtocol {
     const val WATCH_FACE_STATUS_PATH = "/aaps-display/v1/watchface-status"
     const val WATCH_RUNTIME_STATUS_PATH = "/aaps-display/v1/watch-runtime-status"
     const val WATCH_RUNTIME_REQUEST_PATH = "/aaps-display/v1/watch-runtime-request"
+    const val G7_SETUP_PATH = "/aaps-display/v1/g7-setup"
+    const val G7_READING_PATH = "/aaps-display/v1/g7-reading"
     private val json = Json {
         ignoreUnknownKeys = true
         explicitNulls = false
@@ -116,6 +137,12 @@ object WearProtocol {
 
     fun encodeRuntimeStatus(status: WatchRuntimeStatus): ByteArray =
         json.encodeToString(status).encodeToByteArray()
+
+    fun encodeG7Setup(command: G7SetupCommand): ByteArray =
+        json.encodeToString(command).encodeToByteArray()
+
+    fun decodeG7Setup(bytes: ByteArray): G7SetupCommand =
+        json.decodeFromString<G7SetupCommand>(bytes.decodeToString())
 
     fun decodeRuntimeStatus(bytes: ByteArray): WatchRuntimeStatus {
         val decoded = json.decodeFromString<WatchRuntimeStatus>(bytes.decodeToString())
