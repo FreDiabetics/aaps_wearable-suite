@@ -214,6 +214,7 @@ internal fun SugarliciousOverviewScreen(
                 preferences = preferences,
                 viewport = cgmChartViewport,
                 chartHeightDp = graphHeightDp,
+                now = now,
             )
         }
 
@@ -538,6 +539,7 @@ private fun GlucoseGraphSurface(
     preferences: DashboardUiPreferences,
     viewport: ChartViewport,
     chartHeightDp: Int,
+    now: Long,
 ) {
     AndroidView(
         modifier = Modifier.fillMaxWidth().height(chartHeightDp.dp),
@@ -578,6 +580,7 @@ private fun GlucoseGraphSurface(
                     preferences.cgmDotOutlineEnabled,
                 cgmDotOutlineWidthDp =
                     preferences.cgmDotOutlineWidthDp,
+                clockEpochMs = now,
             )
         },
     )

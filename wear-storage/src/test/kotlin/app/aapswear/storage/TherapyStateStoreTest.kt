@@ -4,7 +4,10 @@ import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import app.aapswear.model.DataCapability
 import app.aapswear.model.GlucoseState
+import app.aapswear.model.GlucosePrediction
+import app.aapswear.model.GlucoseSample
 import app.aapswear.model.GlucoseUnit
+import app.aapswear.model.PredictionKind
 import app.aapswear.model.TherapyDisplayState
 import app.aapswear.model.Trend
 import kotlinx.coroutines.flow.first
@@ -34,7 +37,19 @@ class TherapyStateStoreTest {
                 deltaMgDl = 4.0,
                 averageDeltaMgDl = 3.0,
             ),
-            capabilities = setOf(DataCapability.GLUCOSE, DataCapability.TREND),
+            glucosePredictions =
+                listOf(
+                    GlucosePrediction(
+                        PredictionKind.IOB,
+                        listOf(GlucoseSample(150.0, 1_500_000L)),
+                    ),
+                ),
+            capabilities =
+                setOf(
+                    DataCapability.GLUCOSE,
+                    DataCapability.TREND,
+                    DataCapability.PREDICTIONS,
+                ),
         )
 
         TherapyStateStore(context).save(expected)

@@ -11,29 +11,42 @@ import app.aapswear.model.CarbState
 import app.aapswear.model.DataCapability
 import app.aapswear.model.DeviceState
 import app.aapswear.model.GlucoseSample
+import app.aapswear.model.GlucosePrediction
 import app.aapswear.model.GlucoseState
 import app.aapswear.model.GlucoseUnit
 import app.aapswear.model.InsulinState
 import app.aapswear.model.LoopState
 import app.aapswear.model.ProfileState
+import app.aapswear.model.PredictionKind
 import app.aapswear.model.PumpState
 import app.aapswear.model.TargetState
 import app.aapswear.model.TherapyDisplayState
 import app.aapswear.model.Trend
 import app.aapswear.storage.TherapyStateStore
+import app.aapswear.storage.PersistentPredictionCache
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.first
 import kotlin.math.sin
 
-/** Emulator-only synthetic state injection. This class is absent from release APKs. */
+/** Debug-build-only synthetic state injection. This class is absent from release APKs. */
 class DebugStateReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         val pending = goAsync()
         CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
             try {
-                TherapyStateStore(context).save(syntheticState(intent.getStringExtra("mode") ?: "current"))
+                val store = TherapyStateStore(context)
+                val previous = store.state.first()
+                val incoming = syntheticState(intent.getStringExtra("mode") ?: "current")
+                store.save(
+                    PersistentPredictionCache.merge(
+                        previous = previous,
+                        incoming = incoming,
+                        nowEpochMs = System.currentTimeMillis(),
+                    ),
+                )
                 AllProviders.classes.forEach { provider ->
                     ComplicationDataSourceUpdateRequester.create(context, ComponentName(context, provider)).requestUpdateAll()
                 }
@@ -53,12 +66,29 @@ class DebugStateReceiver : BroadcastReceiver() {
                 measuredAtEpochMs = now - minutesAgo * 60_000L,
             )
         }
+        val predictions =
+            if (mode == "predictions") {
+                listOf(
+                    GlucosePrediction(
+                        PredictionKind.IOB,
+                        (-3..12).map { index ->
+                            GlucoseSample(
+                                valueMgDl = 129.0 - index * 2.5,
+                                measuredAtEpochMs = now + index * 5L * 60_000L,
+                            )
+                        },
+                    ),
+                )
+            } else {
+                emptyList()
+            }
         return TherapyDisplayState(
             receivedAtEpochMs = now,
             sourceVersion = "4.0.0-dev synthetic",
             sourceContract = "AAPS_EXTENDED_STATUS_V1",
             glucose = if (mode == "none") null else GlucoseState(129.0, GlucoseUnit.MG_DL, Trend.FLAT, measuredAt, 6.0, 4.0),
             glucoseHistory = history,
+            glucosePredictions = predictions,
             insulin = InsulinState(2.45, 1.65, 0.80),
             carbs = CarbState(36.0, 0.0),
             basal = BasalState(0.95, tempPercent = 110, displayText = "110%"),

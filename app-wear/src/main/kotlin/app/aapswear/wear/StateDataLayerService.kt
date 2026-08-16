@@ -10,6 +10,7 @@ import app.aapswear.model.SugarliciousComplicationIds
 import app.aapswear.model.GlucoseSample
 import app.aapswear.protocol.WatchRuntimeStatus
 import app.aapswear.protocol.WearProtocol
+import app.aapswear.storage.PersistentPredictionCache
 import app.aapswear.storage.TherapyStateStore
 import com.google.android.gms.wearable.DataEvent
 import com.google.android.gms.wearable.DataEventBuffer
@@ -226,8 +227,10 @@ class StateDataLayerService : WearableListenerService() {
                     .takeLast(MAX_HISTORY_POINTS)
 
             val merged =
-                incoming.copy(
-                    glucoseHistory = history,
+                PersistentPredictionCache.merge(
+                    previous = old,
+                    incoming = incoming.copy(glucoseHistory = history),
+                    nowEpochMs = now,
                 )
             val meaningfulState =
                 old?.copy(receivedAtEpochMs = merged.receivedAtEpochMs)

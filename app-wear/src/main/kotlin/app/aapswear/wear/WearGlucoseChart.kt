@@ -120,10 +120,6 @@ class WearGlucoseChart @JvmOverloads constructor(
             fillPaint,
         )
 
-        val currentMeasurement =
-            state?.glucose?.measuredAtEpochMs
-                ?.coerceAtMost(now + FUTURE_TOLERANCE_MS)
-                ?: now
         val predictions =
             if (showPredictions) {
                 state?.glucosePredictions.orEmpty()
@@ -134,10 +130,10 @@ class WearGlucoseChart @JvmOverloads constructor(
             predictions
                 .flatMap { it.samples }
                 .maxOfOrNull { it.measuredAtEpochMs }
-                ?: currentMeasurement
+                ?: now
         val timeWindow =
             wearChartTimeWindow(
-                currentMeasurement = currentMeasurement,
+                timelineNow = now,
                 predictionEnd = predictionEnd,
                 durationHours = durationHours,
                 showPredictions = showPredictions,
@@ -171,7 +167,7 @@ class WearGlucoseChart @JvmOverloads constructor(
                     series.copy(
                         samples =
                             series.samples.filter {
-                                it.measuredAtEpochMs in currentMeasurement..end
+                                it.measuredAtEpochMs in start..end
                             },
                     )
                 }
@@ -276,7 +272,7 @@ class WearGlucoseChart @JvmOverloads constructor(
             targetLabelPaint,
         )
 
-        val dividerX = xFor(currentMeasurement)
+        val dividerX = xFor(now)
         if (visiblePredictions.isNotEmpty()) {
             linePaint.color = colors.divider
             linePaint.strokeWidth = 1f.dp
@@ -317,7 +313,6 @@ class WearGlucoseChart @JvmOverloads constructor(
                 series = series,
                 xFor = ::xFor,
                 yFor = ::yFor,
-                dividerX = dividerX,
             )
         }
     }
@@ -356,7 +351,6 @@ class WearGlucoseChart @JvmOverloads constructor(
         series: GlucosePrediction,
         xFor: (Long) -> Float,
         yFor: (Double) -> Float,
-        dividerX: Float,
     ) {
         fillPaint.color =
             when (series.kind) {
@@ -367,17 +361,9 @@ class WearGlucoseChart @JvmOverloads constructor(
                 PredictionKind.ZERO_TEMP -> colors.predictionZeroTemp
             }
 
-        series.samples.forEachIndexed { index, point ->
-            val rawX = xFor(point.measuredAtEpochMs)
-            val x =
-                if (index == 0) {
-                    max(rawX, dividerX + 4f.dp)
-                } else {
-                    rawX
-                }
-
+        series.samples.forEach { point ->
             canvas.drawCircle(
-                x,
+                xFor(point.measuredAtEpochMs),
                 yFor(point.valueMgDl),
                 1.8f.dp,
                 fillPaint,
@@ -402,12 +388,11 @@ class WearGlucoseChart @JvmOverloads constructor(
     companion object {
         private const val TARGET_LOW = 80.0
         private const val TARGET_HIGH = 160.0
-        private const val FUTURE_TOLERANCE_MS = 5 * 60_000L
     }
 }
 
 internal fun wearChartTimeWindow(
-    currentMeasurement: Long,
+    timelineNow: Long,
     predictionEnd: Long,
     durationHours: Int,
     showPredictions: Boolean,
@@ -417,12 +402,12 @@ internal fun wearChartTimeWindow(
             .coerceAtLeast(1)
             .toLong() *
             WEAR_CHART_HOUR_MS
-    val start = (currentMeasurement - historyDuration).coerceAtLeast(0L)
+    val start = (timelineNow - historyDuration).coerceAtLeast(0L)
     val end =
         if (showPredictions) {
-            max(currentMeasurement, predictionEnd)
+            max(timelineNow, predictionEnd)
         } else {
-            currentMeasurement
+            timelineNow
         }.coerceAtLeast(start + 1L)
     return start..end
 }

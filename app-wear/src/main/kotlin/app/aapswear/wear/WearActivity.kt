@@ -279,6 +279,7 @@ class WearActivity : Activity() {
             colors = preferences.graphColors,
             style = preferences.graphStyle,
         )
+        if (refreshClock) chart.invalidate()
 
         if (
             firstRender ||
