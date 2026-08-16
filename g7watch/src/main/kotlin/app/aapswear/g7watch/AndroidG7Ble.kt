@@ -38,6 +38,24 @@ internal const val G7_RECONNECT_SCAN_TIMEOUT_MS = 90_000L
 internal fun g7ScanTimeoutMs(sensor: G7Sensor): Long =
     if (sensor.deviceAddress.isNullOrBlank()) G7_INITIAL_PAIRING_SCAN_TIMEOUT_MS else G7_RECONNECT_SCAN_TIMEOUT_MS
 
+internal enum class G7WriteCallbackDisposition {
+    EXPECTED_SUCCESS,
+    EXPECTED_FAILURE,
+    STALE_SUCCESS,
+    STALE_FAILURE,
+}
+
+internal fun classifyG7WriteCallback(
+    expectedUuid: UUID,
+    actualUuid: UUID,
+    status: Int,
+): G7WriteCallbackDisposition = when {
+    actualUuid == expectedUuid && status == BluetoothGatt.GATT_SUCCESS -> G7WriteCallbackDisposition.EXPECTED_SUCCESS
+    actualUuid == expectedUuid -> G7WriteCallbackDisposition.EXPECTED_FAILURE
+    status == BluetoothGatt.GATT_SUCCESS -> G7WriteCallbackDisposition.STALE_SUCCESS
+    else -> G7WriteCallbackDisposition.STALE_FAILURE
+}
+
 internal fun interface G7DeviceMatcher {
     fun matches(device: BluetoothDevice, advertisedName: String?, knownSensor: G7Sensor?): Boolean
 }
@@ -394,9 +412,18 @@ private class G7GattConnection(
             throw G7BleException("G7-GATT-212", "G7-Daten konnten nicht gesendet werden", true)
         }
         if (!awaitCallback) return
-        val (uuid, status) = withTimeout(OPERATION_TIMEOUT_MS) { writeEvents.receive() }
-        if (uuid != characteristic.uuid || status != BluetoothGatt.GATT_SUCCESS) {
-            throw G7BleException("G7-GATT-213", "G7-Daten wurden abgelehnt ($status)", true)
+        withTimeout(OPERATION_TIMEOUT_MS) {
+            while (true) {
+                val (uuid, status) = writeEvents.receive()
+                when (classifyG7WriteCallback(characteristic.uuid, uuid, status)) {
+                    G7WriteCallbackDisposition.EXPECTED_SUCCESS -> return@withTimeout
+                    G7WriteCallbackDisposition.EXPECTED_FAILURE ->
+                        throw G7BleException("G7-GATT-213", "G7-Daten wurden abgelehnt ($status)", true)
+                    G7WriteCallbackDisposition.STALE_SUCCESS -> Unit
+                    G7WriteCallbackDisposition.STALE_FAILURE ->
+                        throw G7BleException("G7-GATT-214", "Vorheriger G7-Datentransfer ist fehlgeschlagen ($status)", true)
+                }
+            }
         }
     }
 
