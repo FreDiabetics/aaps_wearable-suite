@@ -18,7 +18,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -475,15 +474,16 @@ private fun QuickStatsRow(
     heightDp: Int,
 ) {
     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        QuickStatCard(Modifier.weight(1f), "IOB", formatNumber(state?.insulin?.totalIob, 2), "IE", SugarliciousColors.Blue, heightDp)
-        QuickStatCard(Modifier.weight(1f), "COB", formatNumber(state?.carbs?.cobGrams, 0), "g", SugarliciousColors.Orange, heightDp)
-        QuickStatCard(Modifier.weight(1f), "BASAL", formatNumber(state?.basal?.currentUnitsPerHour, 2), "IE/h", SugarliciousColors.Secondary, heightDp)
+        QuickStatCard(Modifier.weight(1f), R.drawable.ic_iob, "IOB", formatNumber(state?.insulin?.totalIob, 2), "IE", SugarliciousColors.Blue, heightDp)
+        QuickStatCard(Modifier.weight(1f), R.drawable.ic_carbs, "COB", formatNumber(state?.carbs?.cobGrams, 0), "g", SugarliciousColors.Orange, heightDp)
+        QuickStatCard(Modifier.weight(1f), R.drawable.ic_basal, "BASAL", formatNumber(state?.basal?.currentUnitsPerHour, 2), "IE/h", SugarliciousColors.Secondary, heightDp)
     }
 }
 
 @Composable
 private fun QuickStatCard(
     modifier: Modifier,
+    iconRes: Int,
     title: String,
     value: String,
     suffix: String,
@@ -500,7 +500,12 @@ private fun QuickStatCard(
         verticalArrangement = Arrangement.SpaceBetween,
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.size(7.dp).background(accent, CircleShape))
+            Image(
+                painter = painterResource(iconRes),
+                contentDescription = null,
+                modifier = Modifier.size(15.dp),
+                colorFilter = ColorFilter.tint(accent),
+            )
             Spacer(Modifier.width(6.dp))
             Text(
                 text = title,

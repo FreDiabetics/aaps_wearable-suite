@@ -78,8 +78,8 @@ internal val sugarliciousWatchFaceCards =
         SugarliciousWatchFaceCard(
             name = "Sugarlicious Digital",
             style = "Digital",
-            slots = 1,
-            features = listOf("Glukose", "AOD"),
+            slots = 8,
+            features = listOf("Glukose", "Graph", "AOD"),
         ),
     )
 

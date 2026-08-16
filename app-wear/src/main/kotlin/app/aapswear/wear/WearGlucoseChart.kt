@@ -56,6 +56,7 @@ class WearGlucoseChart @JvmOverloads constructor(
     private var showPredictions: Boolean = false
     private var colors: WatchGraphColors = WatchGraphColors()
     private var graphStyle: WatchGraphStyle = WatchGraphStyle()
+    private var stateSignature: List<Any?>? = null
 
     fun bind(
         newState: TherapyDisplayState?,
@@ -64,11 +65,32 @@ class WearGlucoseChart @JvmOverloads constructor(
         colors: WatchGraphColors,
         style: WatchGraphStyle,
     ) {
-        state = newState
-        durationHours =
+        val resolvedDuration =
             graphHours
                 .takeIf { it in WearDisplayPreferences.allowedGraphHours }
                 ?: 3
+        val newStateSignature =
+            newState?.let {
+                listOf(
+                    it.glucose,
+                    it.glucoseHistory,
+                    it.glucosePredictions,
+                    it.target,
+                )
+            }
+        if (
+            stateSignature == newStateSignature &&
+            durationHours == resolvedDuration &&
+            this.showPredictions == showPredictions &&
+            this.colors == colors &&
+            graphStyle == style
+        ) {
+            return
+        }
+
+        state = newState
+        stateSignature = newStateSignature
+        durationHours = resolvedDuration
         this.showPredictions = showPredictions
         this.colors = colors
         graphStyle = style
@@ -204,6 +226,15 @@ class WearGlucoseChart @JvmOverloads constructor(
         val targetTop = yFor(targetHigh)
         val targetBottom = yFor(targetLow)
 
+        fillPaint.color = colors.rangeHigh
+        canvas.drawRect(
+            left,
+            top,
+            right,
+            targetTop,
+            fillPaint,
+        )
+
         fillPaint.color = colors.rangeInRange
         canvas.drawRoundRect(
             left,
@@ -212,6 +243,15 @@ class WearGlucoseChart @JvmOverloads constructor(
             targetBottom,
             5f.dp,
             5f.dp,
+            fillPaint,
+        )
+
+        fillPaint.color = colors.rangeLow
+        canvas.drawRect(
+            left,
+            targetBottom,
+            right,
+            bottom,
             fillPaint,
         )
 

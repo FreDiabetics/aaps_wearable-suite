@@ -104,6 +104,17 @@ class MainActivityTest {
         assertEquals(96, Color.alpha(SugarliciousColorStore.load(preferences).argb(SugarliciousColorRole.RANGE_IN_RANGE)))
     }
 
+    @Test fun `light target band defaults to the opaque picker color`() {
+        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+        val preferences = context.getSharedPreferences("dashboard_ui", android.content.Context.MODE_PRIVATE)
+        preferences.edit().clear().putString("themeMode", "LIGHT").commit()
+
+        val target = SugarliciousColorStore.load(preferences).argb(SugarliciousColorRole.TARGET_BAND)
+
+        assertEquals(255, Color.alpha(target))
+        assertEquals(0xFFB9EFC7.toInt(), target)
+    }
+
     @Test fun `cgm dot appearance settings are read from preferences`() {
         val context = ApplicationProvider.getApplicationContext<android.content.Context>()
         val preferences = context.getSharedPreferences("dashboard_ui", android.content.Context.MODE_PRIVATE)
@@ -176,7 +187,7 @@ class MainActivityTest {
         controller.pause().stop().destroy()
     }
 
-    @Test fun `Sugarlicious about tile shows independent branding and contact`() {
+    @Test fun `Sugarlicious about tile shows compact branding and contact pills`() {
         val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
         val activity = controller.get()
 
@@ -186,8 +197,14 @@ class MainActivityTest {
         assertTrue(settingsText.contains("Sugarlicious"))
         assertFalse(settingsText.contains("typ1.diafreddy@gmail.com"))
         assertFalse(settingsText.contains("FreDiabetics/aaps_wearable-suite"))
-        assertTrue(settingsText.contains("Unabhängiges Projekt"))
-        assertFalse(settingsText.contains("GITHUB"))
+        assertFalse(settingsText.contains("Unabhängiges Projekt"))
+        assertTrue(settingsText.contains("GitHub"))
+        assertTrue(settingsText.contains("E-Mail"))
+        assertFalse(settingsText.contains("Watchfaces"))
+
+        activity.findViewById<View>(R.id.dashboard_github).performClick()
+        val githubIntent = shadowOf(activity).nextStartedActivity
+        assertEquals("github.com", githubIntent.data?.host)
 
         activity.findViewById<View>(R.id.dashboard_contact_email).performClick()
         val emailIntent = shadowOf(activity).nextStartedActivity

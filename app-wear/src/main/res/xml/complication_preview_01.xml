@@ -1,13 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <complications>
-    <complication
-        type="RANGED_VALUE"
-        value="123"
-        min="40"
-        max="260">
+    <complication type="SHORT_TEXT">
         <text><plain value="123" valueType="integer"/></text>
     </complication>
-    <complication type="SHORT_TEXT">
+    <complication type="LONG_TEXT">
+        <text><plain value="123" valueType="integer"/></text>
+    </complication>
+    <complication type="RANGED_VALUE" value="123" min="40" max="260">
         <text><plain value="123" valueType="integer"/></text>
     </complication>
 </complications>

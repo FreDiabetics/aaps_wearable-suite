@@ -15,6 +15,7 @@ rootProject.name = "Sugarlicious"
 
 include(
     ":core-model",
+    ":dexcom-g7",
     ":data-source-api",
     ":data-source-aaps",
     ":data-source-xdrip",
@@ -23,6 +24,7 @@ include(
     ":complications",
     ":app-mobile",
     ":app-wear",
+    ":g7watch",
     ":watchfaces:test-wff",
     ":watchfaces:aaps-v4",
     ":watchfaces:aaps-v2",

@@ -15,6 +15,10 @@ import app.aapswear.model.PredictionKind
 import app.aapswear.model.TargetState
 import app.aapswear.model.TherapyDisplayState
 import app.aapswear.model.TherapyHistorySample
+import app.aapswear.mobile.ui.theme.SugarliciousColorRole
+import app.aapswear.mobile.ui.theme.SugarliciousColorStore
+import app.aapswear.mobile.ui.theme.SugarliciousColors
+import app.aapswear.mobile.ui.theme.SugarliciousPalette
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -60,6 +64,45 @@ class DashboardChartsTest {
         val predictionPixels = count(bitmap) { Color.blue(it) > 180 && Color.green(it) > 120 }
         assertTrue("inRange=$inRangePixels", inRangePixels > 20)
         assertTrue("prediction=$predictionPixels", predictionPixels > 2)
+    }
+
+    @Test fun `glucose chart paints configured high target and low regions`() {
+        val preferences = context.getSharedPreferences("chart_region_colors", android.content.Context.MODE_PRIVATE)
+        preferences.edit().clear().putString("themeMode", "DARK").commit()
+        val high = Color.rgb(25, 40, 220)
+        val target = Color.rgb(30, 210, 70)
+        val low = Color.rgb(225, 35, 55)
+        SugarliciousColorStore.save(preferences, SugarliciousColorRole.RANGE_HIGH, high)
+        SugarliciousColorStore.save(preferences, SugarliciousColorRole.TARGET_BAND, target)
+        SugarliciousColorStore.save(preferences, SugarliciousColorRole.RANGE_LOW, low)
+        SugarliciousColors.apply(SugarliciousColorStore.load(preferences))
+
+        val now = System.currentTimeMillis()
+        val state =
+            TherapyDisplayState(
+                receivedAtEpochMs = now,
+                glucose = GlucoseState(123.0, GlucoseUnit.MG_DL, measuredAtEpochMs = now),
+                glucoseHistory = listOf(GlucoseSample(123.0, now)),
+                target = TargetState(80.0, 160.0),
+            )
+        val bitmap =
+            render(
+                GlucoseDashboardChart(context).apply {
+                    bind(
+                        state = state,
+                        unit = GlucoseUnit.MG_DL,
+                        showPredictions = false,
+                        durationHours = 3,
+                        showTargetRange = true,
+                    )
+                },
+                230,
+            )
+
+        assertTrue(count(bitmap) { it == high } > 100)
+        assertTrue(count(bitmap) { it == target } > 100)
+        assertTrue(count(bitmap) { it == low } > 100)
+        SugarliciousColors.apply(SugarliciousPalette.defaults())
     }
 
     @Test fun `metabolic chart renders independent iob and cob areas`() {

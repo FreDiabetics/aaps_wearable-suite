@@ -8,6 +8,7 @@ import androidx.wear.watchfacepush.WatchFacePushManager
 import androidx.wear.watchfacepush.WatchFacePushManagerFactory
 import java.io.File
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.delay
 
 internal data class ManagedWatchFaceSlot(
     val slotId: String,
@@ -33,7 +34,7 @@ internal object SugarliciousWatchFacePush {
     private const val DIRECT_ACTIVATION_ATTEMPTED = "direct_activation_attempted"
     private const val SETTLING_WINDOW_MS = 15_000L
     private const val MANUAL_ACTIVATION_MESSAGE =
-        "Geladen - Uhr: lange drücken, ganz rechts +, Ziffernblatt auswählen"
+        "Watchface geladen - auf der Uhr lange drücken und Sugarlicious auswählen"
     private const val TAG = "WatchFacePush"
 
     private data class FaceSpec(
@@ -189,10 +190,11 @@ internal object SugarliciousWatchFacePush {
                     },
             )
 
-            val managed =
-                installed.filter { details ->
-                    faces.any { face -> face.packageName == details.packageName }
-                }
+            // listWatchFaces() is already scoped to faces installed by this marketplace app.
+            // Reuse every returned slot, including package names from older Sugarlicious builds;
+            // Wear OS 6 exposes only one marketplace slot, so filtering legacy names here would
+            // incorrectly attempt to add a second slot and leave no updated face in the carousel.
+            val managed = installed
 
             val managedSlots =
                 managed.map { details ->
@@ -257,20 +259,13 @@ internal object SugarliciousWatchFacePush {
                 directActivationWasAttempted(context) -> MANUAL_ACTIVATION_MESSAGE
 
                 else -> {
-                    markDirectActivationAttempted(context)
-                    try {
-                        manager.setWatchFaceAsActive(details.slotId)
-                        rememberApplied(context, index)
-                        "Watchface aktiv"
-                    } catch (cancelled: CancellationException) {
-                        throw cancelled
-                    } catch (error: WatchFacePushManager.SetWatchFaceAsActiveException) {
-                        Log.w(
-                            TAG,
-                            "Direct activation unavailable (code=${error.errorCode}); manual selection required",
-                        )
-                        MANUAL_ACTIVATION_MESSAGE
-                    }
+                    activateInstalledSlot(
+                        context = context,
+                        manager = manager,
+                        initialSlotId = details.slotId,
+                        packageName = details.packageName,
+                        index = index,
+                    )
                 }
             }
         } catch (cancelled: CancellationException) {
@@ -295,10 +290,61 @@ internal object SugarliciousWatchFacePush {
 
     internal fun directActivationWasAttempted(context: Context): Boolean {
         val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-        return prefs.getBoolean(DIRECT_ACTIVATION_ATTEMPTED, false) ||
-            // Upgrade existing installs conservatively: a recorded successful face application
-            // means the one-shot activation path has already been used in an earlier version.
-            prefs.getLong(LAST_APPLIED_AT, 0L) > 0L
+        return prefs.getBoolean(DIRECT_ACTIVATION_ATTEMPTED, false)
+    }
+
+    private suspend fun activateInstalledSlot(
+        context: Context,
+        manager: WatchFacePushManager,
+        initialSlotId: String,
+        packageName: String,
+        index: Int,
+    ): String {
+        var slotId = initialSlotId
+        val settlingDelays = longArrayOf(0L, 750L, 1_500L)
+
+        settlingDelays.forEachIndexed { attempt, settlingDelay ->
+            if (settlingDelay > 0L) {
+                delay(settlingDelay)
+                slotId =
+                    runCatching {
+                        manager.listWatchFaces()
+                            .installedWatchFaceDetails
+                            .firstOrNull { it.packageName == packageName }
+                            ?.slotId
+                    }.getOrNull() ?: slotId
+            }
+
+            try {
+                manager.setWatchFaceAsActive(slotId)
+                markDirectActivationAttempted(context)
+                rememberApplied(context, index)
+                return "Watchface aktiv"
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: WatchFacePushManager.SetWatchFaceAsActiveException) {
+                Log.w(
+                    TAG,
+                    "Direct activation attempt ${attempt + 1} failed " +
+                        "(slot=$slotId, code=${error.errorCode})",
+                )
+                when (error.errorCode) {
+                    WatchFacePushManager.SetWatchFaceAsActiveException.ERROR_MISSING_PERMISSION ->
+                        return "Watchface geladen - Direktwechsel auf der Uhr freigeben"
+
+                    WatchFacePushManager.SetWatchFaceAsActiveException.ERROR_MAXIMUM_ATTEMPTS_REACHED -> {
+                        markDirectActivationAttempted(context)
+                        return MANUAL_ACTIVATION_MESSAGE
+                    }
+
+                    WatchFacePushManager.SetWatchFaceAsActiveException.ERROR_INVALID_SLOT_ID,
+                    WatchFacePushManager.SetWatchFaceAsActiveException.ERROR_UNKNOWN,
+                    -> if (attempt == settlingDelays.lastIndex) return MANUAL_ACTIVATION_MESSAGE
+                }
+            }
+        }
+
+        return MANUAL_ACTIVATION_MESSAGE
     }
 
     private fun markDirectActivationAttempted(context: Context) {

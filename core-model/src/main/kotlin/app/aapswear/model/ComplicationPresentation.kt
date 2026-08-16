@@ -1,5 +1,8 @@
 package app.aapswear.model
 
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 import java.util.Locale
 import kotlin.math.roundToInt
 
@@ -55,6 +58,7 @@ object SugarliciousComplicationIds {
     const val IOB_COB_BASAL = 34
     const val TREND_ONLY = 35
     const val DELTA_ONLY = 36
+    const val DATE = 53
 
     const val GLUCOSE_LONG = 37
     const val GLUCOSE_RANGED = 38
@@ -75,24 +79,25 @@ object SugarliciousComplicationIds {
 
     val ordered = listOf(
         GLUCOSE,
-        TREND_ONLY,
-        DELTA_ONLY,
-        GLUCOSE_AGE,
-        BASAL,
-        IOB,
-        COB,
         GLUCOSE_TREND,
         GLUCOSE_PLUS_DELTA,
-        TIME_DELTA,
         GLUCOSE_TREND_AGE,
         GLUCOSE_TREND_DELTA,
         GLUCOSE_TREND_DELTA_AGE,
+        GRAPH,
+        TREND_ONLY,
+        DELTA_ONLY,
+        GLUCOSE_AGE,
+        TIME_DELTA,
+        SENSOR_AGE,
+        BASAL,
+        IOB,
+        COB,
         IOB_COB_BASAL,
         LOOP,
         RESERVOIR,
-        SENSOR_AGE,
         TIR,
-        GRAPH,
+        DATE,
     )
 
     val variantsByBase = mapOf(
@@ -140,7 +145,6 @@ object ComplicationPresentationFormatter {
             SugarliciousComplicationIds.TREND_ONLY ->
                 p(
                     text = trend?.let(TherapyDisplayFormatter::trendArrow).orEmpty().ifBlank { DASH },
-                    trend = trend,
                     desc = trend?.let { "Glukosetrend ${TherapyDisplayFormatter.trendArrow(it)}" } ?: "Kein Glukosetrend",
                 )
 
@@ -186,18 +190,17 @@ object ComplicationPresentationFormatter {
             }
 
             SugarliciousComplicationIds.IOB_COB_BASAL -> {
-                val basal = TherapyDisplayFormatter.units(state?.basal?.currentUnitsPerHour, "U/h", 2)
-                val iob = TherapyDisplayFormatter.units(state?.insulin?.totalIob, "U", 1)
-                val cob = TherapyDisplayFormatter.units(state?.carbs?.cobGrams, "g", 0)
-                p("$iob · $cob", basal, desc = "Basal $basal, IOB $iob, COB $cob")
+                val basal = TherapyDisplayFormatter.units(state?.basal?.currentUnitsPerHour, "", 2)
+                val iob = TherapyDisplayFormatter.units(state?.insulin?.totalIob, "", 1)
+                val cob = TherapyDisplayFormatter.units(state?.carbs?.cobGrams, "", 0)
+                p("$basal/$iob/$cob", "B/I/C", desc = "Basal $basal U/h, IOB $iob U, COB $cob g")
             }
 
             SugarliciousComplicationIds.LOOP -> {
                 val loop = when (state?.loop?.status?.lowercase()) {
-                    "enacted", "closed", "loop", "on", "enabled" -> "ON"
-                    "suggested" -> "AUTO"
-                    null -> DASH
-                    else -> state.loop.status?.take(8) ?: DASH
+                    "enacted", "closed", "loop", "on", "enabled", "suggested" -> "●"
+                    null -> "○"
+                    else -> "○"
                 }
                 p(loop, desc = "AndroidAPS Loop $loop")
             }
@@ -214,6 +217,12 @@ object ComplicationPresentationFormatter {
                 val tir = tirPercent(state, nowEpochMs)
                 val value = tir?.let { "$it%" } ?: DASH
                 p(value, "70–180", desc = "TIR $value")
+            }
+
+            SugarliciousComplicationIds.DATE -> {
+                val localDate = Instant.ofEpochMilli(nowEpochMs).atZone(ZoneId.systemDefault())
+                val weekday = localDate.format(DAY_OF_WEEK_FORMATTER).uppercase(Locale.ENGLISH)
+                p(localDate.dayOfMonth.toString(), weekday, desc = "$weekday ${localDate.dayOfMonth}")
             }
 
             else -> p(DASH, desc = "Keine Daten")
@@ -238,4 +247,5 @@ object ComplicationPresentationFormatter {
     ) = ComplicationPresentation(text = text, title = title, trend = trend, contentDescription = desc)
 
     private const val DASH = "—"
+    private val DAY_OF_WEEK_FORMATTER = DateTimeFormatter.ofPattern("EEE", Locale.ENGLISH)
 }

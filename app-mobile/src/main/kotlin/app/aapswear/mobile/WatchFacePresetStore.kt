@@ -21,7 +21,7 @@ internal object WatchFacePresetStore {
                 .getString(key(normalized), null)
                 ?.let(::decode)
 
-        return stored ?: loadComplicationPreset(context)
+        return stored.orEmpty()
     }
 
     fun readAll(context: Context): List<List<Int>> =

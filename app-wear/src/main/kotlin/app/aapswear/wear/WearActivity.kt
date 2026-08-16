@@ -40,6 +40,10 @@ class WearActivity : Activity() {
     private var refreshJob: Job? = null
     private var latest: TherapyDisplayState? = null
     private var connectedNodes = 0
+    private var lastRenderedState: TherapyDisplayState? = null
+    private var lastRenderedPreferences: WearDisplayPreferences? = null
+    private var lastRenderedConnectedNodes: Int? = null
+    private var hasRendered = false
 
     private lateinit var glucose: TextView
     private lateinit var trendContainer: LinearLayout
@@ -59,7 +63,7 @@ class WearActivity : Activity() {
 
     private val displayPreferencesListener =
         SharedPreferences.OnSharedPreferenceChangeListener { _, _ ->
-            runOnUiThread(::render)
+            runOnUiThread { render() }
         }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -106,7 +110,7 @@ class WearActivity : Activity() {
         refreshJob =
             scope.launch {
                 while (true) {
-                    render()
+                    render(refreshClock = true)
                     delay(30_000L)
                 }
             }
@@ -177,14 +181,20 @@ class WearActivity : Activity() {
         }
     }
 
-    private fun render() {
+    private fun render(refreshClock: Boolean = false) {
         if (!::glucose.isInitialized) return
 
         val now = System.currentTimeMillis()
         val state = latest
+        val previousState = lastRenderedState
         val glucoseState = state?.glucose
         val preferences = WearDisplayPreferences.read(this)
-        applyUiColors(preferences)
+        val previousPreferences = lastRenderedPreferences
+        val firstRender = !hasRendered
+
+        if (firstRender || previousPreferences?.uiColors != preferences.uiColors) {
+            applyUiColors(preferences)
+        }
 
         val freshness =
             FreshnessPolicy.classify(
@@ -209,40 +219,50 @@ class WearActivity : Activity() {
                 preferences.glucoseUnit,
             )
 
-        glucose.text =
-            if (canShowValue) {
-                formatGlucose(
-                    glucoseState.valueMgDl,
-                    resolvedUnit,
-                )
-            } else {
-                "—"
-            }
+        val glucoseSectionChanged =
+            firstRender ||
+                refreshClock ||
+                previousState?.glucose != glucoseState ||
+                previousState?.target != state?.target ||
+                previousPreferences?.glucoseUnit != preferences.glucoseUnit ||
+                previousPreferences.uiColors != preferences.uiColors
 
-        glucose.setTextColor(
-            when {
-                !canShowValue -> preferences.uiColors.textPrimary
-                glucoseState.valueMgDl < targetLow -> preferences.uiColors.glucoseLow
-                glucoseState.valueMgDl > targetHigh -> preferences.uiColors.glucoseHigh
-                else -> preferences.uiColors.glucoseInRange
-            },
-        )
+        if (glucoseSectionChanged) {
+            glucose.text =
+                if (canShowValue) {
+                    formatGlucose(
+                        glucoseState.valueMgDl,
+                        resolvedUnit,
+                    )
+                } else {
+                    "—"
+                }
 
-        renderTrend(
-            if (canShowValue) glucoseState.trend else null,
-            preferences.uiColors.textPrimary,
-        )
+            glucose.setTextColor(
+                when {
+                    !canShowValue -> preferences.uiColors.textPrimary
+                    glucoseState.valueMgDl < targetLow -> preferences.uiColors.glucoseLow
+                    glucoseState.valueMgDl > targetHigh -> preferences.uiColors.glucoseHigh
+                    else -> preferences.uiColors.glucoseInRange
+                },
+            )
 
-        delta.text =
-            if (canShowValue) {
-                formatDelta(
-                    glucoseState.deltaMgDl,
-                    resolvedUnit,
-                )
-            } else {
-                "—"
-            }
-        age.text = ageMinutes(glucoseState?.measuredAtEpochMs, now)
+            renderTrend(
+                if (canShowValue) glucoseState.trend else null,
+                preferences.uiColors.textPrimary,
+            )
+
+            delta.text =
+                if (canShowValue) {
+                    formatDelta(
+                        glucoseState.deltaMgDl,
+                        resolvedUnit,
+                    )
+                } else {
+                    "—"
+                }
+            age.text = ageMinutes(glucoseState?.measuredAtEpochMs, now)
+        }
 
         chart.bind(
             newState = state,
@@ -252,40 +272,67 @@ class WearActivity : Activity() {
             style = preferences.graphStyle,
         )
 
-        therapyRow.visibility =
-            if (preferences.showTherapyStats) View.VISIBLE else View.GONE
-        findViewById<View>(R.id.wear_basal_card).visibility =
-            if (preferences.showTherapyStats) View.VISIBLE else View.GONE
+        if (
+            firstRender ||
+            previousPreferences?.showTherapyStats != preferences.showTherapyStats ||
+            previousState?.insulin != state?.insulin ||
+            previousState?.carbs != state?.carbs ||
+            previousState?.basal != state?.basal
+        ) {
+            therapyRow.visibility =
+                if (preferences.showTherapyStats) View.VISIBLE else View.GONE
+            findViewById<View>(R.id.wear_basal_card).visibility =
+                if (preferences.showTherapyStats) View.VISIBLE else View.GONE
 
-        iob.text = formatNumber(state?.insulin?.totalIob, 2, " U")
-        cob.text = formatNumber(state?.carbs?.cobGrams, 0, " g")
-        basal.text = formatNumber(state?.basal?.currentUnitsPerHour, 2, " U/h")
+            iob.text = formatNumber(state?.insulin?.totalIob, 2, " U")
+            cob.text = formatNumber(state?.carbs?.cobGrams, 0, " g")
+            basal.text = formatNumber(state?.basal?.currentUnitsPerHour, 2, " U/h")
+        }
 
-        source.text =
-            when (state?.source) {
-                DataSourceId.ANDROID_APS -> "AndroidAPS"
-                DataSourceId.XDRIP_PLUS ->
-                    state.sourceVersion
-                        ?.let { "xDrip+ $it" }
-                        ?: "xDrip+"
-                null -> "Datenquelle nicht verfügbar"
-            }
+        if (
+            firstRender ||
+            previousState?.source != state?.source ||
+            previousState?.sourceVersion != state?.sourceVersion
+        ) {
+            source.text =
+                when (state?.source) {
+                    DataSourceId.DEXCOM_G7_WATCH -> "Dexcom G7 Watch"
+                    DataSourceId.ANDROID_APS -> "AndroidAPS"
+                    DataSourceId.NIGHTSCOUT -> "Nightscout"
+                    DataSourceId.XDRIP_PLUS ->
+                        state.sourceVersion
+                            ?.let { "xDrip+ $it" }
+                            ?: "xDrip+"
+                    DataSourceId.OTHER -> "Other"
+                    null -> "Datenquelle nicht verfügbar"
+                }
+        }
 
-        connection.text =
-            if (connectedNodes > 0) {
-                "● Telefon verbunden"
-            } else {
-                "○ Telefon nicht erreichbar"
-            }
-        connection.setTextColor(
-            if (connectedNodes > 0) {
-                preferences.uiColors.accent
-            } else {
-                preferences.uiColors.textSecondary
-            },
-        )
+        if (
+            firstRender ||
+            lastRenderedConnectedNodes != connectedNodes ||
+            previousPreferences?.uiColors != preferences.uiColors
+        ) {
+            connection.text =
+                if (connectedNodes > 0) {
+                    "● Telefon verbunden"
+                } else {
+                    "○ Telefon nicht erreichbar"
+                }
+            connection.setTextColor(
+                if (connectedNodes > 0) {
+                    preferences.uiColors.accent
+                } else {
+                    preferences.uiColors.textSecondary
+                },
+            )
+        }
 
         renderWatchFacePushStatus()
+        lastRenderedState = state
+        lastRenderedPreferences = preferences
+        lastRenderedConnectedNodes = connectedNodes
+        hasRendered = true
     }
 
     private fun renderTrend(

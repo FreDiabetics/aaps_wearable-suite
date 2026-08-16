@@ -5,6 +5,7 @@ import android.content.Context
 import androidx.wear.watchface.complications.datasource.ComplicationDataSourceUpdateRequester
 import app.aapswear.complications.ActiveComplicationRegistry
 import app.aapswear.complications.AllProviders
+import app.aapswear.complications.ComplicationUpdatePlanner
 import app.aapswear.model.SugarliciousComplicationIds
 import app.aapswear.model.GlucoseSample
 import app.aapswear.protocol.WatchRuntimeStatus
@@ -224,12 +225,19 @@ class StateDataLayerService : WearableListenerService() {
                     .toList()
                     .takeLast(MAX_HISTORY_POINTS)
 
-            store.save(
+            val merged =
                 incoming.copy(
                     glucoseHistory = history,
-                ),
+                )
+            val meaningfulState =
+                old?.copy(receivedAtEpochMs = merged.receivedAtEpochMs)
+            if (meaningfulState == merged) return@launch
+
+            store.save(merged)
+            requestComplicationUpdates(
+                ComplicationUpdatePlanner.affectedProviders(old, merged),
             )
-            requestAllComplicationUpdates()
+            requestSugarliciousTileUpdates(this@StateDataLayerService)
         }
     }
 
@@ -260,7 +268,11 @@ class StateDataLayerService : WearableListenerService() {
     }
 
     private fun requestAllComplicationUpdates() {
-        AllProviders.classes.forEach { provider ->
+        requestComplicationUpdates(AllProviders.classes)
+    }
+
+    private fun requestComplicationUpdates(providers: List<Class<*>>) {
+        providers.forEach { provider ->
             ComplicationDataSourceUpdateRequester
                 .create(
                     this,

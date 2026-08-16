@@ -1,12 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <complications>
-    <complication
-        type="RANGED_VALUE"
-        value="123"
-        min="40"
-        max="260"
-        monochromaticImage="@drawable/comp_preview_trend_arrow">
-        <text><plain value="123" valueType="integer"/></text>
-        <title><plain value="↗" valueType="string"/></title>
+    <complication type="SHORT_TEXT">
+        <text><plain value="↗"/></text>
     </complication>
 </complications>

@@ -52,7 +52,20 @@ class WatchFacePushControllerTest {
     }
 
     @Test
-    fun `legacy successful application migrates one-shot activation history`() {
+    fun `unknown legacy marketplace package still supplies the reusable slot`() {
+        val slots =
+            listOf(
+                ManagedWatchFaceSlot("legacy-slot", "app.aapswear.watchfacepush.old", false),
+            )
+
+        assertEquals(
+            "legacy-slot",
+            selectManagedWatchFaceSlot(slots, "app.aapswear.watchfacepush.analog")?.slotId,
+        )
+    }
+
+    @Test
+    fun `successful updates do not imply that the one-shot activation was consumed`() {
         assertFalse(SugarliciousWatchFacePush.directActivationWasAttempted(context))
 
         context.getSharedPreferences("sugarlicious_watchface_push", Context.MODE_PRIVATE)
@@ -60,7 +73,7 @@ class WatchFacePushControllerTest {
             .putLong("last_applied_at", 1L)
             .commit()
 
-        assertTrue(SugarliciousWatchFacePush.directActivationWasAttempted(context))
+        assertFalse(SugarliciousWatchFacePush.directActivationWasAttempted(context))
     }
 
     @Test

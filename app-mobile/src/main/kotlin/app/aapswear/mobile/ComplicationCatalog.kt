@@ -107,8 +107,9 @@ internal enum class ComplicationCategory(
     val label: String,
     val range: String,
 ) {
-    GLUCOSE("Glukose", "02 · 28 · 03 · 09 · 10"),
-    THERAPY("Therapie", "11 · 14"),
+    GLUCOSE("Glukose", "01–12"),
+    THERAPY("Therapie", "13–19"),
+    GENERAL("Allgemein", "20"),
 }
 
 internal val SugarliciousComplicationCatalog = listOf(
@@ -116,20 +117,6 @@ internal val SugarliciousComplicationCatalog = listOf(
         variant(SugarliciousComplicationIds.GLUCOSE, ComplicationVariantType.SHORT_TEXT),
         variant(SugarliciousComplicationIds.GLUCOSE_LONG, ComplicationVariantType.LONG_TEXT),
         variant(SugarliciousComplicationIds.GLUCOSE_RANGED, ComplicationVariantType.RANGED_VALUE)),
-    entry("Trend", ComplicationCategory.GLUCOSE,
-        variant(SugarliciousComplicationIds.TREND_ONLY, ComplicationVariantType.SHORT_TEXT)),
-    entry("Delta", ComplicationCategory.GLUCOSE,
-        variant(SugarliciousComplicationIds.DELTA_ONLY, ComplicationVariantType.SHORT_TEXT)),
-    entry("Zeit seit letztem Wert", ComplicationCategory.GLUCOSE,
-        variant(SugarliciousComplicationIds.GLUCOSE_AGE, ComplicationVariantType.SHORT_TEXT)),
-    entry("Basal", ComplicationCategory.THERAPY,
-        variant(SugarliciousComplicationIds.BASAL, ComplicationVariantType.SHORT_TEXT)),
-    entry("IOB", ComplicationCategory.THERAPY,
-        variant(SugarliciousComplicationIds.IOB, ComplicationVariantType.SHORT_TEXT),
-        variant(SugarliciousComplicationIds.IOB_RANGED, ComplicationVariantType.RANGED_VALUE)),
-    entry("COB", ComplicationCategory.THERAPY,
-        variant(SugarliciousComplicationIds.COB, ComplicationVariantType.SHORT_TEXT),
-        variant(SugarliciousComplicationIds.COB_RANGED, ComplicationVariantType.RANGED_VALUE)),
     entry("Glukose + Trend", ComplicationCategory.GLUCOSE,
         variant(SugarliciousComplicationIds.GLUCOSE_TREND, ComplicationVariantType.SHORT_TEXT),
         variant(SugarliciousComplicationIds.GLUCOSE_TREND_LONG, ComplicationVariantType.LONG_TEXT),
@@ -137,8 +124,6 @@ internal val SugarliciousComplicationCatalog = listOf(
     entry("Glukose + Delta", ComplicationCategory.GLUCOSE,
         variant(SugarliciousComplicationIds.GLUCOSE_PLUS_DELTA, ComplicationVariantType.SHORT_TEXT),
         variant(SugarliciousComplicationIds.GLUCOSE_PLUS_DELTA_LONG, ComplicationVariantType.LONG_TEXT)),
-    entry("Zeit + Delta", ComplicationCategory.GLUCOSE,
-        variant(SugarliciousComplicationIds.TIME_DELTA, ComplicationVariantType.SHORT_TEXT)),
     entry("Glukose + Trend + Zeit", ComplicationCategory.GLUCOSE,
         variant(SugarliciousComplicationIds.GLUCOSE_TREND_AGE, ComplicationVariantType.SHORT_TEXT),
         variant(SugarliciousComplicationIds.GLUCOSE_TREND_AGE_LONG, ComplicationVariantType.LONG_TEXT)),
@@ -147,7 +132,29 @@ internal val SugarliciousComplicationCatalog = listOf(
     entry("Glukose + Trend + Delta + Zeit", ComplicationCategory.GLUCOSE,
         variant(SugarliciousComplicationIds.GLUCOSE_TREND_DELTA_AGE, ComplicationVariantType.SHORT_TEXT),
         variant(SugarliciousComplicationIds.GLUCOSE_TREND_DELTA_AGE_LONG, ComplicationVariantType.LONG_TEXT)),
-    entry("IOB + COB + Basal", ComplicationCategory.THERAPY,
+    entry("CGM Graph", ComplicationCategory.GLUCOSE,
+        variant(SugarliciousComplicationIds.GRAPH, ComplicationVariantType.SMALL_IMAGE),
+        variant(SugarliciousComplicationIds.GRAPH_LARGE, ComplicationVariantType.PHOTO_IMAGE)),
+    entry("Trend", ComplicationCategory.GLUCOSE,
+        variant(SugarliciousComplicationIds.TREND_ONLY, ComplicationVariantType.SHORT_TEXT)),
+    entry("Delta", ComplicationCategory.GLUCOSE,
+        variant(SugarliciousComplicationIds.DELTA_ONLY, ComplicationVariantType.SHORT_TEXT)),
+    entry("Zeit seit letztem Wert", ComplicationCategory.GLUCOSE,
+        variant(SugarliciousComplicationIds.GLUCOSE_AGE, ComplicationVariantType.SHORT_TEXT)),
+    entry("Zeit + Delta", ComplicationCategory.GLUCOSE,
+        variant(SugarliciousComplicationIds.TIME_DELTA, ComplicationVariantType.SHORT_TEXT)),
+    entry("Sensoralter", ComplicationCategory.GLUCOSE,
+        variant(SugarliciousComplicationIds.SENSOR_AGE, ComplicationVariantType.SHORT_TEXT),
+        variant(SugarliciousComplicationIds.SENSOR_AGE_RANGED, ComplicationVariantType.RANGED_VALUE)),
+    entry("Basal", ComplicationCategory.THERAPY,
+        variant(SugarliciousComplicationIds.BASAL, ComplicationVariantType.SHORT_TEXT)),
+    entry("IOB", ComplicationCategory.THERAPY,
+        variant(SugarliciousComplicationIds.IOB, ComplicationVariantType.SHORT_TEXT),
+        variant(SugarliciousComplicationIds.IOB_RANGED, ComplicationVariantType.RANGED_VALUE)),
+    entry("COB", ComplicationCategory.THERAPY,
+        variant(SugarliciousComplicationIds.COB, ComplicationVariantType.SHORT_TEXT),
+        variant(SugarliciousComplicationIds.COB_RANGED, ComplicationVariantType.RANGED_VALUE)),
+    entry("Basal + IOB + COB", ComplicationCategory.THERAPY,
         variant(SugarliciousComplicationIds.IOB_COB_BASAL, ComplicationVariantType.SHORT_TEXT),
         variant(SugarliciousComplicationIds.IOB_COB_BASAL_LONG, ComplicationVariantType.LONG_TEXT)),
     entry("Loop Status", ComplicationCategory.THERAPY,
@@ -156,17 +163,16 @@ internal val SugarliciousComplicationCatalog = listOf(
     entry("Pumpe / Reservoir", ComplicationCategory.THERAPY,
         variant(SugarliciousComplicationIds.RESERVOIR, ComplicationVariantType.SHORT_TEXT),
         variant(SugarliciousComplicationIds.RESERVOIR_RANGED, ComplicationVariantType.RANGED_VALUE)),
-    entry("Sensoralter", ComplicationCategory.GLUCOSE,
-        variant(SugarliciousComplicationIds.SENSOR_AGE, ComplicationVariantType.SHORT_TEXT),
-        variant(SugarliciousComplicationIds.SENSOR_AGE_RANGED, ComplicationVariantType.RANGED_VALUE)),
     entry("TIR", ComplicationCategory.GLUCOSE,
         variant(SugarliciousComplicationIds.TIR, ComplicationVariantType.SHORT_TEXT),
         variant(SugarliciousComplicationIds.TIR_GOAL, ComplicationVariantType.GOAL_PROGRESS),
         variant(SugarliciousComplicationIds.TIR_WEIGHTED, ComplicationVariantType.WEIGHTED_ELEMENTS)),
-    entry("CGM Graph", ComplicationCategory.GLUCOSE,
-        variant(SugarliciousComplicationIds.GRAPH, ComplicationVariantType.SMALL_IMAGE),
-        variant(SugarliciousComplicationIds.GRAPH_LARGE, ComplicationVariantType.PHOTO_IMAGE)),
+    entry("Datum", ComplicationCategory.GENERAL,
+        variant(SugarliciousComplicationIds.DATE, ComplicationVariantType.SHORT_TEXT)),
 )
+
+private fun catalogNumber(entry: ComplicationCatalogEntry): Int =
+    SugarliciousComplicationCatalog.indexOf(entry).coerceAtLeast(0) + 1
 
 internal val SugarliciousComplicationVariantIds: Set<Int> =
     SugarliciousComplicationCatalog.flatMap { it.variants }.map { it.id }.toSet()
@@ -353,7 +359,7 @@ private fun PresetStrip(selected: List<Int>) {
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
                     Text(
-                        id?.toString()?.padStart(2, '0') ?: "—",
+                        entry?.let { catalogNumber(it).toString().padStart(2, '0') } ?: "—",
                         color = if (entry != null) {
                             SugarliciousColors.Primary
                         } else {
@@ -714,7 +720,7 @@ private fun ComplicationDataPreview(
     val preview = previewFor(entry.id, state)
     val shape = RoundedCornerShape(14.dp)
 
-    if (entry.id == 2) {
+    if (entry.id == SugarliciousComplicationIds.GLUCOSE_TREND) {
         val now = System.currentTimeMillis()
         val glucose = state?.glucose
         val freshness = FreshnessPolicy.classify(glucose?.measuredAtEpochMs, now)
@@ -735,8 +741,8 @@ private fun ComplicationDataPreview(
         return
     }
 
-    if (entry.id == 9 || entry.id == 10) {
-        val windowMinutes = if (entry.id == 9) 90 else 360
+    if (entry.id == SugarliciousComplicationIds.GRAPH) {
+        val windowMinutes = 180
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -745,7 +751,7 @@ private fun ComplicationDataPreview(
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    if (entry.id == 9) "1,5h Datenvorschau" else "6h Datenvorschau",
+                    "3h Datenvorschau",
                     color = SugarliciousColors.TextSecondary,
                     fontSize = 8.sp,
                 )
@@ -824,11 +830,11 @@ private fun CircularGlucoseComplicationPreview(
         contentAlignment = Alignment.Center,
     ) {
         Box(
-            modifier = Modifier.size(122.dp),
+            modifier = Modifier.size(146.dp),
             contentAlignment = Alignment.Center,
         ) {
             Canvas(modifier = Modifier.fillMaxSize()) {
-                val stroke = 17.dp.toPx()
+                val stroke = 20.dp.toPx()
                 val diameter = size.minDimension - stroke
                 val topLeft = Offset(
                     (size.width - diameter) / 2f,
@@ -927,11 +933,6 @@ private fun MiniGlucosePreview(
         fun y(value: Double) = bottom - (GlucoseGraphScale.ratio(value) * (bottom - top)).toFloat()
         val low = 80.0
         val high = 160.0
-        drawRect(
-            color = SugarliciousColors.color(SugarliciousColorRole.RANGE_IN_RANGE),
-            topLeft = Offset(left, y(high)),
-            size = androidx.compose.ui.geometry.Size(right - left, (y(low) - y(high)).coerceAtLeast(1f)),
-        )
         drawLine(SugarliciousColors.color(SugarliciousColorRole.GRAPH_DIVIDER), Offset(left, y(high)), Offset(right, y(high)), 0.7.dp.toPx())
         drawLine(SugarliciousColors.color(SugarliciousColorRole.GRAPH_DIVIDER), Offset(left, y(low)), Offset(right, y(low)), 0.7.dp.toPx())
         merged.forEachIndexed { index, sample ->

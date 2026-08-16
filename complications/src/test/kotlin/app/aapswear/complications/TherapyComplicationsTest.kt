@@ -7,6 +7,7 @@ import androidx.wear.watchface.complications.data.RangedValueComplicationData
 import androidx.wear.watchface.complications.data.SmallImageComplicationData
 import androidx.wear.watchface.complications.data.ShortTextComplicationData
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -21,9 +22,9 @@ class TherapyComplicationsTest {
 
     @Test
     fun `all documented providers remain active`() {
-        assertEquals(35, AllProviders.classes.distinct().size)
+        assertEquals(36, AllProviders.classes.distinct().size)
         assertEquals(GlucoseComplication::class.java, AllProviders.classes.first())
-        assertEquals(GlucoseGraphLargeComplication::class.java, AllProviders.classes.last())
+        assertEquals(DateComplication::class.java, AllProviders.classes.last())
     }
 
     @Test
@@ -35,11 +36,11 @@ class TherapyComplicationsTest {
     }
 
     @Test
-    fun `IOB COB basal keeps basal in the title`() {
+    fun `basal IOB COB stays readable in short text`() {
         val service = Robolectric.buildService(IobCobBasalComplication::class.java).create().get()
         val data = service.getPreviewData(ComplicationType.SHORT_TEXT) as ShortTextComplicationData
-        assertEquals("1.2U · 15g", data.text.getTextAt(service.resources, Instant.now()).toString())
-        assertEquals("0.80U/h", data.title!!.getTextAt(service.resources, Instant.now()).toString())
+        assertEquals("0.80/1.2/15", data.text.getTextAt(service.resources, Instant.now()).toString())
+        assertEquals("B/I/C", data.title!!.getTextAt(service.resources, Instant.now()).toString())
     }
 
     @Test
@@ -47,7 +48,16 @@ class TherapyComplicationsTest {
         val service = Robolectric.buildService(GlucoseTrendComplication::class.java).create().get()
         val data = service.getPreviewData(ComplicationType.SHORT_TEXT) as ShortTextComplicationData
         assertEquals("123", data.text.getTextAt(service.resources, Instant.now()).toString())
-        org.junit.Assert.assertNotNull(data.monochromaticImage)
+        assertNotNull(data.monochromaticImage)
+    }
+
+    @Test
+    fun `trend only exposes one large text arrow without a duplicate icon`() {
+        val service = Robolectric.buildService(TrendOnlyComplication::class.java).create().get()
+        val data = service.getPreviewData(ComplicationType.SHORT_TEXT) as ShortTextComplicationData
+        assertEquals("↗", data.text.getTextAt(service.resources, Instant.now()).toString())
+        assertNull(data.title)
+        assertNull(data.monochromaticImage)
     }
 
     @Test
@@ -76,7 +86,7 @@ class TherapyComplicationsTest {
                 .toString(),
         )
         assertNull(data.title)
-        org.junit.Assert.assertNotNull(data.monochromaticImage)
+        assertNotNull(data.monochromaticImage)
         assertNull(data.smallImage)
     }
 
@@ -124,6 +134,7 @@ class TherapyComplicationsTest {
                 .toString(),
         )
         assertNull(iob.title)
+        assertNotNull(iob.monochromaticImage)
 
         val cobService =
             Robolectric
@@ -144,6 +155,19 @@ class TherapyComplicationsTest {
                 .toString(),
         )
         assertNull(cob.title)
+        assertNotNull(cob.monochromaticImage)
+    }
+
+    @Test
+    fun `date preview uses uppercase weekday and plain day of month`() {
+        val service = Robolectric.buildService(DateComplication::class.java).create().get()
+        val data = service.getPreviewData(ComplicationType.SHORT_TEXT) as ShortTextComplicationData
+        assertEquals(3, data.title!!.getTextAt(service.resources, Instant.now()).length)
+        assertEquals(
+            data.title!!.getTextAt(service.resources, Instant.now()).toString().uppercase(),
+            data.title!!.getTextAt(service.resources, Instant.now()).toString(),
+        )
+        data.text.getTextAt(service.resources, Instant.now()).toString().toInt()
     }
 
     @Test

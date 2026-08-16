@@ -1,0 +1,113 @@
+package app.aapswear.complications
+
+import app.aapswear.model.TherapyDisplayState
+
+/**
+ * Selects only the providers whose rendered payload can change for a new state.
+ * This keeps a new glucose sample from needlessly rebuilding therapy complications
+ * and keeps an IOB/COB update from invalidating every graph and glucose field.
+ */
+object ComplicationUpdatePlanner {
+    fun affectedProviders(
+        old: TherapyDisplayState?,
+        new: TherapyDisplayState,
+    ): List<Class<*>> {
+        if (old == null) return AllProviders.classes.map { it }
+        if (old == new) return emptyList()
+
+        val affected = linkedSetOf<Class<*>>()
+        val glucoseChanged = old.glucose != new.glucose
+        val glucoseHistoryChanged = old.glucoseHistory != new.glucoseHistory
+
+        if (glucoseChanged) affected += glucoseProviders
+
+        if (
+            glucoseChanged ||
+            glucoseHistoryChanged ||
+            old.glucosePredictions != new.glucosePredictions ||
+            old.target != new.target
+        ) {
+            affected += graphProviders
+        }
+
+        if (glucoseChanged || glucoseHistoryChanged) affected += tirProviders
+
+        if (old.insulin != new.insulin) {
+            affected += iobProviders
+            affected += combinedTherapyProviders
+        }
+        if (old.carbs != new.carbs) {
+            affected += cobProviders
+            affected += combinedTherapyProviders
+        }
+        if (old.basal != new.basal) {
+            affected += basalProviders
+            affected += combinedTherapyProviders
+        }
+        if (old.loop != new.loop) affected += loopProviders
+        if (old.pump != new.pump) affected += reservoirProviders
+
+        return affected.toList()
+    }
+
+    private val glucoseProviders =
+        listOf(
+            GlucoseComplication::class.java,
+            GlucoseLongTextComplication::class.java,
+            GlucoseRangedValueComplication::class.java,
+            GlucoseTrendComplication::class.java,
+            GlucoseTrendLongTextComplication::class.java,
+            GlucoseTrendRangedValueComplication::class.java,
+            GlucosePlusDeltaComplication::class.java,
+            GlucosePlusDeltaLongTextComplication::class.java,
+            GlucoseTrendAgeComplication::class.java,
+            GlucoseTrendAgeLongTextComplication::class.java,
+            GlucoseTrendDeltaComplication::class.java,
+            GlucoseTrendDeltaAgeComplication::class.java,
+            GlucoseTrendDeltaAgeLongTextComplication::class.java,
+            TrendOnlyComplication::class.java,
+            DeltaOnlyComplication::class.java,
+            GlucoseAgeComplication::class.java,
+            GlucoseDeltaComplication::class.java,
+        )
+
+    private val graphProviders =
+        listOf(
+            GlucoseGraphComplication::class.java,
+            GlucoseGraphLargeComplication::class.java,
+        )
+
+    private val tirProviders =
+        listOf(
+            TirComplication::class.java,
+            TirGoalProgressComplication::class.java,
+            TirWeightedElementsComplication::class.java,
+        )
+
+    private val basalProviders = listOf(BasalComplication::class.java)
+    private val iobProviders =
+        listOf(
+            IobComplication::class.java,
+            IobRangedValueComplication::class.java,
+        )
+    private val cobProviders =
+        listOf(
+            CobComplication::class.java,
+            CobRangedValueComplication::class.java,
+        )
+    private val combinedTherapyProviders =
+        listOf(
+            IobCobBasalComplication::class.java,
+            IobCobBasalLongTextComplication::class.java,
+        )
+    private val loopProviders =
+        listOf(
+            LoopComplication::class.java,
+            LoopIconComplication::class.java,
+        )
+    private val reservoirProviders =
+        listOf(
+            ReservoirComplication::class.java,
+            ReservoirRangedValueComplication::class.java,
+        )
+}
