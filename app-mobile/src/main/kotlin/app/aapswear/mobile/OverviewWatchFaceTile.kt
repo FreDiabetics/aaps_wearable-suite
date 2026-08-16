@@ -218,7 +218,7 @@ internal fun OverviewWatchFaceTile(
     }
 
     val syncStatus = diagnostics.syncStatus
-    val connected = diagnostics.reachableWatches > 0 || syncStatus == "ok"
+    val connected = isWatchConnected(diagnostics.reachableWatches)
     val pending = !connected && syncStatus == "pending"
     val error = syncStatus !in listOf(null, "ok", "pending")
 

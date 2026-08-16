@@ -35,7 +35,7 @@ internal fun OverviewInlineHeader(onSettings: () -> Unit) {
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(
-            modifier = Modifier.size(width = 34.dp, height = 38.dp),
+            modifier = Modifier.size(width = 31.dp, height = 38.dp),
             contentAlignment = Alignment.CenterStart,
         ) {
             Image(
