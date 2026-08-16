@@ -1,8 +1,8 @@
 package app.aapswear.g7watch
 
 import app.aapswear.g7.G7Sensor
-import kotlin.test.Test
-import kotlin.test.assertEquals
+import org.junit.Assert.assertEquals
+import org.junit.Test
 
 class G7BlePolicyTest {
     @Test fun `initial pairing keeps scanning for up to thirty minutes`() {
