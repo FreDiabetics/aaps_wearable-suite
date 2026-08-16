@@ -12,6 +12,9 @@
   aber keine vollständigen Gesundheits-Payloads, Rohpakete oder Authentifizierungsschlüssel
 - der G7-Sensorcode wird auf Wunsch in der lokalen Sensor-Dokumentation angezeigt,
   liegt verschlüsselt im Android Keystore und wird nicht in exportierbare Ereignislogs übernommen
+- Health Connect wird nur nach einzeln erteilten Android-Berechtigungen verwendet. Sugarlicious
+  schreibt ausschließlich eigene CGM-Messungen als Blutzucker und liest freigegebene Gesundheitsdaten
+  in einen lokalen 24-Stunden-Snapshot. Importierte Health-Connect-Daten werden nicht zurückgeschrieben
 - der Debug-Testdatenempfänger wird nur in Debug-Builds kompiliert; er enthält
   ausschließlich synthetische Daten und existiert nicht in Release-Varianten
 

@@ -57,9 +57,17 @@ class MainActivity : ComponentActivity() {
         scope.launch {
             if (granted.any { it in HealthConnectIntegration.recordPermissions }) {
                 HealthConnectIntegration.schedule(applicationContext)
-                HealthConnectIntegration.sync(applicationContext)
+                val result = runCatching { HealthConnectIntegration.sync(applicationContext) }.getOrNull()
                 SugarliciousWidgets.update(applicationContext)
-                Toast.makeText(this@MainActivity, "Health Connect verbunden", Toast.LENGTH_SHORT).show()
+                val message = when {
+                    HealthConnectIntegration.glucoseWritePermission !in granted -> "Verbunden · BZ-Schreibrecht fehlt"
+                    result?.glucoseExport?.state == HealthConnectExportState.SUCCESS -> "Verbunden · ${result.glucoseExport.acceptedCount} BZ-Werte übertragen"
+                    result?.glucoseExport?.state == HealthConnectExportState.FAILED -> "Verbunden · BZ-Export ${result.glucoseExport.errorCode}"
+                    else -> "Health Connect verbunden"
+                }
+                Toast.makeText(this@MainActivity, message, Toast.LENGTH_LONG).show()
+            } else {
+                Toast.makeText(this@MainActivity, "Keine Health-Connect-Berechtigung erteilt", Toast.LENGTH_LONG).show()
             }
             refresh(forceSettingsRender = true)
         }
@@ -215,7 +223,14 @@ class MainActivity : ComponentActivity() {
             val synced = runCatching { HealthConnectIntegration.sync(applicationContext) }.getOrNull()
             if (synced != null) {
                 SugarliciousWidgets.update(applicationContext)
-                Toast.makeText(this@MainActivity, "Gesundheitsdaten aktualisiert", Toast.LENGTH_SHORT).show()
+                val message = when (synced.glucoseExport.state) {
+                    HealthConnectExportState.SUCCESS -> "Aktualisiert · ${synced.glucoseExport.acceptedCount} BZ-Werte übertragen"
+                    HealthConnectExportState.NO_DATA -> "Aktualisiert · kein neuer BZ-Wert"
+                    HealthConnectExportState.PERMISSION_MISSING -> "Aktualisiert · BZ-Schreibrecht fehlt"
+                    HealthConnectExportState.FAILED -> "BZ-Export fehlgeschlagen · ${synced.glucoseExport.errorCode}"
+                    HealthConnectExportState.UNAVAILABLE -> "Health Connect nicht verfügbar"
+                }
+                Toast.makeText(this@MainActivity, message, Toast.LENGTH_LONG).show()
             } else {
                 Toast.makeText(this@MainActivity, "Health-Connect-Zugriff fehlt", Toast.LENGTH_SHORT).show()
             }

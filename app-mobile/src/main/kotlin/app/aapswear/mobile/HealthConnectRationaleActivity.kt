@@ -14,7 +14,7 @@ class HealthConnectRationaleActivity : Activity() {
             orientation = LinearLayout.VERTICAL; gravity = Gravity.CENTER; setPadding(48, 48, 48, 48); setBackgroundColor(Color.rgb(20, 24, 28))
             addView(TextView(this@HealthConnectRationaleActivity).apply { text = "Health Connect"; textSize = 26f; setTextColor(Color.WHITE); gravity = Gravity.CENTER })
             addView(TextView(this@HealthConnectRationaleActivity).apply {
-                text = "Sugarlicious nutzt freigegebene Aktivitäts- und Gesundheitsdaten ausschließlich lokal für deine Übersicht und dein Diabetes-Management. Du entscheidest für jeden Datentyp getrennt. Importierte Daten werden nicht als neue Daten zurückgeschrieben. Therapieentscheidungen oder Insulinsteuerung erfolgen nicht."
+                text = "Sugarlicious nutzt freigegebene Aktivitäts- und Gesundheitsdaten ausschließlich lokal für deine Übersicht und dein Diabetes-Management. Du entscheidest für jeden Datentyp getrennt. Eigene CGM-Werte können als Blutzucker an Health Connect geschrieben werden. Importierte Daten werden niemals als neue Daten zurückgeschrieben. Therapieentscheidungen oder Insulinsteuerung erfolgen nicht."
                 textSize = 16f; setTextColor(Color.LTGRAY); gravity = Gravity.CENTER; setPadding(0, 24, 0, 0)
             })
         })
