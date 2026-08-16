@@ -135,13 +135,15 @@ class WearGlucoseChart @JvmOverloads constructor(
                 .flatMap { it.samples }
                 .maxOfOrNull { it.measuredAtEpochMs }
                 ?: currentMeasurement
-        val end =
-            if (showPredictions) {
-                max(currentMeasurement, predictionEnd)
-            } else {
-                currentMeasurement
-            }.coerceAtLeast(60_000L)
-        val start = end - durationHours * HOUR_MS
+        val timeWindow =
+            wearChartTimeWindow(
+                currentMeasurement = currentMeasurement,
+                predictionEnd = predictionEnd,
+                durationHours = durationHours,
+                showPredictions = showPredictions,
+            )
+        val start = timeWindow.start
+        val end = timeWindow.endInclusive
 
         val history =
             buildList {
@@ -401,6 +403,28 @@ class WearGlucoseChart @JvmOverloads constructor(
         private const val TARGET_LOW = 80.0
         private const val TARGET_HIGH = 160.0
         private const val FUTURE_TOLERANCE_MS = 5 * 60_000L
-        private const val HOUR_MS = 60L * 60_000L
     }
 }
+
+internal fun wearChartTimeWindow(
+    currentMeasurement: Long,
+    predictionEnd: Long,
+    durationHours: Int,
+    showPredictions: Boolean,
+): LongRange {
+    val historyDuration =
+        durationHours
+            .coerceAtLeast(1)
+            .toLong() *
+            WEAR_CHART_HOUR_MS
+    val start = (currentMeasurement - historyDuration).coerceAtLeast(0L)
+    val end =
+        if (showPredictions) {
+            max(currentMeasurement, predictionEnd)
+        } else {
+            currentMeasurement
+        }.coerceAtLeast(start + 1L)
+    return start..end
+}
+
+private const val WEAR_CHART_HOUR_MS = 60L * 60_000L
