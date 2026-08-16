@@ -56,13 +56,22 @@ class G7WatchActivity : Activity() {
             setBackgroundColor(BACKGROUND)
         }
 
-        content.addView(ImageView(this).apply {
-            setImageResource(R.drawable.ic_g7_collector)
-            imageTintList = ColorStateList.valueOf(ACCENT)
-            scaleType = ImageView.ScaleType.CENTER_INSIDE
-        }, LinearLayout.LayoutParams(44.dp, 44.dp))
-        content.addView(label("Sugarlicious", 11f, TEXT_SECONDARY, bold = true).apply { letterSpacing = 0.12f })
-        content.addView(label("G7 Watch Collector", 21f, TEXT_PRIMARY, bold = true))
+        content.addView(
+            ImageView(this).apply {
+                setImageResource(R.drawable.ic_g7_sensor)
+                contentDescription = "G7 Sensor"
+                scaleType = ImageView.ScaleType.CENTER_INSIDE
+            },
+            LinearLayout.LayoutParams(82.dp, 82.dp).apply {
+                bottomMargin = 4.dp
+            },
+        )
+        content.addView(label("G7 Direct to Watch", 21f, TEXT_PRIMARY, bold = true))
+        content.addView(
+            label("by Sugarlicious", 11f, TEXT_SECONDARY, bold = true).apply {
+                letterSpacing = 0.08f
+            },
+        )
         content.addView(statusPill(state.collectorEnabled, state.lastError != null))
 
         val reading = state.lastReading
