@@ -34,4 +34,11 @@ class WearProtocolTest {
   val decoded=WearProtocol.decodeConfig(legacy.encodeToByteArray())
   assertEquals(WatchUiColors().basal,decoded.uiColors.basal)
  }
+ @Test fun g7SetupAndDataSourceRoundTrip() {
+  val command=G7SetupCommand("1234","SERIAL","00386270000000")
+  assertEquals(command,WearProtocol.decodeG7Setup(WearProtocol.encodeG7Setup(command)))
+  val config=WatchConfig(dataSource=WatchDataSource.DEXCOM_G7_WATCH)
+  assertEquals(WatchDataSource.DEXCOM_G7_WATCH,WearProtocol.decodeConfig(WearProtocol.encodeConfig(config)).dataSource)
+  assertFailsWith<IllegalArgumentException>{G7SetupCommand("12")}
+ }
 }

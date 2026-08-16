@@ -12,6 +12,7 @@ import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import app.aapswear.complications.R as ComplicationR
+import app.aapswear.complications.G7LocalReadingResolver
 import app.aapswear.model.BasalState
 import app.aapswear.model.DataSourceId
 import app.aapswear.model.Freshness
@@ -193,10 +194,10 @@ class WearActivity : Activity() {
         if (!::glucose.isInitialized) return
 
         val now = System.currentTimeMillis()
-        val state = latest
+        val preferences = WearDisplayPreferences.read(this)
+        val state = G7LocalReadingResolver.resolve(this, latest, now, preferences.dataSource)
         val previousState = lastRenderedState
         val glucoseState = state?.glucose
-        val preferences = WearDisplayPreferences.read(this)
         val previousPreferences = lastRenderedPreferences
         val firstRender = !hasRendered
 

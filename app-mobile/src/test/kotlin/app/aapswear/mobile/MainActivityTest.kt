@@ -43,6 +43,13 @@ class MainActivityTest {
         assertEquals(basal, colors.basal)
     }
 
+    @Test fun `watch config carries direct G7 source selection`() {
+        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+        context.getSharedPreferences("dashboard_ui", android.content.Context.MODE_PRIVATE)
+            .edit().clear().putString("dataSource", DataSourcePreference.DEXCOM_G7_WATCH.name).commit()
+        assertEquals(app.aapswear.protocol.WatchDataSource.DEXCOM_G7_WATCH, readWatchConfig(context).dataSource)
+    }
+
     @Test fun `app surfaces are neutral gray and system accent follows the icon`() {
         val context = ApplicationProvider.getApplicationContext<android.content.Context>()
         listOf(R.color.app_background, R.color.app_surface, R.color.app_surface_high, R.color.app_surface_raised, R.color.app_surface_selected).forEach { colorId ->

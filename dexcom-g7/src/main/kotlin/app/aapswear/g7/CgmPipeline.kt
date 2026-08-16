@@ -98,6 +98,8 @@ fun G7Reading.toCgm(previous: CgmReading? = null): CgmReading {
         sensorAgeSeconds = sensorAgeSeconds,
         sequenceNumber = sequenceNumber,
         status = if (sensorState == G7SensorState.ERROR) CgmReadingStatus.SENSOR_ERROR else CgmReadingStatus.VALID,
+        displayOnly = displayOnly,
+        rawSourceTimestamp = sensorClockSeconds,
     )
     return base.copy(
         deltaMgDl = CgmDeltaCalculator.calculate(base, previous),

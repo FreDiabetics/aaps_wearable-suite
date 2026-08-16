@@ -140,6 +140,7 @@ class MainActivity : ComponentActivity() {
             navigate = ::navigate,
             setUnit = { uiPreferences.edit { putString("unit", it.name) } },
             setDataSource = { uiPreferences.edit { putString("dataSource", it.name) } },
+            openG7Setup = { startActivity(Intent(this, G7SetupActivity::class.java)) },
             setThemeMode = { uiPreferences.edit { putString("themeMode", it.name) } },
             setShowDetails = { uiPreferences.edit { putBoolean("showDetails", it) } },
             setShowCgmGraph = { uiPreferences.edit { putBoolean("showCgmGraph", it) } },

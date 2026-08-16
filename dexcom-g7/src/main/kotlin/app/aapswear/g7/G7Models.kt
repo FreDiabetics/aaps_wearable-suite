@@ -100,6 +100,8 @@ data class G7Reading(
     val predictedMgDl: Double? = null,
     val sensorAgeSeconds: Long? = null,
     val sensorState: G7SensorState = G7SensorState.UNKNOWN,
+    val displayOnly: Boolean = false,
+    val sensorClockSeconds: Long? = null,
 )
 
 @Serializable

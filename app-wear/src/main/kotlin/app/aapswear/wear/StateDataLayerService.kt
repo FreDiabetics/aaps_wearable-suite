@@ -2,6 +2,7 @@ package app.aapswear.wear
 
 import android.content.ComponentName
 import android.content.Context
+import android.content.Intent
 import androidx.wear.watchface.complications.datasource.ComplicationDataSourceUpdateRequester
 import app.aapswear.complications.ActiveComplicationRegistry
 import app.aapswear.complications.AllProviders
@@ -69,7 +70,23 @@ class StateDataLayerService : WearableListenerService() {
                         event.sourceNodeId,
                     )
                 }
+            WearProtocol.G7_SETUP_PATH -> configureG7Collector(event)
         }
+    }
+
+    private fun configureG7Collector(event: MessageEvent) {
+        val command = runCatching { WearProtocol.decodeG7Setup(event.data) }.getOrNull() ?: return
+        val intent = Intent("app.aapswear.g7watch.CONFIGURE")
+            .setComponent(
+                ComponentName(
+                    "app.aapswear.g7watch",
+                    "app.aapswear.g7watch.G7SetupReceiver",
+                ),
+            )
+            .putExtra("pairing_code", command.pairingCode)
+            .putExtra("sensor_serial", command.sensorSerial)
+            .putExtra("gtin", command.gtin)
+        sendBroadcast(intent, "app.aapswear.g7watch.permission.CONFIGURE_G7")
     }
 
     private fun applyWatchFace(event: MessageEvent) {

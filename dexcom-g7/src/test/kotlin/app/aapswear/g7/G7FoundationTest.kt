@@ -7,6 +7,8 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
 
 class G7FoundationTest {
     private val now = 1_800_000_000_000L
@@ -46,9 +48,9 @@ class G7FoundationTest {
         assertTrue(manager.state.retryCount <= 10)
     }
 
-    @Test fun `non recoverable protocol gaps never create an endless retry`() {
+    @Test fun `non recoverable collector errors never create an endless retry`() {
         val manager = G7SessionManager(G7PersistedState(collectorEnabled = true, retryCount = 2))
-        val state = manager.failure(G7CollectorError("G7_PROTOCOL_NOT_IMPLEMENTED", false, now, "Research required"))
+        val state = manager.failure(G7CollectorError("G7-AUTH-211", false, now, "Rebond required"))
         assertEquals(G7SessionState.USER_INTERVENTION_REQUIRED, state.sessionState)
         assertNull(state.nextReconnectEpochMs)
     }
@@ -64,9 +66,27 @@ class G7FoundationTest {
         assertEquals(CgmAlarmState.RESOLVED, resolved[CgmAlarmType.HIGH]?.state)
     }
 
-    @Test fun `research parser and crypto never fake success`() {
-        assertFailsWith<G7ProtocolResearchRequired> { ResearchG7PacketParser().parse(byteArrayOf(1), G7Sensor("sensor"), now) }
-        assertFailsWith<G7ProtocolResearchRequired> { ResearchG7CryptoEngine().validateCertificate(byteArrayOf(1)) }
+    @Test fun `G7 packet parser accepts validated glucose framing and rejects malformed data`() {
+        val packet = ByteBuffer.allocate(19).order(ByteOrder.LITTLE_ENDIAN).apply {
+            put(0x4e); put(0)
+            putInt(1234); putShort(17); putShort(0); putShort(20)
+            putShort(112); put(0x06); put(12); putShort(118); put(0)
+        }.array()
+        val reading = G7GlucosePacketParser().parse(packet, G7Sensor("sensor", "session"), now)
+        assertEquals(112.0, reading.glucoseMgDl)
+        assertEquals(1.2, reading.trendRateMgDlPerMinute)
+        assertEquals(118.0, reading.predictedMgDl)
+        assertEquals(now - 20_000L, reading.sensorTimestampEpochMs)
+        assertFailsWith<IllegalArgumentException> { G7GlucosePacketParser().parse(byteArrayOf(1), G7Sensor("sensor"), now) }
+    }
+
+    @Test fun `setup accepts manual pin and GS1 applicator barcode`() {
+        assertEquals("1234", G7SetupParser.parse("1234")?.pairingCode)
+        val barcode = "0100386270000000\u001d2409876\u001d21SERIAL"
+        val parsed = G7SetupParser.parse(barcode)
+        assertEquals("9876", parsed?.pairingCode)
+        assertEquals("SERIAL", parsed?.sensorSerial)
+        assertNull(G7SetupParser.parse("12"))
     }
 
     @Test fun `trend mapping uses shared model`() {
