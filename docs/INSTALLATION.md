@@ -30,18 +30,23 @@ Therapieinformationen bleiben ausschließlich AndroidAPS-Daten.
    das betreffende Watchface-Paket entfernen und nach der Wear-App erneut
    installieren oder die AAPS-Complications einmal manuell zuweisen.
 
-Wichtig: Die vier Sugarlicious-Watchfaces sind eigenständige WFF-Apps. Die
+Wichtig: Die fünf Sugarlicious-Watchfaces sind eigenständige WFF-Apps. Die
 Installation von `app-wear-debug.apk` installiert sie nicht automatisch. Für
-einen lokalen Debug-Build werden zuerst alle vier Pakete gebaut und danach auf
-der Watch installiert:
+einen vollständigen lokalen Build mit Tests und Installation aller Apps und
+Watchfaces genügt bei verbundenem Telefon und verbundener Watch:
 
 ```powershell
-.\gradlew.bat :watchfaces:sugarlicious-analog:assembleRelease :watchfaces:sugarlicious-orbit:assembleRelease :watchfaces:sugarlicious-rings:assembleRelease :watchfaces:sugarlicious-graph:assembleRelease
-.\tools\install-sugarlicious-watchfaces.ps1 -WatchSerial "ADB-SERIENNUMMER-DER-WATCH"
+.\dev.ps1 all -Test
 ```
 
-Anschließend erscheinen `Sugarlicious Analog`, `Sugarlicious Orbit`,
-`Sugarlicious Rings` und `Sugarlicious Graph` in der Watchface-Auswahl. Falls
+Das Skript erkennt Telefon und Watch anhand ihrer Android-Geräteart; USB- und
+Wireless-Debugging-Seriennummern funktionieren gleichermaßen. Bei mehreren
+Telefonen oder Watches kann die Auswahl mit `-PhoneSerial` beziehungsweise
+`-WatchSerial` eindeutig vorgegeben werden.
+
+Anschließend erscheinen `Sugarlicious Digital`, `Sugarlicious Analog`,
+`Sugarlicious Orbit`, `Sugarlicious Rings` und `Sugarlicious Graph` in der
+Watchface-Auswahl. Falls
 Galaxy Wearable die Liste noch zwischengespeichert hat, die Auswahl auf der Uhr
 durch langes Drücken des Zifferblatts öffnen oder Galaxy Wearable neu starten.
 

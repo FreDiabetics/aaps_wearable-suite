@@ -2,16 +2,7 @@
 <resources>
     <!-- Spacing -->
     <dimen name="space_xxs">2dp</dimen>
-    <dimen name="space_sm">8dp</dimen>
     <dimen name="space_md">12dp</dimen>
-    <!-- Shape radii -->
-    <dimen name="radius_navigation">28dp</dimen>
-    <!-- Components -->
-    <dimen name="header_height">64dp</dimen>
-    <dimen name="bottom_navigation_height">72dp</dimen>
-    <dimen name="navigation_icon_size">27dp</dimen>
-    <dimen name="shield_icon_size">34dp</dimen>
     <!-- Typography for legacy Views -->
     <dimen name="text_app_title">21sp</dimen>
-    <dimen name="text_nav_label">11sp</dimen>
 </resources>
