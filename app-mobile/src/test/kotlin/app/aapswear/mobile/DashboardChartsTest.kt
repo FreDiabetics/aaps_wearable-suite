@@ -105,6 +105,56 @@ class DashboardChartsTest {
         SugarliciousColors.apply(SugarliciousPalette.defaults())
     }
 
+    @Test fun `glucose chart keeps cached predictions visible behind now divider`() {
+        val now = System.currentTimeMillis()
+        val state =
+            TherapyDisplayState(
+                receivedAtEpochMs = now - 10 * 60_000L,
+                glucose =
+                    GlucoseState(
+                        121.0,
+                        GlucoseUnit.MG_DL,
+                        measuredAtEpochMs = now - 10 * 60_000L,
+                    ),
+                glucoseHistory =
+                    listOf(
+                        GlucoseSample(118.0, now - 20 * 60_000L),
+                        GlucoseSample(121.0, now - 10 * 60_000L),
+                    ),
+                glucosePredictions =
+                    listOf(
+                        GlucosePrediction(
+                            PredictionKind.IOB,
+                            listOf(
+                                GlucoseSample(124.0, now - 8 * 60_000L),
+                                GlucoseSample(127.0, now - 3 * 60_000L),
+                            ),
+                        ),
+                    ),
+            )
+        val bitmap =
+            render(
+                GlucoseDashboardChart(context, sharedViewport = ChartViewport(1)).apply {
+                    bind(
+                        state = state,
+                        unit = GlucoseUnit.MG_DL,
+                        showPredictions = true,
+                        durationHours = 1,
+                        showPredictionIob = true,
+                        clockEpochMs = now,
+                    )
+                },
+                230,
+            )
+
+        val predictionPixels =
+            count(bitmap) {
+                Color.blue(it) > 180 &&
+                    Color.green(it) > 120
+            }
+        assertTrue("cached prediction=$predictionPixels", predictionPixels > 2)
+    }
+
     @Test fun `metabolic chart renders independent iob and cob areas`() {
         val now = System.currentTimeMillis()
         val history = (0..5).map { index ->

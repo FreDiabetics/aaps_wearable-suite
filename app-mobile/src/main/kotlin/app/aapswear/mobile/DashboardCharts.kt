@@ -386,6 +386,7 @@ internal class GlucoseDashboardChart @JvmOverloads constructor(
     private var cgmDotOutlineEnabled = true
     private var cgmDotOutlineWidthDp = 0.95f
     private var stateSignature: List<Any?>? = null
+    private var clockBucket: Long = Long.MIN_VALUE
 
     fun bind(
         state: TherapyDisplayState?,
@@ -403,9 +404,11 @@ internal class GlucoseDashboardChart @JvmOverloads constructor(
         cgmDotRadiusDp: Float = 2.4f,
         cgmDotOutlineEnabled: Boolean = true,
         cgmDotOutlineWidthDp: Float = 0.95f,
+        clockEpochMs: Long = System.currentTimeMillis(),
     ) {
         val resolvedRadius = cgmDotRadiusDp.coerceIn(1.5f, 6.0f)
         val resolvedOutlineWidth = cgmDotOutlineWidthDp.coerceIn(0.25f, 3.0f)
+        val resolvedClockBucket = clockEpochMs / CLOCK_REFRESH_MS
         val newStateSignature =
             state?.let {
                 buildList {
@@ -431,7 +434,8 @@ internal class GlucoseDashboardChart @JvmOverloads constructor(
                 this.showPredictionZeroTemp != showPredictionZeroTemp ||
                 this.cgmDotRadiusDp != resolvedRadius ||
                 this.cgmDotOutlineEnabled != cgmDotOutlineEnabled ||
-                this.cgmDotOutlineWidthDp != resolvedOutlineWidth
+                this.cgmDotOutlineWidthDp != resolvedOutlineWidth ||
+                clockBucket != resolvedClockBucket
 
         if (!changed) return
 
@@ -450,6 +454,7 @@ internal class GlucoseDashboardChart @JvmOverloads constructor(
         this.cgmDotRadiusDp = resolvedRadius
         this.cgmDotOutlineEnabled = cgmDotOutlineEnabled
         this.cgmDotOutlineWidthDp = resolvedOutlineWidth
+        clockBucket = resolvedClockBucket
 
         if (
             !isAttachedToWindow
@@ -491,7 +496,7 @@ internal class GlucoseDashboardChart @JvmOverloads constructor(
                     emptyList()
                 }
             val liveEdge =
-                if (viewport.futureWindowMs == 0L) {
+                if (!showPredictions || predictions.isEmpty()) {
                     state?.glucose?.measuredAtEpochMs?.coerceAtMost(now) ?: now
                 } else {
                     now
@@ -507,7 +512,7 @@ internal class GlucoseDashboardChart @JvmOverloads constructor(
                 .distinctBy { it.measuredAtEpochMs to it.source }
                 .filter { it.measuredAtEpochMs in start..min(end, now) }
             val visiblePredictions = predictions.map { series ->
-                series.copy(samples = series.samples.filter { it.measuredAtEpochMs > now && it.measuredAtEpochMs in start..end })
+                series.copy(samples = series.samples.filter { it.measuredAtEpochMs in start..end })
             }.filter { it.samples.isNotEmpty() }
             val targetTop = mapGlucoseY(targetHigh, plot)
             val targetBottom = mapGlucoseY(targetLow, plot)
@@ -629,7 +634,7 @@ internal class GlucoseDashboardChart @JvmOverloads constructor(
                 }
             }
             if (predictionLaneVisible) {
-                visiblePredictions.forEach { drawPrediction(canvas, it, plot, start, end, dividerX) }
+                visiblePredictions.forEach { drawPrediction(canvas, it, plot, start, end) }
             }
 
             if (
@@ -957,7 +962,6 @@ internal class GlucoseDashboardChart @JvmOverloads constructor(
         plot: RectF,
         start: Long,
         end: Long,
-        dividerX: Float,
     ) {
         val color = when (series.kind) {
             PredictionKind.IOB -> SugarliciousColors.argb(SugarliciousColorRole.PREDICTION_IOB)
@@ -966,7 +970,7 @@ internal class GlucoseDashboardChart @JvmOverloads constructor(
             PredictionKind.ZERO_TEMP -> SugarliciousColors.argb(SugarliciousColorRole.PREDICTION_ZERO_TEMP)
         }
         series.samples.forEach { point ->
-            val x = max(mapX(point.measuredAtEpochMs, start, end, plot), dividerX + 3f.dp)
+            val x = mapX(point.measuredAtEpochMs, start, end, plot)
             if (x > plot.right) return@forEach
             val y = mapGlucoseY(point.valueMgDl, plot)
             fillPaint.color = withAlpha(SugarliciousColors.argb(SugarliciousColorRole.GRAPH_CURRENT_OUTLINE), 190)
@@ -974,6 +978,10 @@ internal class GlucoseDashboardChart @JvmOverloads constructor(
             fillPaint.color = color
             canvas.drawCircle(x, y, 1.75f.dp, fillPaint)
         }
+    }
+
+    companion object {
+        private const val CLOCK_REFRESH_MS = 30_000L
     }
 
     private fun drawRoundedBorder(canvas: Canvas, rect: RectF, radius: Float) {

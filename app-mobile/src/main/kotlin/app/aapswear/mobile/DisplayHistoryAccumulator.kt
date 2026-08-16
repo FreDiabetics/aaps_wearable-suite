@@ -4,6 +4,7 @@ import app.aapswear.model.GlucoseSample
 import app.aapswear.model.DataSourceId
 import app.aapswear.model.TherapyDisplayState
 import app.aapswear.model.TherapyHistorySample
+import app.aapswear.storage.PersistentPredictionCache
 
 /** Keeps a bounded graph cache inside the single latest display state. */
 internal object DisplayHistoryAccumulator {
@@ -66,7 +67,15 @@ internal object DisplayHistoryAccumulator {
             .takeLast(MAX_POINTS)
             .withEstimatedInsulinActivity()
 
-        return current.copy(glucoseHistory = glucose, therapyHistory = therapy)
+        return PersistentPredictionCache.merge(
+            previous = previous,
+            incoming =
+                current.copy(
+                    glucoseHistory = glucose,
+                    therapyHistory = therapy,
+                ),
+            nowEpochMs = nowEpochMs,
+        )
     }
 
     fun mergeExternalHistory(
