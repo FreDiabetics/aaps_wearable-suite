@@ -6,6 +6,7 @@ import android.app.Service
 import android.content.Intent
 import android.graphics.Color
 import androidx.test.core.app.ApplicationProvider
+import app.aapswear.mobile.ui.theme.SugarliciousColorRole
 import app.aapswear.model.GlucoseState
 import app.aapswear.model.GlucoseUnit
 import app.aapswear.model.TherapyDisplayState
@@ -92,30 +93,54 @@ class PersistentBridgeServiceTest {
         assertNotNull(notification.bigContentView)
         assertNull(notification.extras.getParcelable(Notification.EXTRA_PICTURE))
 
+        val graphPreferences =
+            context.getSharedPreferences("dashboard_ui", android.content.Context.MODE_PRIVATE)
+        val highEdgeColor = Color.rgb(198, 36, 91)
+        val targetBandColor = Color.rgb(0, 184, 126)
+        val lowEdgeColor = Color.rgb(24, 156, 214)
+        val graphColors = graphPreferences.edit()
+        listOf("dark", "light").forEach { mode ->
+            graphColors.putInt(
+                "notification.color.$mode.${SugarliciousColorRole.RANGE_HIGH.preferenceKey}",
+                highEdgeColor,
+            )
+            graphColors.putInt(
+                "notification.color.$mode.${SugarliciousColorRole.TARGET_BAND.preferenceKey}",
+                targetBandColor,
+            )
+            graphColors.putInt(
+                "notification.color.$mode.${SugarliciousColorRole.RANGE_LOW.preferenceKey}",
+                lowEdgeColor,
+            )
+        }
+        graphColors.commit()
+
         val collapsedGraph = NotificationGraphRenderer.renderCollapsed(
             context,
             therapyState,
-            context.getSharedPreferences("dashboard_ui", android.content.Context.MODE_PRIVATE),
+            graphPreferences,
         )
         val expandedGraph = NotificationGraphRenderer.renderExpanded(
             context,
             therapyState,
-            context.getSharedPreferences("dashboard_ui", android.content.Context.MODE_PRIVATE),
+            graphPreferences,
         )
 
         assertEquals(NotificationGraphRenderer.COLLAPSED_WIDTH, collapsedGraph.width)
         assertEquals(NotificationGraphRenderer.COLLAPSED_HEIGHT, collapsedGraph.height)
         assertEquals(NotificationGraphRenderer.EXPANDED_WIDTH, expandedGraph.width)
         assertEquals(NotificationGraphRenderer.EXPANDED_HEIGHT, expandedGraph.height)
-        assertEquals(0, Color.alpha(collapsedGraph.getPixel(0, 0)))
-        assertTrue(
-            Color.alpha(
-                expandedGraph.getPixel(
-                    expandedGraph.width / 2,
-                    expandedGraph.height / 2,
-                ),
-            ) > 0,
-        )
+        listOf(collapsedGraph, expandedGraph).forEach { graph ->
+            assertEquals(0, Color.alpha(graph.getPixel(0, 0)))
+            assertEquals(0, Color.alpha(graph.getPixel(graph.width - 1, 0)))
+            assertEquals(0, Color.alpha(graph.getPixel(0, graph.height - 1)))
+            assertEquals(0, Color.alpha(graph.getPixel(graph.width - 1, graph.height - 1)))
+            assertEquals(highEdgeColor, graph.getPixel(graph.width / 2, 0))
+            assertEquals(lowEdgeColor, graph.getPixel(graph.width / 2, graph.height - 1))
+        }
+        val targetTop = (expandedGraph.height * 0.1875f).toInt() + 2
+        assertEquals(targetBandColor, expandedGraph.getPixel(0, targetTop))
+        assertEquals(targetBandColor, expandedGraph.getPixel(expandedGraph.width - 1, targetTop))
         assertEquals(null, notification.extras.getCharSequence(Notification.EXTRA_SUB_TEXT))
         assertEquals(1, notification.actions.size)
         controller.destroy()
