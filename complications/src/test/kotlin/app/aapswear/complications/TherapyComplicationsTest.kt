@@ -108,7 +108,7 @@ class TherapyComplicationsTest {
             data.text.getTextAt(service.resources, Instant.now()).toString(),
         )
         assertEquals(
-            "0m",
+            "2m",
             data.title!!.getTextAt(service.resources, Instant.now()).toString(),
         )
     }

@@ -2,100 +2,187 @@ package app.aapswear.wear
 
 import android.content.ComponentName
 import android.content.Context
+import android.content.pm.PackageManager
 import androidx.test.core.app.ApplicationProvider
+import androidx.wear.watchface.complications.data.ComplicationData
+import androidx.wear.watchface.complications.data.ComplicationText
 import androidx.wear.watchface.complications.data.ComplicationType
+import androidx.wear.watchface.complications.data.GoalProgressComplicationData
+import androidx.wear.watchface.complications.data.LongTextComplicationData
+import androidx.wear.watchface.complications.data.MonochromaticImageComplicationData
+import androidx.wear.watchface.complications.data.RangedValueComplicationData
+import androidx.wear.watchface.complications.data.ShortTextComplicationData
+import androidx.wear.watchface.complications.data.SmallImageComplicationData
 import androidx.wear.watchface.complications.data.parser.StaticPreviewDataParser
-import app.aapswear.complications.BasalComplication
-import app.aapswear.complications.CobComplication
-import app.aapswear.complications.CobRangedValueComplication
+import androidx.wear.watchface.complications.datasource.SuspendingComplicationDataSourceService
+import app.aapswear.complications.AllProviders
 import app.aapswear.complications.DateComplication
-import app.aapswear.complications.DeltaOnlyComplication
-import app.aapswear.complications.GlucoseAgeComplication
-import app.aapswear.complications.GlucoseComplication
-import app.aapswear.complications.GlucoseDeltaComplication
-import app.aapswear.complications.GlucoseGraphComplication
-import app.aapswear.complications.GlucoseLongTextComplication
-import app.aapswear.complications.GlucosePlusDeltaComplication
-import app.aapswear.complications.GlucosePlusDeltaLongTextComplication
-import app.aapswear.complications.GlucoseRangedValueComplication
-import app.aapswear.complications.GlucoseTrendAgeComplication
-import app.aapswear.complications.GlucoseTrendAgeLongTextComplication
-import app.aapswear.complications.GlucoseTrendComplication
-import app.aapswear.complications.GlucoseTrendDeltaAgeComplication
-import app.aapswear.complications.GlucoseTrendDeltaAgeLongTextComplication
-import app.aapswear.complications.GlucoseTrendDeltaComplication
-import app.aapswear.complications.GlucoseTrendLongTextComplication
-import app.aapswear.complications.GlucoseTrendRangedValueComplication
-import app.aapswear.complications.IobCobBasalComplication
-import app.aapswear.complications.IobCobBasalLongTextComplication
-import app.aapswear.complications.IobComplication
-import app.aapswear.complications.IobRangedValueComplication
-import app.aapswear.complications.LoopComplication
-import app.aapswear.complications.LoopIconComplication
-import app.aapswear.complications.ReservoirComplication
-import app.aapswear.complications.ReservoirRangedValueComplication
-import app.aapswear.complications.SensorAgeComplication
-import app.aapswear.complications.SensorAgeRangedValueComplication
-import app.aapswear.complications.TirComplication
-import app.aapswear.complications.TirGoalProgressComplication
-import app.aapswear.complications.TrendOnlyComplication
+import app.aapswear.complications.GlucoseGraphLargeComplication
+import app.aapswear.complications.TirWeightedElementsComplication
+import java.time.Instant
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.robolectric.Robolectric
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34])
 class ComplicationStaticPreviewTest {
-    @Test
-    fun `every parser supported provider has matching static picker data`() {
-        val context = ApplicationProvider.getApplicationContext<Context>()
-        val expected = listOf(
-            GlucoseComplication::class.java to ComplicationType.SHORT_TEXT,
-            GlucoseLongTextComplication::class.java to ComplicationType.LONG_TEXT,
-            GlucoseRangedValueComplication::class.java to ComplicationType.RANGED_VALUE,
-            GlucoseTrendComplication::class.java to ComplicationType.SHORT_TEXT,
-            GlucoseTrendLongTextComplication::class.java to ComplicationType.LONG_TEXT,
-            GlucoseTrendRangedValueComplication::class.java to ComplicationType.RANGED_VALUE,
-            GlucosePlusDeltaComplication::class.java to ComplicationType.SHORT_TEXT,
-            GlucosePlusDeltaLongTextComplication::class.java to ComplicationType.LONG_TEXT,
-            GlucoseTrendAgeComplication::class.java to ComplicationType.SHORT_TEXT,
-            GlucoseTrendAgeLongTextComplication::class.java to ComplicationType.LONG_TEXT,
-            GlucoseTrendDeltaComplication::class.java to ComplicationType.SHORT_TEXT,
-            GlucoseTrendDeltaAgeComplication::class.java to ComplicationType.SHORT_TEXT,
-            GlucoseTrendDeltaAgeLongTextComplication::class.java to ComplicationType.LONG_TEXT,
-            GlucoseGraphComplication::class.java to ComplicationType.SMALL_IMAGE,
-            TrendOnlyComplication::class.java to ComplicationType.SHORT_TEXT,
-            DeltaOnlyComplication::class.java to ComplicationType.SHORT_TEXT,
-            GlucoseAgeComplication::class.java to ComplicationType.SHORT_TEXT,
-            GlucoseDeltaComplication::class.java to ComplicationType.SHORT_TEXT,
-            SensorAgeComplication::class.java to ComplicationType.SHORT_TEXT,
-            SensorAgeRangedValueComplication::class.java to ComplicationType.RANGED_VALUE,
-            BasalComplication::class.java to ComplicationType.SHORT_TEXT,
-            IobComplication::class.java to ComplicationType.SHORT_TEXT,
-            IobRangedValueComplication::class.java to ComplicationType.RANGED_VALUE,
-            CobComplication::class.java to ComplicationType.SHORT_TEXT,
-            CobRangedValueComplication::class.java to ComplicationType.RANGED_VALUE,
-            IobCobBasalComplication::class.java to ComplicationType.SHORT_TEXT,
-            IobCobBasalLongTextComplication::class.java to ComplicationType.LONG_TEXT,
-            LoopComplication::class.java to ComplicationType.SHORT_TEXT,
-            LoopIconComplication::class.java to ComplicationType.MONOCHROMATIC_IMAGE,
-            ReservoirComplication::class.java to ComplicationType.SHORT_TEXT,
-            ReservoirRangedValueComplication::class.java to ComplicationType.RANGED_VALUE,
-            TirComplication::class.java to ComplicationType.SHORT_TEXT,
-            TirGoalProgressComplication::class.java to ComplicationType.GOAL_PROGRESS,
-            DateComplication::class.java to ComplicationType.SHORT_TEXT,
-        )
+    private val expectedTypes = listOf(
+        ComplicationType.SHORT_TEXT,
+        ComplicationType.LONG_TEXT,
+        ComplicationType.RANGED_VALUE,
+        ComplicationType.SHORT_TEXT,
+        ComplicationType.LONG_TEXT,
+        ComplicationType.RANGED_VALUE,
+        ComplicationType.SHORT_TEXT,
+        ComplicationType.LONG_TEXT,
+        ComplicationType.SHORT_TEXT,
+        ComplicationType.LONG_TEXT,
+        ComplicationType.SHORT_TEXT,
+        ComplicationType.SHORT_TEXT,
+        ComplicationType.LONG_TEXT,
+        ComplicationType.SMALL_IMAGE,
+        ComplicationType.PHOTO_IMAGE,
+        ComplicationType.SHORT_TEXT,
+        ComplicationType.SHORT_TEXT,
+        ComplicationType.SHORT_TEXT,
+        ComplicationType.SHORT_TEXT,
+        ComplicationType.SHORT_TEXT,
+        ComplicationType.RANGED_VALUE,
+        ComplicationType.SHORT_TEXT,
+        ComplicationType.SHORT_TEXT,
+        ComplicationType.RANGED_VALUE,
+        ComplicationType.SHORT_TEXT,
+        ComplicationType.RANGED_VALUE,
+        ComplicationType.SHORT_TEXT,
+        ComplicationType.LONG_TEXT,
+        ComplicationType.SHORT_TEXT,
+        ComplicationType.MONOCHROMATIC_IMAGE,
+        ComplicationType.SHORT_TEXT,
+        ComplicationType.RANGED_VALUE,
+        ComplicationType.SHORT_TEXT,
+        ComplicationType.GOAL_PROGRESS,
+        ComplicationType.WEIGHTED_ELEMENTS,
+        ComplicationType.SHORT_TEXT,
+    )
 
-        expected.forEach { (provider, type) ->
-            val preview = StaticPreviewDataParser.parsePreviewData(
-                context,
-                ComponentName(context, provider),
-            )
-            assertNotNull("Missing static preview for ${provider.simpleName}", preview)
-            assertEquals(type, preview!![type]?.type)
+    @Test
+    fun `all providers expose their declared dynamic preview type`() {
+        assertEquals(36, AllProviders.classes.size)
+        assertEquals(AllProviders.classes.size, expectedTypes.size)
+
+        AllProviders.classes.zip(expectedTypes).forEach { (provider, expectedType) ->
+            val service = buildService(provider)
+            assertEquals(provider.simpleName, expectedType, service.getPreviewData(expectedType)!!.type)
         }
+    }
+
+    @Test
+    fun `picker resources are provider specific and match dynamic fields`() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val staticResourceIds = mutableSetOf<Int>()
+        val providerIconIds = mutableSetOf<Int>()
+
+        AllProviders.classes.zip(expectedTypes).forEach { (provider, expectedType) ->
+            val component = ComponentName(context, provider)
+            val serviceInfo = context.packageManager.getServiceInfo(component, PackageManager.GET_META_DATA)
+            val iconId = serviceInfo.iconResource
+            assertNotEquals("Missing provider icon for ${provider.simpleName}", 0, iconId)
+            assertFalse("Shared provider icon for ${provider.simpleName}", providerIconIds.add(iconId).not())
+
+            val supportsStaticParser = provider != GlucoseGraphLargeComplication::class.java &&
+                provider != TirWeightedElementsComplication::class.java
+            val previewResourceId = serviceInfo.metaData?.getInt(STATIC_PREVIEW_KEY) ?: 0
+
+            if (!supportsStaticParser) {
+                assertEquals("Unsupported static type must use its dynamic provider preview", 0, previewResourceId)
+                assertNull(StaticPreviewDataParser.parsePreviewData(context, component))
+                return@forEach
+            }
+
+            assertNotEquals("Missing static preview for ${provider.simpleName}", 0, previewResourceId)
+            assertFalse("Shared static preview for ${provider.simpleName}", staticResourceIds.add(previewResourceId).not())
+
+            val staticPreview = StaticPreviewDataParser.parsePreviewData(context, component)
+            assertNotNull("Unparseable static preview for ${provider.simpleName}", staticPreview)
+            val staticData = staticPreview!![expectedType]
+            assertNotNull("Wrong static type for ${provider.simpleName}", staticData)
+            assertEquals(expectedType, staticData!!.type)
+
+            val dynamicData = buildService(provider).getPreviewData(expectedType)!!
+            assertMatchingFields(provider, staticData, dynamicData)
+        }
+
+        assertEquals(34, staticResourceIds.size)
+        assertEquals(36, providerIconIds.size)
+    }
+
+    private fun assertMatchingFields(
+        provider: Class<*>,
+        staticData: ComplicationData,
+        dynamicData: ComplicationData,
+    ) {
+        if (provider == DateComplication::class.java) {
+            assertEquals(3, title(staticData)!!.length)
+            text(staticData)!!.toInt()
+        } else {
+            assertEquals("Text mismatch for ${provider.simpleName}", text(dynamicData), text(staticData))
+            assertEquals("Title mismatch for ${provider.simpleName}", title(dynamicData), title(staticData))
+        }
+        assertEquals(
+            "Monochromatic image mismatch for ${provider.simpleName}",
+            hasMonochromaticImage(dynamicData),
+            hasMonochromaticImage(staticData),
+        )
+        assertEquals(
+            "Small image mismatch for ${provider.simpleName}",
+            dynamicData is SmallImageComplicationData,
+            staticData is SmallImageComplicationData,
+        )
+    }
+
+    @Suppress("UNCHECKED_CAST")
+    private fun buildService(provider: Class<*>): SuspendingComplicationDataSourceService =
+        Robolectric.buildService(
+            provider as Class<out SuspendingComplicationDataSourceService>,
+        ).create().get()
+
+    private fun text(data: ComplicationData): String? = when (data) {
+        is ShortTextComplicationData -> value(data.text)
+        is LongTextComplicationData -> value(data.text)
+        is RangedValueComplicationData -> data.text?.let(::value)
+        is GoalProgressComplicationData -> data.text?.let(::value)
+        else -> null
+    }
+
+    private fun title(data: ComplicationData): String? = when (data) {
+        is ShortTextComplicationData -> data.title?.let(::value)
+        is LongTextComplicationData -> data.title?.let(::value)
+        is RangedValueComplicationData -> data.title?.let(::value)
+        is GoalProgressComplicationData -> data.title?.let(::value)
+        else -> null
+    }
+
+    private fun value(text: ComplicationText): String =
+        text.getTextAt(ApplicationProvider.getApplicationContext<Context>().resources, Instant.now()).toString()
+
+    private fun hasMonochromaticImage(data: ComplicationData): Boolean = when (data) {
+        is ShortTextComplicationData -> data.monochromaticImage != null
+        is LongTextComplicationData -> data.monochromaticImage != null
+        is RangedValueComplicationData -> data.monochromaticImage != null
+        is GoalProgressComplicationData -> data.monochromaticImage != null
+        is MonochromaticImageComplicationData -> true
+        else -> false
+    }
+
+    private companion object {
+        const val STATIC_PREVIEW_KEY = "com.google.android.wearable.complications.STATIC_PREVIEW_DATA"
     }
 }

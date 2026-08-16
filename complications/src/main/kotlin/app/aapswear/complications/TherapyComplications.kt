@@ -888,7 +888,7 @@ abstract class TherapyComplicationService(
                 valueMgDl = 123.0,
                 displayUnit = GlucoseUnit.MG_DL,
                 trend = Trend.FORTY_FIVE_UP,
-                measuredAtEpochMs = now,
+                measuredAtEpochMs = now - 2 * 60_000L,
                 deltaMgDl = 5.0,
                 averageDeltaMgDl = 3.0,
             ),
