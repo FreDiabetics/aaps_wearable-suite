@@ -33,6 +33,32 @@ class G7FoundationTest {
         assertEquals(CollectorOwner.WATCH, manager.phoneDisconnected())
     }
 
+    @Test fun `fresh setup clears stale errors retries and readings`() {
+        val stale = G7PersistedState(
+            sensor = G7Sensor("old"),
+            collectorEnabled = true,
+            connectionState = G7ConnectionState.DISCONNECTED,
+            protocolState = G7ProtocolState.ERROR,
+            sessionState = G7SessionState.RECOVERING,
+            authenticationState = G7AuthenticationState.FAILED,
+            lastReading = reading(99.0),
+            lastSuccessfulConnectionEpochMs = now - 60_000L,
+            nextReconnectEpochMs = now + 60_000L,
+            retryCount = 5,
+            lastError = G7CollectorError("G7-BLE-107", true, now, "not found"),
+        )
+        val state = G7SessionManager(stale).beginInitialSetup(G7Sensor("new"))
+        assertEquals(G7ConnectionState.SCANNING, state.connectionState)
+        assertEquals(G7ProtocolState.SCANNING, state.protocolState)
+        assertEquals(G7SessionState.INITIAL_SETUP, state.sessionState)
+        assertEquals(G7AuthenticationState.REQUIRED, state.authenticationState)
+        assertEquals(0, state.retryCount)
+        assertNull(state.lastError)
+        assertNull(state.lastReading)
+        assertNull(state.lastSuccessfulConnectionEpochMs)
+        assertNull(state.nextReconnectEpochMs)
+    }
+
     @Test fun `reading schedules autonomous reconnect and clears retries`() {
         val manager = G7SessionManager(G7PersistedState(collectorEnabled = true, retryCount = 4))
         val state = manager.readingReceived(reading(112.0))
