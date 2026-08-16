@@ -10,6 +10,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.os.IBinder
+import android.os.PowerManager
 import app.aapswear.g7.G7CollectorError
 import app.aapswear.g7.G7ConnectionState
 import app.aapswear.g7.G7PersistedState
@@ -31,13 +32,14 @@ class G7CollectorService : Service() {
     private lateinit var credentials: G7CredentialStore
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var collectionJob: Job? = null
+    private var cycleWakeLock: PowerManager.WakeLock? = null
 
     override fun onCreate() {
         super.onCreate()
         store = G7SensorStateStore(this)
         credentials = G7CredentialStore(this)
         getSystemService(NotificationManager::class.java).createNotificationChannel(
-            NotificationChannel(CHANNEL, "G7 Collector", NotificationManager.IMPORTANCE_LOW),
+            NotificationChannel(CHANNEL, "G7 Direct to Watch", NotificationManager.IMPORTANCE_LOW),
         )
     }
 
@@ -49,6 +51,7 @@ class G7CollectorService : Service() {
             return START_NOT_STICKY
         }
 
+        acquireCycleWakeLock()
         startForegroundCollector("Collector startet")
         scope.launch { applicationContext.recordG7Diagnostic("G7-COLLECT-100", "Collector cycle started") }
         if (collectionJob?.isActive == true) return START_STICKY
@@ -184,8 +187,8 @@ class G7CollectorService : Service() {
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
         )
         return Notification.Builder(this, CHANNEL)
-            .setSmallIcon(R.drawable.ic_g7_collector)
-            .setContentTitle("Sugarlicious G7")
+            .setSmallIcon(R.drawable.ic_g7_notification)
+            .setContentTitle("G7 Direct to Watch")
             .setContentText(message)
             .setContentIntent(openApp)
             .setOngoing(true)
@@ -203,12 +206,32 @@ class G7CollectorService : Service() {
         getSystemService(AlarmManager::class.java).setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, at, pending)
     }
 
+    private fun acquireCycleWakeLock() {
+        if (cycleWakeLock?.isHeld == true) return
+        cycleWakeLock =
+            getSystemService(PowerManager::class.java)
+                .newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "$packageName:G7Collection")
+                .apply {
+                    setReferenceCounted(false)
+                    acquire(COLLECTION_WAKE_LOCK_TIMEOUT_MS)
+                }
+    }
+
+    private fun releaseCycleWakeLock() {
+        cycleWakeLock?.let { wakeLock ->
+            if (wakeLock.isHeld) wakeLock.release()
+        }
+        cycleWakeLock = null
+    }
+
     private fun finishService(startId: Int) {
+        releaseCycleWakeLock()
         stopForeground(STOP_FOREGROUND_REMOVE)
         stopSelfResult(startId)
     }
 
     override fun onDestroy() {
+        releaseCycleWakeLock()
         scope.cancel()
         super.onDestroy()
     }
@@ -220,6 +243,7 @@ class G7CollectorService : Service() {
         const val ACTION_STOP = "app.aapswear.g7watch.STOP"
         private const val CHANNEL = "g7_collector"
         private const val NOTIFICATION_ID = 7001
+        private const val COLLECTION_WAKE_LOCK_TIMEOUT_MS = 35L * 60L * 1000L
 
         fun start(context: Context) = context.startForegroundService(
             Intent(context, G7CollectorService::class.java).setAction(ACTION_START),
