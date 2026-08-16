@@ -2,6 +2,7 @@ package app.aapswear.mobile
 
 import android.content.Context
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.glance.GlanceId
@@ -38,11 +39,15 @@ import app.aapswear.storage.TherapyStateStore
 import kotlinx.coroutines.flow.first
 import java.util.Locale
 
-private val WidgetBackground = ColorProvider(0xFF15191D.toInt())
-private val WidgetCard = ColorProvider(0xFF22282D.toInt())
-private val WidgetPrimary = ColorProvider(0xFFF5F5F5.toInt())
-private val WidgetSecondary = ColorProvider(0xFFB8C0C4.toInt())
-private val WidgetAccent = ColorProvider(0xFF19D7E8.toInt())
+private val WidgetBackground = ColorProvider(Color(0xFF15191D))
+private val WidgetCard = ColorProvider(Color(0xFF22282D))
+private val WidgetPrimary = ColorProvider(Color(0xFFF5F5F5))
+private val WidgetSecondary = ColorProvider(Color(0xFFB8C0C4))
+private val WidgetAccent = ColorProvider(Color(0xFF19D7E8))
+private val WidgetIob = ColorProvider(Color(0xFF64BFFF))
+private val WidgetCob = ColorProvider(Color(0xFFFF9D18))
+private val WidgetBasal = ColorProvider(Color(0xFF54DF30))
+private val WidgetHeartRate = ColorProvider(Color(0xFFFF6B7A))
 
 private abstract class SugarliciousWidget : GlanceAppWidget() {
     protected abstract val kind: WidgetKind
@@ -113,12 +118,12 @@ private fun GlucoseWidgetContent(state: TherapyDisplayState?) {
 private fun MetabolicWidgetContent(state: TherapyDisplayState?) {
     val pillWidth = ((LocalSize.current.width - 40.dp) / 2).coerceAtLeast(64.dp)
     Row(modifier = GlanceModifier.fillMaxWidth()) {
-        MetricPill("IOB", state?.insulin?.totalIob?.let { String.format(Locale.US, "%.1f U", it) } ?: "–", ColorProvider(0xFF64BFFF.toInt()), GlanceModifier.width(pillWidth))
+        MetricPill("IOB", state?.insulin?.totalIob?.let { String.format(Locale.US, "%.1f U", it) } ?: "–", WidgetIob, GlanceModifier.width(pillWidth))
         Spacer(GlanceModifier.width(8.dp))
-        MetricPill("COB", state?.carbs?.cobGrams?.let { String.format(Locale.US, "%.0f g", it) } ?: "–", ColorProvider(0xFFFF9D18.toInt()), GlanceModifier.width(pillWidth))
+        MetricPill("COB", state?.carbs?.cobGrams?.let { String.format(Locale.US, "%.0f g", it) } ?: "–", WidgetCob, GlanceModifier.width(pillWidth))
     }
     Spacer(GlanceModifier.height(8.dp))
-    MetricPill("Basal", state?.basal?.currentUnitsPerHour?.let { String.format(Locale.US, "%.2f U/h", it) } ?: "–", ColorProvider(0xFF54DF30.toInt()), GlanceModifier.fillMaxWidth())
+    MetricPill("Basal", state?.basal?.currentUnitsPerHour?.let { String.format(Locale.US, "%.2f U/h", it) } ?: "–", WidgetBasal, GlanceModifier.fillMaxWidth())
 }
 
 @Composable
@@ -135,12 +140,12 @@ private fun ActivityWidgetContent(snapshot: HealthConnectSnapshot?) {
     Row(modifier = GlanceModifier.fillMaxWidth()) {
         MetricPill("Schritte", snapshot?.steps?.toString() ?: "–", WidgetAccent, GlanceModifier.width(pillWidth))
         Spacer(GlanceModifier.width(8.dp))
-        MetricPill("Puls", snapshot?.latestHeartRate?.let { "$it bpm" } ?: "–", ColorProvider(0xFFFF6B7A.toInt()), GlanceModifier.width(pillWidth))
+        MetricPill("Puls", snapshot?.latestHeartRate?.let { "$it bpm" } ?: "–", WidgetHeartRate, GlanceModifier.width(pillWidth))
     }
     Spacer(GlanceModifier.height(8.dp))
     Row(modifier = GlanceModifier.fillMaxWidth()) {
-        MetricPill("Aktiv", snapshot?.activeMinutes?.let { "$it min" } ?: "–", ColorProvider(0xFF54DF30.toInt()), GlanceModifier.width(pillWidth))
+        MetricPill("Aktiv", snapshot?.activeMinutes?.let { "$it min" } ?: "–", WidgetBasal, GlanceModifier.width(pillWidth))
         Spacer(GlanceModifier.width(8.dp))
-        MetricPill("Kalorien", snapshot?.activeCaloriesKcal?.let { String.format(Locale.US, "%.0f kcal", it) } ?: "–", ColorProvider(0xFFFF9D18.toInt()), GlanceModifier.width(pillWidth))
+        MetricPill("Kalorien", snapshot?.activeCaloriesKcal?.let { String.format(Locale.US, "%.0f kcal", it) } ?: "–", WidgetCob, GlanceModifier.width(pillWidth))
     }
 }

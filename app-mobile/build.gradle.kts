@@ -1,18 +1,28 @@
 plugins {
     id("org.jetbrains.kotlin.plugin.compose")
     id("org.jetbrains.kotlin.plugin.serialization")
- id("com.android.application") }
+    id("com.android.application")
+}
+
 android {
     buildFeatures { compose = true }
 
-    namespace="app.aapswear.mobile"
-    compileSdk=36
-    defaultConfig { applicationId="app.aapswear"; minSdk=26; targetSdk=36; versionCode=10; versionName="0.6.2" }
+    namespace = "app.aapswear.mobile"
+    compileSdk = 36
+    defaultConfig {
+        applicationId = "app.aapswear"
+        minSdk = 26
+        targetSdk = 36
+        versionCode = 10
+        versionName = "0.6.2"
+    }
     testOptions { unitTests.isIncludeAndroidResources = true }
 }
+
 dependencies {
     implementation(platform("androidx.compose:compose-bom:2026.06.01"))
     implementation("androidx.activity:activity-compose:1.13.0")
+    implementation("androidx.fragment:fragment-ktx:1.8.9")
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.foundation:foundation")
     implementation("androidx.compose.material3:material3")

@@ -3,15 +3,13 @@ param(
     [ValidateSet("mobile", "wear", "g7", "all", "wfp")]
     [string]$Target = "mobile",
     [switch]$Test,
-    [switch]$NoPull
+    [switch]$NoPull,
+    [string]$PhoneSerial,
+    [string]$WatchSerial
 )
 
 $ErrorActionPreference = "Stop"
 Set-StrictMode -Version 2.0
-
-$phoneUsb = "R3GL30M0HYX"
-$phoneWifi = "adb-R3GL30M0HYX-gUIExC._adb-tls-connect._tcp"
-$watchWifi = "adb-RFAY12MBZ8X-AVH2AE._adb-tls-connect._tcp"
 
 function Assert-LastExitCode([string]$Step) {
     if ($LASTEXITCODE -ne 0) {
@@ -19,17 +17,69 @@ function Assert-LastExitCode([string]$Step) {
     }
 }
 
-function Resolve-AdbSerial([string]$Preferred, [string]$Fallback) {
-    $connected = @(
-        adb devices |
+function Get-ConnectedAdbDevices {
+    & adb start-server | Out-Host
+    Assert-LastExitCode "ADB start"
+
+    $serials = @(
+        & adb devices |
             Select-Object -Skip 1 |
             ForEach-Object {
                 if ($_ -match '^([^\s]+)\s+device(?:\s|$)') { $matches[1] }
             }
     )
-    if ($Preferred -in $connected) { return $Preferred }
-    if ($Fallback -in $connected) { return $Fallback }
-    return $Preferred
+    Assert-LastExitCode "ADB device query"
+
+    foreach ($serial in $serials) {
+        $characteristics =
+            ((& adb -s $serial shell getprop ro.build.characteristics) | Out-String).Trim()
+        Assert-LastExitCode "ADB characteristics query for $serial"
+        $model =
+            ((& adb -s $serial shell getprop ro.product.model) | Out-String).Trim()
+        Assert-LastExitCode "ADB model query for $serial"
+
+        [pscustomobject]@{
+            Serial = $serial
+            Model = $model
+            IsWatch = $characteristics -match '(^|,)watch(,|$)'
+        }
+    }
+}
+
+function Resolve-AdbDevice(
+    [object[]]$Devices,
+    [ValidateSet("phone", "watch")]
+    [string]$Kind,
+    [string]$RequestedSerial
+) {
+    $expectWatch = $Kind -eq "watch"
+
+    if ($RequestedSerial) {
+        $requested = @($Devices | Where-Object { $_.Serial -eq $RequestedSerial })
+        if ($requested.Count -ne 1) {
+            throw "Requested $Kind '$RequestedSerial' is not an active ADB device."
+        }
+        if ($requested[0].IsWatch -ne $expectWatch) {
+            throw "Requested device '$RequestedSerial' is not a $Kind."
+        }
+        return $requested[0].Serial
+    }
+
+    $candidates = @($Devices | Where-Object { $_.IsWatch -eq $expectWatch })
+    if (($Kind -eq "phone") -and ($candidates.Count -gt 1)) {
+        $usbCandidates = @(
+            $candidates |
+                Where-Object { $_.Serial -notmatch '(_adb-tls-connect|:\d+$)' }
+        )
+        if ($usbCandidates.Count -eq 1) { return $usbCandidates[0].Serial }
+    }
+    if ($candidates.Count -ne 1) {
+        $connected =
+            ($Devices | ForEach-Object { "$($_.Serial) ($($_.Model))" }) -join ", "
+        if (-not $connected) { $connected = "none" }
+        throw "Expected exactly one $kind, found $($candidates.Count). Connected: $connected"
+    }
+    return $candidates[0].Serial
 }
 
 function Test-WatchFacePushAssetsStale {
@@ -94,7 +144,24 @@ if (-not $NoPull) {
     Assert-LastExitCode "git pull"
 }
 
+$needsPhone = $Target -in @("mobile", "all")
+$needsWatch = $Target -in @("wear", "g7", "all", "wfp")
+$adbDevices = @(Get-ConnectedAdbDevices)
+
+$phone = $null
+if ($needsPhone) {
+    $phone = Resolve-AdbDevice $adbDevices "phone" $PhoneSerial
+    Write-Host "Phone: $phone"
+}
+
+$watch = $null
+if ($needsWatch) {
+    $watch = Resolve-AdbDevice $adbDevices "watch" $WatchSerial
+    Write-Host "Watch: $watch"
+}
+
 $effectiveTarget = $Target
+$installWatchFaces = $Target -in @("all", "wfp")
 $needsWatchFaceAssets = $Target -in @("wear", "all", "wfp")
 if ($needsWatchFaceAssets -and (($Target -eq "wfp") -or (Test-WatchFacePushAssetsStale))) {
     Write-Host "Preparing current Watch Face Push assets..."
@@ -139,7 +206,6 @@ foreach ($task in $gradleTasks) { Write-Host "  $task" }
 Assert-LastExitCode "Gradle"
 
 if (($effectiveTarget -eq "mobile") -or ($effectiveTarget -eq "all")) {
-    $phone = Resolve-AdbSerial $phoneUsb $phoneWifi
     $mobileApk = Get-ChildItem .\app-mobile\build\outputs\apk\debug\*.apk |
         Sort-Object LastWriteTime -Descending |
         Select-Object -First 1
@@ -149,12 +215,11 @@ if (($effectiveTarget -eq "mobile") -or ($effectiveTarget -eq "all")) {
     Assert-LastExitCode "Mobile install"
     adb -s $phone shell am force-stop app.aapswear
     Assert-LastExitCode "Mobile force-stop"
-    adb -s $phone shell monkey -p app.aapswear 1 | Out-Null
+    adb -s $phone shell am start -n app.aapswear/.mobile.MainActivity | Out-Host
     Assert-LastExitCode "Mobile start"
 }
 
 if (($effectiveTarget -eq "wear") -or ($effectiveTarget -eq "g7") -or ($effectiveTarget -eq "all")) {
-    $watch = Resolve-AdbSerial $watchWifi $watchWifi
     if (($effectiveTarget -eq "g7") -or ($effectiveTarget -eq "all")) {
         $g7WatchApk = Get-ChildItem .\g7watch\build\outputs\apk\debug\*.apk |
             Sort-Object LastWriteTime -Descending |
@@ -180,8 +245,16 @@ if (($effectiveTarget -eq "wear") -or ($effectiveTarget -eq "g7") -or ($effectiv
     Assert-LastExitCode "Wear install"
     adb -s $watch shell am force-stop app.aapswear
     Assert-LastExitCode "Wear force-stop"
-    adb -s $watch shell monkey -p app.aapswear 1 | Out-Null
+    adb -s $watch shell am start -n app.aapswear/.wear.WearActivity | Out-Host
     Assert-LastExitCode "Wear start"
+
+    if ($installWatchFaces) {
+        Write-Host "Installing Sugarlicious watchfaces on $watch..."
+        & .\tools\install-sugarlicious-watchfaces.ps1 `
+            -WatchSerial $watch `
+            -Adb ((Get-Command adb).Source)
+        if (-not $?) { throw "Sugarlicious watchface installation failed" }
+    }
 }
 
 Write-Host ""

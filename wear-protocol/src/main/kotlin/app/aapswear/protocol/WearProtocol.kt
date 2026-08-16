@@ -96,8 +96,6 @@ object WearProtocol {
     const val WATCH_FACE_STATUS_PATH = "/aaps-display/v1/watchface-status"
     const val WATCH_RUNTIME_STATUS_PATH = "/aaps-display/v1/watch-runtime-status"
     const val WATCH_RUNTIME_REQUEST_PATH = "/aaps-display/v1/watch-runtime-request"
-    const val CAPABILITY = "aaps_display"
-
     private val json = Json {
         ignoreUnknownKeys = true
         explicitNulls = false
