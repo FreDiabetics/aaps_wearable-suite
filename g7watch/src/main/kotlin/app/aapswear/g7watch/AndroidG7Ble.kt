@@ -32,6 +32,12 @@ import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 
+internal const val G7_INITIAL_PAIRING_SCAN_TIMEOUT_MS = 30 * 60_000L
+internal const val G7_RECONNECT_SCAN_TIMEOUT_MS = 90_000L
+
+internal fun g7ScanTimeoutMs(sensor: G7Sensor): Long =
+    if (sensor.deviceAddress.isNullOrBlank()) G7_INITIAL_PAIRING_SCAN_TIMEOUT_MS else G7_RECONNECT_SCAN_TIMEOUT_MS
+
 internal fun interface G7DeviceMatcher {
     fun matches(device: BluetoothDevice, advertisedName: String?, knownSensor: G7Sensor?): Boolean
 }
@@ -104,7 +110,7 @@ internal class AndroidG7Scanner(
             }.onFailure { finish(null, G7BleException("G7-BLE-106", "Sensorsuche konnte nicht gestartet werden", true, it)) }
             android.os.Handler(context.mainLooper).postDelayed(
                 { finish(null) },
-                timeoutMs.coerceIn(5_000L, 45_000L),
+                timeoutMs.coerceIn(5_000L, G7_INITIAL_PAIRING_SCAN_TIMEOUT_MS),
             )
             continuation.invokeOnCancellation {
                 if (finished.compareAndSet(false, true)) runCatching { scanner.stopScan(callback) }
@@ -144,7 +150,7 @@ internal class AndroidG7Collector(
         onSharedKey: (String, ByteArray) -> Unit = { _, _ -> },
     ): G7CollectionResult {
         onState(G7ProtocolState.SCANNING)
-        val sensor = scanner.findKnownSensor(initialSensor, SCAN_TIMEOUT_MS)
+        val sensor = scanner.findKnownSensor(initialSensor, g7ScanTimeoutMs(initialSensor))
             ?: throw G7BleException("G7-BLE-107", "Kein sendender Dexcom-G7-Sensor gefunden", true)
         var sharedKey = credentials.sharedKey?.takeIf {
             credentials.sharedKeyAddress == null || credentials.sharedKeyAddress.equals(sensor.deviceAddress, true)
@@ -176,7 +182,6 @@ internal class AndroidG7Collector(
     }
 
     private companion object {
-        const val SCAN_TIMEOUT_MS = 25_000L
         const val SESSION_TIMEOUT_MS = 75_000L
     }
 }
