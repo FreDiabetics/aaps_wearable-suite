@@ -91,6 +91,10 @@ class MainActivityTest {
         val settingsText = textOf(activity.findViewById(R.id.dashboard_content))
         assertTrue(settingsText.contains("Datenquelle"))
         assertTrue(settingsText.contains("AndroidAPS"))
+        assertTrue(settingsText.contains("APP-BETRIEB & SICHERUNG"))
+        assertTrue(settingsText.contains("Dauerbetrieb"))
+        assertTrue(settingsText.contains("Einstellungen sichern"))
+        assertTrue(settingsText.contains("Einstellungen wiederherstellen"))
         controller.pause().stop().destroy()
     }
 

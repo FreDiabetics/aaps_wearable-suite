@@ -2,12 +2,17 @@ package app.aapswear.g7watch
 
 import android.Manifest
 import android.app.Activity
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.res.ColorStateList
 import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
+import android.net.Uri
+import android.os.Build
 import android.os.Bundle
+import android.os.PowerManager
+import android.provider.Settings
 import android.text.InputFilter
 import android.text.InputType
 import android.view.Gravity
@@ -113,6 +118,46 @@ class G7WatchActivity : Activity() {
                     addView(label(error.code, 12f, ERROR, bold = true).apply { gravity = Gravity.START })
                     addView(label(error.safeMessage, 12f, TEXT_PRIMARY).apply { gravity = Gravity.START })
                 }
+            },
+            cardParams(),
+        )
+
+        content.addView(
+            card().apply {
+                addView(sectionLabel("APP-BETRIEB"))
+                val nearbyAllowed =
+                    checkSelfPermission(Manifest.permission.BLUETOOTH_SCAN) == PackageManager.PERMISSION_GRANTED &&
+                        checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED
+                val notificationsAllowed =
+                    Build.VERSION.SDK_INT < 33 ||
+                        checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+                val batteryUnrestricted = isBatteryUnrestricted()
+                addView(valueRow("Geräte in der Nähe", if (nearbyAllowed) "Erlaubt" else "Freigeben"))
+                addView(valueRow("Benachrichtigungen", if (notificationsAllowed) "Erlaubt" else "Freigeben"))
+                addView(valueRow("Akku-Optimierung", if (batteryUnrestricted) "Uneingeschränkt" else "Optimiert"))
+                if (!nearbyAllowed || !notificationsAllowed) {
+                    addView(
+                        actionButton("Berechtigungen freigeben", primary = false) {
+                            requestMissingPermissions()
+                        },
+                        buttonParams(top = 10),
+                    )
+                }
+                if (!batteryUnrestricted) {
+                    addView(
+                        actionButton("Dauerbetrieb freigeben", primary = false) {
+                            requestBatteryExemption()
+                        },
+                        buttonParams(top = 10),
+                    )
+                }
+                addView(
+                    label(
+                        "Der Collector verbindet sich nur mit dem eingerichteten G7-Sensor und verwendet BLE niemals zur Standortbestimmung.",
+                        9f,
+                        TEXT_SECONDARY,
+                    ).apply { gravity = Gravity.START },
+                )
             },
             cardParams(),
         )
@@ -271,6 +316,29 @@ class G7WatchActivity : Activity() {
             if (checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) add(Manifest.permission.POST_NOTIFICATIONS)
         }
         if (missing.isNotEmpty()) requestPermissions(missing.toTypedArray(), PERMISSION_REQUEST)
+    }
+
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<out String>,
+        grantResults: IntArray,
+    ) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == PERMISSION_REQUEST) render()
+    }
+
+    private fun isBatteryUnrestricted(): Boolean =
+        getSystemService(PowerManager::class.java).isIgnoringBatteryOptimizations(packageName)
+
+    private fun requestBatteryExemption() {
+        runCatching {
+            startActivity(
+                Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS)
+                    .setData(Uri.parse("package:$packageName")),
+            )
+        }.onFailure {
+            runCatching { startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)) }
+        }
     }
 
     private fun app.aapswear.g7.G7ProtocolState.displayName(): String = when (this) {
