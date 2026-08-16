@@ -271,6 +271,10 @@ data class DashboardCallbacks(
     val connectHealthConnect: () -> Unit,
     val syncHealthConnect: () -> Unit,
     val manageHealthConnect: () -> Unit,
+    val requestNotificationAccess: () -> Unit,
+    val requestUnrestrictedBattery: () -> Unit,
+    val exportSettings: () -> Unit,
+    val importSettings: () -> Unit,
     val openProjectGitHub: () -> Unit,
     val openContactEmail: () -> Unit,
 )
@@ -505,6 +509,53 @@ class DashboardViewFactory(
                 )
                 addView(divider())
                 addView(actionRow("Jetzt synchronisieren", "Jetzt") { callbacks.syncNow() })
+            },
+            cardParams(top = 4),
+        )
+
+        parent.addView(settingsGroupLabel("APP-BETRIEB & SICHERUNG"), fullWidth())
+        parent.addView(
+            tile(null).apply {
+                addView(
+                    actionRow(
+                        "Benachrichtigungen",
+                        AppRuntimeAccess.notificationLabel(context),
+                        callbacks.requestNotificationAccess,
+                    ),
+                )
+                addView(divider())
+                addView(
+                    actionRow(
+                        "Dauerbetrieb",
+                        AppRuntimeAccess.batteryLabel(context),
+                        callbacks.requestUnrestrictedBattery,
+                    ),
+                )
+                addView(
+                    helper(
+                        "Der sichtbare Sugarlicious-Dienst startet mit der App und nach einem Geräteneustart. " +
+                            "Für möglichst zuverlässige Watch-Synchronisierung kann die Akku-Optimierung freigegeben werden.",
+                        3,
+                    ),
+                )
+                addView(divider())
+                addView(actionRow("Einstellungen sichern", "Exportieren", callbacks.exportSettings))
+                addView(divider())
+                addView(actionRow("Einstellungen wiederherstellen", "Importieren", callbacks.importSettings))
+                addView(
+                    helper(
+                        "Die Sicherung enthält nur Darstellung, Verhalten und Watchface-/Complication-Auswahl. " +
+                            "Diagnosen, Gesundheitsdaten und Sensorzugänge bleiben ausgeschlossen.",
+                        3,
+                    ),
+                )
+                addView(
+                    helper(
+                        "Nahgeräte und Benachrichtigungen werden für den G7-Collector direkt auf der Watch abgefragt. " +
+                            "QR-Scan und Dateiauswahl funktionieren ohne pauschalen Kamera-, Standort- oder Speicherzugriff.",
+                        3,
+                    ),
+                )
             },
             cardParams(top = 4),
         )

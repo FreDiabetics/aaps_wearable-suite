@@ -23,6 +23,7 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.ComponentActivity
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.health.connect.client.HealthConnectClient
 import androidx.core.content.edit
 import app.aapswear.mobile.ui.theme.SugarliciousColorRole
@@ -37,7 +38,9 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
+import java.time.LocalDate
 import kotlin.time.Duration.Companion.seconds
 
 class MainActivity : ComponentActivity() {
@@ -72,6 +75,66 @@ class MainActivity : ComponentActivity() {
             refresh(forceSettingsRender = true)
         }
     }
+    private val notificationPermissionLauncher =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) {
+            PersistentBridgeService.refresh(this)
+            if (::factory.isInitialized) refresh(forceSettingsRender = screen == DashboardScreen.SETTINGS)
+        }
+    private val settingsExportLauncher =
+        registerForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
+            if (uri == null) return@registerForActivityResult
+            scope.launch(Dispatchers.IO) {
+                val result = runCatching {
+                    contentResolver.openOutputStream(uri, "wt")?.use { output ->
+                        SettingsBackup.write(applicationContext, output)
+                    } ?: error("Die Datei konnte nicht geöffnet werden")
+                }
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(
+                        this@MainActivity,
+                        result.fold(
+                            onSuccess = { "Einstellungen wurden gesichert" },
+                            onFailure = { "Sicherung fehlgeschlagen: ${it.message ?: "Dateifehler"}" },
+                        ),
+                        Toast.LENGTH_LONG,
+                    ).show()
+                }
+            }
+        }
+    private val settingsImportLauncher =
+        registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+            if (uri == null) return@registerForActivityResult
+            scope.launch(Dispatchers.IO) {
+                val result = runCatching {
+                    contentResolver.openInputStream(uri)?.use { input ->
+                        SettingsBackup.restore(applicationContext, input)
+                    } ?: error("Die Datei konnte nicht geöffnet werden")
+                }
+                result.onSuccess {
+                    runCatching { publishWatchConfig(applicationContext) }
+                    runCatching { syncComplicationPreset(applicationContext, loadComplicationPreset(applicationContext)) }
+                }
+                withContext(Dispatchers.Main) {
+                    result.onSuccess { restored ->
+                        SugarliciousColors.apply(SugarliciousColorStore.load(uiPreferences))
+                        PersistentBridgeService.refresh(this@MainActivity)
+                        SugarliciousWidgets.update(applicationContext)
+                        refresh(forceSettingsRender = true)
+                        Toast.makeText(
+                            this@MainActivity,
+                            "${restored.valueCount} Einstellungen wurden wiederhergestellt",
+                            Toast.LENGTH_LONG,
+                        ).show()
+                    }.onFailure { error ->
+                        Toast.makeText(
+                            this@MainActivity,
+                            "Import fehlgeschlagen: ${error.message ?: "ungültige Datei"}",
+                            Toast.LENGTH_LONG,
+                        ).show()
+                    }
+                }
+            }
+        }
 
     private val diagnosticsListener = SharedPreferences.OnSharedPreferenceChangeListener { _, _ -> runOnUiThread(::refresh) }
     private val uiListener =
@@ -192,6 +255,10 @@ class MainActivity : ComponentActivity() {
             connectHealthConnect = ::connectHealthConnect,
             syncHealthConnect = ::syncHealthConnect,
             manageHealthConnect = ::manageHealthConnect,
+            requestNotificationAccess = ::requestNotificationAccess,
+            requestUnrestrictedBattery = ::requestUnrestrictedBattery,
+            exportSettings = ::exportSettings,
+            importSettings = ::importSettings,
             openProjectGitHub = ::openProjectGitHub,
             openContactEmail = ::openContactEmail,
         ))
@@ -298,6 +365,11 @@ class MainActivity : ComponentActivity() {
         }
         scope.launch(Dispatchers.IO) { runCatching { requestWatchRuntimeStatus(applicationContext) } }
         refresh()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        if (::factory.isInitialized) refresh(forceSettingsRender = screen == DashboardScreen.SETTINGS)
     }
 
     override fun onStop() {
@@ -520,10 +592,45 @@ class MainActivity : ComponentActivity() {
 
     private fun requestNotificationPermissionIfNeeded() {
         if (Build.VERSION.SDK_INT >= 33 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
-            requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), NOTIFICATION_PERMISSION_REQUEST)
+            notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
         }
     }
 
+    private fun requestNotificationAccess() {
+        if (Build.VERSION.SDK_INT >= 33 &&
+            checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+        ) {
+            notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+            return
+        }
+        openExternal(
+            Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                .putExtra(Settings.EXTRA_APP_PACKAGE, packageName),
+        )
+    }
+
+    private fun requestUnrestrictedBattery() {
+        if (AppRuntimeAccess.isIgnoringBatteryOptimizations(this)) {
+            Toast.makeText(this, "Dauerbetrieb ist bereits uneingeschränkt", Toast.LENGTH_SHORT).show()
+            return
+        }
+        runCatching {
+            startActivity(
+                Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS)
+                    .setData(Uri.parse("package:$packageName")),
+            )
+        }.onFailure {
+            openExternal(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS))
+        }
+    }
+
+    private fun exportSettings() {
+        settingsExportLauncher.launch("sugarlicious-settings-${LocalDate.now()}.json")
+    }
+
+    private fun importSettings() {
+        settingsImportLauncher.launch(arrayOf("application/json", "text/json", "text/plain"))
+    }
 
     private fun openContactEmail() {
         val intent = Intent(Intent.ACTION_SENDTO, Uri.fromParts("mailto", getString(R.string.contact_email), null))
@@ -550,7 +657,4 @@ class MainActivity : ComponentActivity() {
 
     private val Int.dp get() = (this * resources.displayMetrics.density).toInt()
 
-    companion object {
-        private const val NOTIFICATION_PERMISSION_REQUEST = 4102
-    }
 }
