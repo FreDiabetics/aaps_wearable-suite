@@ -1,5 +1,6 @@
 package app.aapswear.protocol
 
+import app.aapswear.model.DiagnosticBatch
 import app.aapswear.model.TherapyDisplayState
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
@@ -118,6 +119,8 @@ object WearProtocol {
     const val WATCH_RUNTIME_REQUEST_PATH = "/aaps-display/v1/watch-runtime-request"
     const val G7_SETUP_PATH = "/aaps-display/v1/g7-setup"
     const val G7_READING_PATH = "/aaps-display/v1/g7-reading"
+    const val DIAGNOSTICS_REQUEST_PATH = "/aaps-display/v1/diagnostics-request"
+    const val DIAGNOSTICS_BATCH_PATH = "/aaps-display/v1/diagnostics-batch"
     private val json = Json {
         ignoreUnknownKeys = true
         explicitNulls = false
@@ -143,6 +146,14 @@ object WearProtocol {
 
     fun decodeG7Setup(bytes: ByteArray): G7SetupCommand =
         json.decodeFromString<G7SetupCommand>(bytes.decodeToString())
+
+    fun encodeDiagnostics(batch: DiagnosticBatch): ByteArray =
+        json.encodeToString(batch).encodeToByteArray()
+
+    fun decodeDiagnostics(bytes: ByteArray): DiagnosticBatch {
+        val decoded = json.decodeFromString<DiagnosticBatch>(bytes.decodeToString())
+        return decoded.copy(events = decoded.events.takeLast(1_000))
+    }
 
     fun decodeRuntimeStatus(bytes: ByteArray): WatchRuntimeStatus {
         val decoded = json.decodeFromString<WatchRuntimeStatus>(bytes.decodeToString())

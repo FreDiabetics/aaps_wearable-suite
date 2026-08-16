@@ -16,6 +16,7 @@ import app.aapswear.model.PredictionKind
 import app.aapswear.model.TherapyDisplayState
 import app.aapswear.protocol.WatchGraphColors
 import app.aapswear.protocol.WatchGraphStyle
+import app.aapswear.storage.PredictionDisplayTimeline
 import kotlin.math.max
 
 @SuppressLint("DrawAllocation")
@@ -122,7 +123,10 @@ class WearGlucoseChart @JvmOverloads constructor(
 
         val predictions =
             if (showPredictions) {
-                state?.glucosePredictions.orEmpty()
+                PredictionDisplayTimeline.anchor(
+                    state?.glucosePredictions.orEmpty(),
+                    now,
+                )
             } else {
                 emptyList()
             }
@@ -192,7 +196,7 @@ class WearGlucoseChart @JvmOverloads constructor(
             linePaint,
         )
 
-        if (history.isEmpty()) {
+        if (history.isEmpty() && visiblePredictions.isEmpty()) {
             canvas.drawText(
                 "Noch keine CGM-Historie",
                 width / 2f,

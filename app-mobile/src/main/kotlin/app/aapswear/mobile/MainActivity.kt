@@ -141,6 +141,7 @@ class MainActivity : ComponentActivity() {
             setUnit = { uiPreferences.edit { putString("unit", it.name) } },
             setDataSource = { uiPreferences.edit { putString("dataSource", it.name) } },
             openG7Setup = { startActivity(Intent(this, G7SetupActivity::class.java)) },
+            openDiagnostics = { startActivity(Intent(this, DiagnosticActivity::class.java)) },
             setThemeMode = { uiPreferences.edit { putString("themeMode", it.name) } },
             setShowDetails = { uiPreferences.edit { putBoolean("showDetails", it) } },
             setShowCgmGraph = { uiPreferences.edit { putBoolean("showCgmGraph", it) } },
@@ -188,6 +189,9 @@ class MainActivity : ComponentActivity() {
         ))
         bindTopNavigation()
         PersistentBridgeService.start(this)
+        scope.launch(Dispatchers.IO) {
+            applicationContext.recordMobileDiagnostic("APP", "APP-START-100", "Mobile overview started")
+        }
         requestNotificationPermissionIfNeeded()
         scope.launch {
             TherapyStateStore(this@MainActivity).state.collectLatest {
@@ -370,6 +374,14 @@ class MainActivity : ComponentActivity() {
         screen = target
         scroll.scrollTo(0, 0)
         refresh(forceSettingsRender = true)
+        scope.launch(Dispatchers.IO) {
+            applicationContext.recordMobileDiagnostic(
+                "NAVIGATION",
+                "APP-NAV-100",
+                "Dashboard screen opened",
+                metadata = mapOf("screen" to target.name),
+            )
+        }
     }
 
     private fun updateTopBar() {

@@ -13,7 +13,7 @@ import app.aapswear.model.Trend
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
-internal class G7ReadingDatabase(context: Context) : SQLiteOpenHelper(context, "g7_readings.db", null, 1), CgmReadingRepository {
+internal class G7ReadingDatabase(context: Context) : SQLiteOpenHelper(context, "g7_readings.db", null, 2), CgmReadingRepository {
     private val appContext = context.applicationContext
     private val mutableLatest = MutableStateFlow<CgmReading?>(null)
     override val latestReading: StateFlow<CgmReading?> = mutableLatest
@@ -21,11 +21,22 @@ internal class G7ReadingDatabase(context: Context) : SQLiteOpenHelper(context, "
     init { mutableLatest.value = query(limit = 1).firstOrNull() }
 
     override fun onCreate(db: SQLiteDatabase) {
-        db.execSQL("CREATE TABLE readings (id TEXT PRIMARY KEY, sensor_id TEXT NOT NULL, session_id TEXT NOT NULL, glucose REAL NOT NULL, measured_at INTEGER NOT NULL, received_at INTEGER NOT NULL, delta REAL, trend TEXT NOT NULL, trend_rate REAL, predicted REAL, sensor_age INTEGER, status TEXT NOT NULL, sequence_number INTEGER, synced INTEGER NOT NULL DEFAULT 0)")
+        db.execSQL("CREATE TABLE readings (id TEXT PRIMARY KEY, sensor_id TEXT NOT NULL, session_id TEXT NOT NULL, glucose REAL NOT NULL, measured_at INTEGER NOT NULL, received_at INTEGER NOT NULL, delta REAL, trend TEXT NOT NULL, trend_rate REAL, predicted REAL, sensor_age INTEGER, status TEXT NOT NULL, sequence_number INTEGER, display_only INTEGER NOT NULL DEFAULT 0, sensor_clock INTEGER, sensor_start INTEGER, sensor_end INTEGER, grace_end INTEGER, protocol_status INTEGER, calibration_state INTEGER, reserved_field INTEGER, synced INTEGER NOT NULL DEFAULT 0)")
         db.execSQL("CREATE INDEX readings_measured_at ON readings(measured_at DESC)")
         db.execSQL("CREATE INDEX readings_pending ON readings(synced, measured_at)")
     }
-    override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) = Unit
+    override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
+        if (oldVersion < 2) {
+            db.execSQL("ALTER TABLE readings ADD COLUMN display_only INTEGER NOT NULL DEFAULT 0")
+            db.execSQL("ALTER TABLE readings ADD COLUMN sensor_clock INTEGER")
+            db.execSQL("ALTER TABLE readings ADD COLUMN sensor_start INTEGER")
+            db.execSQL("ALTER TABLE readings ADD COLUMN sensor_end INTEGER")
+            db.execSQL("ALTER TABLE readings ADD COLUMN grace_end INTEGER")
+            db.execSQL("ALTER TABLE readings ADD COLUMN protocol_status INTEGER")
+            db.execSQL("ALTER TABLE readings ADD COLUMN calibration_state INTEGER")
+            db.execSQL("ALTER TABLE readings ADD COLUMN reserved_field INTEGER")
+        }
+    }
 
     override suspend fun insert(reading: CgmReading): Boolean {
         val values = ContentValues().apply {
@@ -34,6 +45,14 @@ internal class G7ReadingDatabase(context: Context) : SQLiteOpenHelper(context, "
             reading.deltaMgDl?.let { put("delta", it) }; put("trend", reading.trend.name); reading.trendRateMgDlPerMinute?.let { put("trend_rate", it) }
             reading.predictedMgDl?.let { put("predicted", it) }; reading.sensorAgeSeconds?.let { put("sensor_age", it) }
             put("status", reading.status.name); reading.sequenceNumber?.let { put("sequence_number", it) }
+            put("display_only", if (reading.displayOnly) 1 else 0)
+            reading.rawSourceTimestamp?.let { put("sensor_clock", it) }
+            reading.sensorStartEpochMs?.let { put("sensor_start", it) }
+            reading.sensorEndEpochMs?.let { put("sensor_end", it) }
+            reading.graceEndEpochMs?.let { put("grace_end", it) }
+            reading.protocolStatusCode?.let { put("protocol_status", it) }
+            reading.calibrationStateCode?.let { put("calibration_state", it) }
+            reading.reservedField?.let { put("reserved_field", it) }
         }
         val inserted = writableDatabase.insertWithOnConflict("readings", null, values, SQLiteDatabase.CONFLICT_IGNORE) != -1L
         if (inserted) {
@@ -67,12 +86,21 @@ internal class G7ReadingDatabase(context: Context) : SQLiteOpenHelper(context, "
                     deltaMgDl = cursor.doubleOrNull("delta"), trend = runCatching { Trend.valueOf(cursor.getString(cursor.getColumnIndexOrThrow("trend"))) }.getOrDefault(Trend.UNKNOWN),
                     trendRateMgDlPerMinute = cursor.doubleOrNull("trend_rate"), predictedMgDl = cursor.doubleOrNull("predicted"), sensorAgeSeconds = cursor.longOrNull("sensor_age"),
                     status = runCatching { CgmReadingStatus.valueOf(cursor.getString(cursor.getColumnIndexOrThrow("status"))) }.getOrDefault(CgmReadingStatus.INVALID), sequenceNumber = cursor.longOrNull("sequence_number"),
+                    displayOnly = cursor.getInt(cursor.getColumnIndexOrThrow("display_only")) != 0,
+                    rawSourceTimestamp = cursor.longOrNull("sensor_clock"),
+                    sensorStartEpochMs = cursor.longOrNull("sensor_start"),
+                    sensorEndEpochMs = cursor.longOrNull("sensor_end"),
+                    graceEndEpochMs = cursor.longOrNull("grace_end"),
+                    protocolStatusCode = cursor.intOrNull("protocol_status"),
+                    calibrationStateCode = cursor.intOrNull("calibration_state"),
+                    reservedField = cursor.intOrNull("reserved_field"),
                 ))
             }
         }
 
     private fun android.database.Cursor.doubleOrNull(name: String): Double? = getColumnIndexOrThrow(name).let { if (isNull(it)) null else getDouble(it) }
     private fun android.database.Cursor.longOrNull(name: String): Long? = getColumnIndexOrThrow(name).let { if (isNull(it)) null else getLong(it) }
+    private fun android.database.Cursor.intOrNull(name: String): Int? = getColumnIndexOrThrow(name).let { if (isNull(it)) null else getInt(it) }
 
     private companion object {
         const val ACTION_G7_READING_UPDATED = "app.aapswear.g7watch.READING_UPDATED"

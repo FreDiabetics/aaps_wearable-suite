@@ -100,6 +100,12 @@ fun G7Reading.toCgm(previous: CgmReading? = null): CgmReading {
         status = if (sensorState == G7SensorState.ERROR) CgmReadingStatus.SENSOR_ERROR else CgmReadingStatus.VALID,
         displayOnly = displayOnly,
         rawSourceTimestamp = sensorClockSeconds,
+        sensorStartEpochMs = sensorStartEpochMs,
+        sensorEndEpochMs = sensorEndEpochMs,
+        graceEndEpochMs = graceEndEpochMs,
+        protocolStatusCode = protocolStatusCode,
+        calibrationStateCode = calibrationStateCode,
+        reservedField = reservedField,
     )
     return base.copy(
         deltaMgDl = CgmDeltaCalculator.calculate(base, previous),

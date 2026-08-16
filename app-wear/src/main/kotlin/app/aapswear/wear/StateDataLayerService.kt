@@ -8,6 +8,7 @@ import app.aapswear.complications.ActiveComplicationRegistry
 import app.aapswear.complications.AllProviders
 import app.aapswear.complications.ComplicationUpdatePlanner
 import app.aapswear.model.SugarliciousComplicationIds
+import app.aapswear.model.DiagnosticSeverity
 import app.aapswear.model.GlucoseSample
 import app.aapswear.protocol.WatchRuntimeStatus
 import app.aapswear.protocol.WearProtocol
@@ -38,6 +39,16 @@ class StateDataLayerService : WearableListenerService() {
             runCatching {
                 requestLatestState(this@StateDataLayerService)
             }
+                .onSuccess { applicationContext.recordWatchDiagnostic("SYNC", "SYNC-PHONE-100", "Requested latest state from phone") }
+                .onFailure { error ->
+                    applicationContext.recordWatchDiagnostic(
+                        "SYNC",
+                        "SYNC-PHONE-503",
+                        "Could not request latest state from phone",
+                        DiagnosticSeverity.WARNING,
+                        mapOf("error" to error.javaClass.simpleName),
+                    )
+                }
         }
     }
 
@@ -71,11 +82,29 @@ class StateDataLayerService : WearableListenerService() {
                     )
                 }
             WearProtocol.G7_SETUP_PATH -> configureG7Collector(event)
+            WearProtocol.DIAGNOSTICS_REQUEST_PATH ->
+                scope.launch {
+                    runCatching { sendWatchDiagnostics(applicationContext, event.sourceNodeId) }
+                        .onSuccess { applicationContext.recordWatchDiagnostic("DIAGNOSTICS", "DIAG-SYNC-200", "Diagnostics sent to phone") }
+                        .onFailure { error ->
+                            applicationContext.recordWatchDiagnostic(
+                                "DIAGNOSTICS",
+                                "DIAG-SYNC-503",
+                                "Diagnostics could not be sent to phone",
+                                DiagnosticSeverity.WARNING,
+                                mapOf("error" to error.javaClass.simpleName),
+                            )
+                        }
+                }
         }
     }
 
     private fun configureG7Collector(event: MessageEvent) {
-        val command = runCatching { WearProtocol.decodeG7Setup(event.data) }.getOrNull() ?: return
+        val command = runCatching { WearProtocol.decodeG7Setup(event.data) }.getOrNull()
+        if (command == null) {
+            scope.launch { applicationContext.recordWatchDiagnostic("G7", "G7-SETUP-401", "Invalid G7 setup command", DiagnosticSeverity.WARNING) }
+            return
+        }
         val intent = Intent("app.aapswear.g7watch.CONFIGURE")
             .setComponent(
                 ComponentName(
@@ -87,6 +116,14 @@ class StateDataLayerService : WearableListenerService() {
             .putExtra("sensor_serial", command.sensorSerial)
             .putExtra("gtin", command.gtin)
         sendBroadcast(intent, "app.aapswear.g7watch.permission.CONFIGURE_G7")
+        scope.launch {
+            applicationContext.recordWatchDiagnostic(
+                "G7",
+                "G7-SETUP-200",
+                "G7 setup forwarded to collector",
+                metadata = mapOf("serialAvailable" to !command.sensorSerial.isNullOrBlank(), "gtinAvailable" to !command.gtin.isNullOrBlank()),
+            )
+        }
     }
 
     private fun applyWatchFace(event: MessageEvent) {
@@ -107,6 +144,15 @@ class StateDataLayerService : WearableListenerService() {
                         appContext,
                         index,
                     )
+                val activated = status.equals("Watchface aktiv", ignoreCase = true)
+
+                applicationContext.recordWatchDiagnostic(
+                    "WATCHFACE",
+                    if (activated) "WATCHFACE-APPLY-200" else "WATCHFACE-APPLY-409",
+                    status,
+                    if (activated) DiagnosticSeverity.INFO else DiagnosticSeverity.WARNING,
+                    mapOf("index" to index),
+                )
 
                 runCatching {
                     Wearable
@@ -174,6 +220,14 @@ class StateDataLayerService : WearableListenerService() {
             .apply()
 
         requestAllComplicationUpdates()
+        scope.launch {
+            applicationContext.recordWatchDiagnostic(
+                "COMPLICATION",
+                "COMP-CONFIG-200",
+                "Complication preset saved",
+                metadata = mapOf("count" to ids.size, "graphHours" to graphHours),
+            )
+        }
     }
 
     private fun persistWatchConfig(event: DataEvent) {
@@ -182,12 +236,24 @@ class StateDataLayerService : WearableListenerService() {
                 WearProtocol.decodeConfig(
                     event.dataItem.data ?: return,
                 )
-            }.getOrNull() ?: return
+            }.getOrNull()
+        if (config == null) {
+            scope.launch { applicationContext.recordWatchDiagnostic("CONFIG", "CONFIG-401", "Invalid Watch configuration", DiagnosticSeverity.WARNING) }
+            return
+        }
 
         WearDisplayPreferences.save(
             this,
             config,
         )
+        scope.launch {
+            applicationContext.recordWatchDiagnostic(
+                "CONFIG",
+                "CONFIG-200",
+                "Watch configuration saved",
+                metadata = mapOf("graphHours" to config.graphHours, "showPredictions" to config.showPredictions, "dataSource" to config.dataSource),
+            )
+        }
     }
 
     private fun persistTherapyState(event: DataEvent) {
@@ -196,7 +262,11 @@ class StateDataLayerService : WearableListenerService() {
                 WearProtocol.decode(
                     event.dataItem.data ?: return,
                 )
-            }.getOrNull() ?: return
+            }.getOrNull()
+        if (incoming == null) {
+            scope.launch { applicationContext.recordWatchDiagnostic("SOURCE", "SRC-PHONE-401", "Invalid phone state payload", DiagnosticSeverity.WARNING) }
+            return
+        }
 
         scope.launch {
             val store =
@@ -249,6 +319,16 @@ class StateDataLayerService : WearableListenerService() {
                     incoming = incoming.copy(glucoseHistory = history),
                     nowEpochMs = now,
                 )
+            applicationContext.recordWatchDiagnostic(
+                "PREDICTION",
+                if (incoming.glucosePredictions.isEmpty() && merged.glucosePredictions.isNotEmpty()) "PRED-CACHE-203" else "PRED-DATA-200",
+                if (incoming.glucosePredictions.isEmpty() && merged.glucosePredictions.isNotEmpty()) "Cached predictions retained on Watch" else "Phone state merged on Watch",
+                metadata = mapOf(
+                    "incomingPredictions" to incoming.glucosePredictions.size,
+                    "displayPredictions" to merged.glucosePredictions.size,
+                    "historyCount" to history.size,
+                ),
+            )
             val meaningfulState =
                 old?.copy(receivedAtEpochMs = merged.receivedAtEpochMs)
             if (meaningfulState == merged) return@launch

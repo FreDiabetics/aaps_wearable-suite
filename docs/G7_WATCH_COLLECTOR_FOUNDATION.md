@@ -34,6 +34,8 @@ Only one direct collector should be active for a sensor. Juggluco, xDrip direct 
 - Pairing code, public G-Key material and shared session key are encrypted using a non-exportable Android Keystore AES/GCM key.
 - Authentication secrets and raw authentication packets are never written to application logs, diagnostics or Health Connect.
 - Readings are inserted idempotently before UI or phone delivery.
+- The collector documents the encrypted applicator code, GTIN/serial (when present), BLE identity, sensor/session identifiers, activation time inferred from the sensor clock, regular ten-day end, twelve-hour grace-period end and every decoded field of the 0x4e glucose record in its local Sensor documentation card. The applicator code remains encrypted at rest and is not copied into exportable event logs.
+- Decoded reading metadata (sensor clock, reading age, sequence, trend rate, predicted glucose, display-only flag, protocol status, calibration state and reserved field) is retained with the local reading database. Raw authentication frames and key material remain excluded.
 - The next collection is scheduled shortly before the expected five-minute reading window.
 - Recoverable BLE/GATT failures use bounded backoff. Stable safe error codes distinguish permissions, scanning, GATT, authentication and packet validation.
 - Boot recovery resumes only if the user left the collector enabled.
@@ -44,6 +46,6 @@ Only one direct collector should be active for a sensor. Juggluco, xDrip direct 
 
 ## Validation boundary
 
-Unit and Android tests cover G7 packet parsing, applicator-code parsing, protocol serialization, scanner name matching, state persistence, data-source propagation and existing Mobile/Wear regressions. Builds verify the complete module graph.
+Unit and Android tests cover G7 packet and timing metadata parsing, applicator-code parsing, protocol serialization, scanner name matching, state persistence, data-source propagation and existing Mobile/Wear regressions. Builds verify the complete module graph.
 
 Physical sensor authentication and the first live glucose packet must still be confirmed with the user's active sensor after entering its four-digit applicator code. Backfill is not implemented; the collector requests the current G7 value and retains readings it has already received locally.

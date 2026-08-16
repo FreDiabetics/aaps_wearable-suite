@@ -62,7 +62,7 @@ class PersistentPredictionCacheTest {
     }
 
     @Test
-    fun `predictions do not cross data source changes`() {
+    fun `valid source-attributed predictions survive a temporary glucose source change`() {
         val previous = state(
             predictions = listOf(prediction(PredictionKind.IOB, now, now + 60 * minute)),
         )
@@ -70,7 +70,8 @@ class PersistentPredictionCacheTest {
 
         val merged = PersistentPredictionCache.merge(previous, xdrip, now)
 
-        assertTrue(merged.glucosePredictions.isEmpty())
+        assertEquals(previous.glucosePredictions, merged.glucosePredictions)
+        assertTrue(DataCapability.PREDICTIONS in merged.capabilities)
     }
 
     private fun state(

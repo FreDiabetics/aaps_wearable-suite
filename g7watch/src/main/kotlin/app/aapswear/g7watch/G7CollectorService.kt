@@ -17,6 +17,7 @@ import app.aapswear.g7.G7ProtocolState
 import app.aapswear.g7.G7SessionManager
 import app.aapswear.g7.G7SessionState
 import app.aapswear.g7.toCgm
+import app.aapswear.model.DiagnosticSeverity
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -49,6 +50,7 @@ class G7CollectorService : Service() {
         }
 
         startForegroundCollector("Collector startet")
+        scope.launch { applicationContext.recordG7Diagnostic("G7-COLLECT-100", "Collector cycle started") }
         if (collectionJob?.isActive == true) return START_STICKY
         collectionJob = scope.launch { collectOnce(startId) }
         return START_STICKY
@@ -90,6 +92,13 @@ class G7CollectorService : Service() {
                     )
                     store.save(next)
                     updateForeground(protocolState.label())
+                    scope.launch {
+                        applicationContext.recordG7Diagnostic(
+                            protocolState.diagnosticCode(),
+                            protocolState.label(),
+                            metadata = mapOf("protocolState" to protocolState.name),
+                        )
+                    }
                 },
                 onSharedKey = credentials::saveSharedKey,
             )
@@ -97,15 +106,30 @@ class G7CollectorService : Service() {
             val database = G7ReadingDatabase(this)
             val reading = result.reading.toCgm(database.getLatest())
             database.insertOrIgnore(reading)
-            val manager = G7SessionManager(store.read().copy(sensor = result.sensor))
+            val documentedSensor = result.sensor.copy(
+                sensorStartEpochMs = result.reading.sensorStartEpochMs,
+                sensorEndEpochMs = result.reading.sensorEndEpochMs,
+                graceEndEpochMs = result.reading.graceEndEpochMs,
+            )
+            val manager = G7SessionManager(store.read().copy(sensor = documentedSensor))
             manager.authenticationSucceeded()
             val next = manager.readingReceived(reading).copy(
-                sensor = result.sensor.copy(state = result.reading.sensorState),
+                sensor = documentedSensor.copy(state = result.reading.sensorState),
                 connectionState = G7ConnectionState.DISCONNECTED,
                 protocolState = G7ProtocolState.WAITING_FOR_NEXT_READING,
                 lastSuccessfulConnectionEpochMs = System.currentTimeMillis(),
             )
             store.save(next)
+            applicationContext.recordG7Diagnostic(
+                "G7-DATA-200",
+                "Validated G7 reading stored",
+                metadata = mapOf(
+                    "sequence" to reading.sequenceNumber,
+                    "sensorState" to result.reading.sensorState,
+                    "sensorClockSeconds" to reading.rawSourceTimestamp,
+                    "displayOnly" to reading.displayOnly,
+                ),
+            )
             scheduleReconnect(next)
             updateForeground("${reading.glucoseMgDl.toInt()} mg/dL empfangen")
         } catch (error: G7BleException) {
@@ -129,6 +153,14 @@ class G7CollectorService : Service() {
         store.save(next)
         scheduleReconnect(next)
         updateForeground("${error.code}: ${error.safeMessage}")
+        scope.launch {
+            applicationContext.recordG7Diagnostic(
+                error.code,
+                error.safeMessage,
+                if (error.recoverable) DiagnosticSeverity.WARNING else DiagnosticSeverity.ERROR,
+                mapOf("recoverable" to error.recoverable, "retryCount" to next.retryCount),
+            )
+        }
     }
 
     private fun startForegroundCollector(message: String) {
@@ -243,4 +275,23 @@ private fun G7ProtocolState.label(): String = when (this) {
     G7ProtocolState.REQUESTING_GLUCOSE -> "Glukosewert wird angefordert"
     G7ProtocolState.RECEIVING_GLUCOSE -> "Glukosewert wird geprüft"
     else -> name.replace('_', ' ')
+}
+
+private fun G7ProtocolState.diagnosticCode(): String = when (this) {
+    G7ProtocolState.SCANNING,
+    G7ProtocolState.CONNECTING,
+    G7ProtocolState.DISCOVERING,
+    G7ProtocolState.DISCOVERING_SERVICES,
+    G7ProtocolState.ENABLING_NOTIFICATIONS,
+    -> "G7-BLE-110"
+    G7ProtocolState.AUTHENTICATION_START,
+    G7ProtocolState.AUTHENTICATING,
+    G7ProtocolState.BONDING,
+    G7ProtocolState.AUTHENTICATED,
+    -> "G7-AUTH-110"
+    G7ProtocolState.REQUESTING_GLUCOSE,
+    G7ProtocolState.RECEIVING_GLUCOSE,
+    G7ProtocolState.WAITING_FOR_NEXT_READING,
+    -> "G7-DATA-110"
+    else -> "G7-STATE-100"
 }
