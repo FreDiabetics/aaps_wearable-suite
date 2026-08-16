@@ -41,7 +41,7 @@ internal fun OverviewInlineHeader(onSettings: () -> Unit) {
             Image(
                 painter = painterResource(R.drawable.ic_foreground),
                 contentDescription = null,
-                modifier = Modifier.requiredSize(46.dp).offset(x = (-11).dp),
+                modifier = Modifier.requiredSize(46.dp).offset(x = (-6).dp),
             )
         }
 

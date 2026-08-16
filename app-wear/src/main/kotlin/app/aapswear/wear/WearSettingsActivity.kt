@@ -237,6 +237,9 @@ class WearSettingsActivity : Activity() {
         colorRow("COB", current.uiColors.cob) {
             updateUiColors { colors -> colors.copy(cob = it) }
         }
+        colorRow("Basal", current.uiColors.basal) {
+            updateUiColors { colors -> colors.copy(basal = it) }
+        }
 
         section("GRAPH FARBEN")
         colorRow("Graph Hintergrund", current.graphColors.graphBackground) {

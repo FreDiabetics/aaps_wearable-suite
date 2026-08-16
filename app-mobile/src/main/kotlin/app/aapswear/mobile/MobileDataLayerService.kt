@@ -143,6 +143,7 @@ internal fun readWatchConfig(context: Context): WatchConfig {
             glucoseHigh = palette.argb(SugarliciousColorRole.GLUCOSE_HIGH),
             iob = palette.argb(SugarliciousColorRole.BLUE),
             cob = palette.argb(SugarliciousColorRole.ORANGE),
+            basal = palette.argb(SugarliciousColorRole.SECONDARY),
         ),
 
         sentAtEpochMs = System.currentTimeMillis(),

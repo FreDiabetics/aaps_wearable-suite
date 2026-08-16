@@ -52,6 +52,7 @@ data class WatchUiColors(
     val glucoseHigh: Int = 0xFFFFD040.toInt(),
     val iob: Int = 0xFF64BFFF.toInt(),
     val cob: Int = 0xFFFF9D18.toInt(),
+    val basal: Int = 0xFF19D7E8.toInt(),
 )
 
 @Serializable
@@ -82,7 +83,7 @@ data class WatchConfig(
     val sentAtEpochMs: Long = 0L,
 ) {
     companion object {
-        const val CURRENT_SCHEMA = 4
+        const val CURRENT_SCHEMA = 5
     }
 }
 

@@ -14,16 +14,18 @@
         android:scaleType="fitXY" />
 
     <LinearLayout
-        android:layout_width="match_parent"
+        android:id="@+id/notification_info_block"
+        android:layout_width="wrap_content"
         android:layout_height="48dp"
         android:layout_toStartOf="@id/notification_graph"
         android:layout_marginEnd="6dp"
-        android:gravity="center_vertical"
+        android:gravity="center_horizontal|center_vertical"
         android:orientation="vertical">
 
         <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="27dp"
+            android:id="@+id/notification_primary_row"
+            android:layout_width="wrap_content"
+            android:layout_height="32dp"
             android:gravity="center_vertical"
             android:orientation="horizontal">
 
@@ -33,8 +35,9 @@
                 android:layout_height="wrap_content"
                 android:ellipsize="end"
                 android:fontFamily="sans-serif-medium"
+                android:includeFontPadding="false"
                 android:maxLines="1"
-                android:textSize="22sp"
+                android:textSize="29sp"
                 tools:text="123" />
 
             <ImageView
@@ -52,8 +55,10 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:ellipsize="end"
+            android:gravity="center"
+            android:includeFontPadding="false"
             android:maxLines="1"
-            android:textSize="9sp"
+            android:textSize="11sp"
             tools:text="+5 · 2 min alt" />
     </LinearLayout>
 </RelativeLayout>

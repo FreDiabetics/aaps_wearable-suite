@@ -29,4 +29,9 @@ class WearProtocolTest {
   val config=WatchConfig(graphColors=colors,sentAtEpochMs=123)
   assertEquals(config,WearProtocol.decodeConfig(WearProtocol.encodeConfig(config)))
  }
+ @Test fun legacyWatchConfigUsesDefaultBasalColor() {
+  val legacy="""{"schemaVersion":4,"uiColors":{}}"""
+  val decoded=WearProtocol.decodeConfig(legacy.encodeToByteArray())
+  assertEquals(WatchUiColors().basal,decoded.uiColors.basal)
+ }
 }

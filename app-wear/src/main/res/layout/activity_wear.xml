@@ -29,6 +29,7 @@
                 android:id="@+id/wear_glucose_card"
                 android:layout_width="match_parent"
                 android:layout_height="82dp"
+                android:gravity="center_horizontal"
                 android:orientation="vertical"
                 android:paddingStart="12dp"
                 android:paddingTop="5dp"
@@ -36,73 +37,85 @@
                 android:paddingBottom="6dp">
 
                 <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="0dp"
-                    android:layout_weight="1"
-                    android:gravity="center"
-                    android:orientation="horizontal">
-
-                    <TextView
-                        android:id="@+id/wear_glucose"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:includeFontPadding="false"
-                        android:text="—"
-                        android:textColor="@color/wear_text"
-                        android:textSize="40sp"
-                        android:textStyle="bold" />
+                    android:id="@+id/wear_glucose_info_block"
+                    android:layout_width="wrap_content"
+                    android:layout_height="match_parent"
+                    android:gravity="center_horizontal"
+                    android:orientation="vertical">
 
                     <LinearLayout
-                        android:id="@+id/wear_trend_container"
+                        android:id="@+id/wear_glucose_primary_row"
                         android:layout_width="wrap_content"
-                        android:layout_height="44dp"
-                        android:layout_marginStart="5dp"
+                        android:layout_height="0dp"
+                        android:layout_weight="1"
                         android:gravity="center"
                         android:orientation="horizontal">
 
-                        <ImageView
-                            android:id="@+id/wear_trend_arrow_1"
-                            android:layout_width="25dp"
-                            android:layout_height="25dp"
-                            android:contentDescription="Trend"
-                            android:src="@drawable/ic_trend_arrow"
-                            android:tint="@color/wear_text" />
+                        <TextView
+                            android:id="@+id/wear_glucose"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:includeFontPadding="false"
+                            android:text="—"
+                            android:textColor="@color/wear_text"
+                            android:textSize="40sp"
+                            android:textStyle="bold" />
 
-                        <ImageView
-                            android:id="@+id/wear_trend_arrow_2"
-                            android:layout_width="25dp"
-                            android:layout_height="25dp"
-                            android:layout_marginStart="1dp"
-                            android:contentDescription="Trend"
-                            android:src="@drawable/ic_trend_arrow"
-                            android:tint="@color/wear_text"
-                            android:visibility="gone" />
+                        <LinearLayout
+                            android:id="@+id/wear_trend_container"
+                            android:layout_width="wrap_content"
+                            android:layout_height="44dp"
+                            android:layout_marginStart="5dp"
+                            android:gravity="center"
+                            android:orientation="horizontal">
+
+                            <ImageView
+                                android:id="@+id/wear_trend_arrow_1"
+                                android:layout_width="25dp"
+                                android:layout_height="25dp"
+                                android:contentDescription="Trend"
+                                android:src="@drawable/ic_trend_arrow"
+                                android:tint="@color/wear_text" />
+
+                            <ImageView
+                                android:id="@+id/wear_trend_arrow_2"
+                                android:layout_width="25dp"
+                                android:layout_height="25dp"
+                                android:layout_marginStart="1dp"
+                                android:contentDescription="Trend"
+                                android:src="@drawable/ic_trend_arrow"
+                                android:tint="@color/wear_text"
+                                android:visibility="gone" />
+                        </LinearLayout>
                     </LinearLayout>
-                </LinearLayout>
 
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:gravity="center"
-                    android:orientation="horizontal">
-
-                    <TextView
-                        android:id="@+id/wear_delta"
-                        android:layout_width="wrap_content"
+                    <LinearLayout
+                        android:id="@+id/wear_glucose_meta_row"
+                        android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:text="—"
-                        android:textColor="@color/wear_cyan"
-                        android:textSize="10sp"
-                        android:textStyle="bold" />
+                        android:gravity="center"
+                        android:orientation="horizontal">
 
-                    <TextView
-                        android:id="@+id/wear_age"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginStart="7dp"
-                        android:text="—"
-                        android:textColor="@color/wear_text_secondary"
-                        android:textSize="9sp" />
+                        <TextView
+                            android:id="@+id/wear_delta"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:includeFontPadding="false"
+                            android:text="—"
+                            android:textColor="@color/wear_text_secondary"
+                            android:textSize="12sp"
+                            android:textStyle="bold" />
+
+                        <TextView
+                            android:id="@+id/wear_age"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="7dp"
+                            android:includeFontPadding="false"
+                            android:text="—"
+                            android:textColor="@color/wear_text_secondary"
+                            android:textSize="12sp" />
+                    </LinearLayout>
                 </LinearLayout>
             </LinearLayout>
 
@@ -116,14 +129,18 @@
                 android:paddingStart="13dp"
                 android:paddingEnd="13dp">
 
-                <TextView
+                <ImageView
+                    android:id="@+id/wear_basal_icon"
+                    android:layout_width="22dp"
+                    android:layout_height="22dp"
+                    android:contentDescription="Basal"
+                    android:src="@drawable/ic_complication_basal"
+                    android:tint="@color/wear_accent" />
+
+                <Space
                     android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:text="Basal"
-                    android:textColor="@color/wear_text_secondary"
-                    android:textSize="8sp"
-                    android:textStyle="bold" />
+                    android:layout_height="1dp"
+                    android:layout_weight="1" />
 
                 <TextView
                     android:id="@+id/wear_basal"
@@ -152,12 +169,13 @@
                     android:gravity="center"
                     android:orientation="vertical">
 
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="IOB"
-                        android:textColor="@color/wear_text_secondary"
-                        android:textSize="8sp" />
+                    <ImageView
+                        android:id="@+id/wear_iob_icon"
+                        android:layout_width="18dp"
+                        android:layout_height="18dp"
+                        android:contentDescription="IOB"
+                        android:src="@drawable/ic_complication_iob"
+                        android:tint="@color/wear_accent" />
 
                     <TextView
                         android:id="@+id/wear_iob"
@@ -178,12 +196,13 @@
                     android:gravity="center"
                     android:orientation="vertical">
 
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="COB"
-                        android:textColor="@color/wear_text_secondary"
-                        android:textSize="8sp" />
+                    <ImageView
+                        android:id="@+id/wear_cob_icon"
+                        android:layout_width="18dp"
+                        android:layout_height="18dp"
+                        android:contentDescription="COB"
+                        android:src="@drawable/ic_complication_carbs"
+                        android:tint="@color/wear_accent" />
 
                     <TextView
                         android:id="@+id/wear_cob"

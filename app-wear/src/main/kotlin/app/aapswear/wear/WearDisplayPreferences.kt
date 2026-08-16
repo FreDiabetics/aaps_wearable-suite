@@ -108,6 +108,7 @@ internal data class WearDisplayPreferences(
                         glucoseHigh = preferences.getInt(UI_PREFIX + "glucose_high", uiDefaults.glucoseHigh),
                         iob = preferences.getInt(UI_PREFIX + "iob", uiDefaults.iob),
                         cob = preferences.getInt(UI_PREFIX + "cob", uiDefaults.cob),
+                        basal = preferences.getInt(UI_PREFIX + "basal", uiDefaults.basal),
                     ),
             )
         }
@@ -221,6 +222,7 @@ internal data class WearDisplayPreferences(
                 .putInt(UI_PREFIX + "glucose_high", value.uiColors.glucoseHigh)
                 .putInt(UI_PREFIX + "iob", value.uiColors.iob)
                 .putInt(UI_PREFIX + "cob", value.uiColors.cob)
+                .putInt(UI_PREFIX + "basal", value.uiColors.basal)
                 .apply()
         }
     }
