@@ -25,6 +25,24 @@ import org.robolectric.annotation.Config
 @Config(sdk = [35])
 class MainActivityTest {
 
+    @Test fun `watch config uses mobile therapy icon colors`() {
+        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+        val preferences = context.getSharedPreferences("dashboard_ui", android.content.Context.MODE_PRIVATE)
+        preferences.edit().clear().putString("themeMode", "DARK").commit()
+        val iob = Color.rgb(10, 20, 30)
+        val cob = Color.rgb(40, 50, 60)
+        val basal = Color.rgb(70, 80, 90)
+        SugarliciousColorStore.save(preferences, SugarliciousColorRole.BLUE, iob)
+        SugarliciousColorStore.save(preferences, SugarliciousColorRole.ORANGE, cob)
+        SugarliciousColorStore.save(preferences, SugarliciousColorRole.SECONDARY, basal)
+
+        val colors = readWatchConfig(context).uiColors
+
+        assertEquals(iob, colors.iob)
+        assertEquals(cob, colors.cob)
+        assertEquals(basal, colors.basal)
+    }
+
     @Test fun `app surfaces are neutral gray and system accent follows the icon`() {
         val context = ApplicationProvider.getApplicationContext<android.content.Context>()
         listOf(R.color.app_background, R.color.app_surface, R.color.app_surface_high, R.color.app_surface_raised, R.color.app_surface_selected).forEach { colorId ->

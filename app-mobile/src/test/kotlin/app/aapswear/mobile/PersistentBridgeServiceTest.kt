@@ -5,6 +5,13 @@ import android.app.NotificationManager
 import android.app.Service
 import android.content.Intent
 import android.graphics.Color
+import android.graphics.Rect
+import android.util.TypedValue
+import android.view.LayoutInflater
+import android.view.View
+import android.view.ViewGroup
+import android.widget.ImageView
+import android.widget.TextView
 import androidx.test.core.app.ApplicationProvider
 import app.aapswear.mobile.ui.theme.SugarliciousColorRole
 import app.aapswear.model.GlucoseState
@@ -25,10 +32,66 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
+import kotlin.math.abs
 
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class PersistentBridgeServiceTest {
+
+    @Test
+    fun `notification value block keeps metadata below the value and flat arrow`() {
+        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+        val layouts =
+            listOf(
+                Triple(R.layout.notification_sugarlicious_collapsed, 29f, 11f),
+                Triple(R.layout.notification_sugarlicious_expanded, 36f, 13f),
+            )
+
+        layouts.forEach { (layoutId, valueSp, metaSp) ->
+            val root = LayoutInflater.from(context).inflate(layoutId, null)
+            val info = root.findViewById<ViewGroup>(R.id.notification_info_block)
+            val primary = root.findViewById<ViewGroup>(R.id.notification_primary_row)
+            val value = root.findViewById<TextView>(R.id.notification_value)
+            val trend = root.findViewById<ImageView>(R.id.notification_trend)
+            val meta = root.findViewById<TextView>(R.id.notification_meta)
+            val density = context.resources.displayMetrics.density
+            val valuePx =
+                TypedValue.applyDimension(
+                    TypedValue.COMPLEX_UNIT_SP,
+                    valueSp,
+                    context.resources.displayMetrics,
+                )
+            val metaPx =
+                TypedValue.applyDimension(
+                    TypedValue.COMPLEX_UNIT_SP,
+                    metaSp,
+                    context.resources.displayMetrics,
+                )
+            val digitBounds = Rect()
+            value.text = "123"
+            meta.text = "+5 · 2 min alt"
+            trend.visibility = View.VISIBLE
+            root.measure(
+                View.MeasureSpec.makeMeasureSpec(
+                    (400f * density).toInt(),
+                    View.MeasureSpec.EXACTLY,
+                ),
+                View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED),
+            )
+            value.paint.getTextBounds("123", 0, 3, digitBounds)
+
+            assertEquals(ViewGroup.LayoutParams.WRAP_CONTENT, info.layoutParams.width)
+            assertEquals(ViewGroup.LayoutParams.WRAP_CONTENT, primary.layoutParams.width)
+            assertEquals(ViewGroup.LayoutParams.MATCH_PARENT, meta.layoutParams.width)
+            assertEquals(valuePx, value.textSize, 0.5f)
+            assertEquals(metaPx, meta.textSize, 0.5f)
+            assertEquals(primary.measuredWidth, info.measuredWidth)
+            assertEquals(info.measuredWidth, meta.measuredWidth)
+            assertTrue(
+                abs(digitBounds.height() - trend.layoutParams.height) <= 3f * density,
+            )
+        }
+    }
 
     @Test
     @Config(sdk = [35])

@@ -11,6 +11,8 @@ import android.view.View
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
+import app.aapswear.complications.R as ComplicationR
+import app.aapswear.model.BasalState
 import app.aapswear.model.DataSourceId
 import app.aapswear.model.Freshness
 import app.aapswear.model.FreshnessPolicy
@@ -57,6 +59,9 @@ class WearActivity : Activity() {
     private lateinit var iob: TextView
     private lateinit var cob: TextView
     private lateinit var basal: TextView
+    private lateinit var iobIcon: ImageView
+    private lateinit var cobIcon: ImageView
+    private lateinit var basalIcon: ImageView
     private lateinit var therapyRow: LinearLayout
     private lateinit var chart: WearGlucoseChart
     private lateinit var watchFacePushStatus: TextView
@@ -148,6 +153,9 @@ class WearActivity : Activity() {
         iob = findViewById(R.id.wear_iob)
         cob = findViewById(R.id.wear_cob)
         basal = findViewById(R.id.wear_basal)
+        iobIcon = findViewById(R.id.wear_iob_icon)
+        cobIcon = findViewById(R.id.wear_cob_icon)
+        basalIcon = findViewById(R.id.wear_basal_icon)
         therapyRow = findViewById(R.id.wear_therapy_row)
         chart = findViewById(R.id.wear_glucose_chart)
         watchFacePushStatus = findViewById(R.id.wear_watchface_push_status)
@@ -286,7 +294,14 @@ class WearActivity : Activity() {
 
             iob.text = formatNumber(state?.insulin?.totalIob, 2, " U")
             cob.text = formatNumber(state?.carbs?.cobGrams, 0, " g")
-            basal.text = formatNumber(state?.basal?.currentUnitsPerHour, 2, " U/h")
+            basal.text =
+                formatNumber(
+                    state?.basal?.tempAbsoluteUnitsPerHour
+                        ?: state?.basal?.currentUnitsPerHour,
+                    2,
+                    " U/h",
+                )
+            basalIcon.setImageResource(basalIconResource(state?.basal))
         }
 
         if (
@@ -389,6 +404,7 @@ class WearActivity : Activity() {
             findViewById<TextView>(id).setTextColor(ui.textPrimary)
         }
         listOf(
+            R.id.wear_delta,
             R.id.wear_age,
             R.id.wear_sync_hint,
             R.id.wear_watchface_push_status,
@@ -397,9 +413,9 @@ class WearActivity : Activity() {
             findViewById<TextView>(id).setTextColor(ui.textSecondary)
         }
 
-        delta.setTextColor(ui.accent)
-        iob.setTextColor(ui.iob)
-        cob.setTextColor(ui.cob)
+        iobIcon.imageTintList = ColorStateList.valueOf(ui.iob)
+        cobIcon.imageTintList = ColorStateList.valueOf(ui.cob)
+        basalIcon.imageTintList = ColorStateList.valueOf(ui.basal)
 
         val primaryTint = ColorStateList.valueOf(ui.textPrimary)
         findViewById<ImageView>(R.id.wear_settings_icon).imageTintList = primaryTint
@@ -548,3 +564,22 @@ class WearActivity : Activity() {
         private const val KEY_WFP_PERMISSION_REQUESTED = "watchface_permission_requested"
     }
 }
+
+internal fun basalIconResource(basal: BasalState?): Int {
+    val absolute = basal?.tempAbsoluteUnitsPerHour
+    val base = basal?.currentUnitsPerHour
+    val percent = basal?.tempPercent
+    return when {
+        absolute != null && base != null && absolute > base + BASAL_COMPARE_EPSILON ->
+            ComplicationR.drawable.ic_complication_basal_more
+        absolute != null && base != null && absolute < base - BASAL_COMPARE_EPSILON ->
+            ComplicationR.drawable.ic_complication_basal_less
+        percent != null && percent > 100 ->
+            ComplicationR.drawable.ic_complication_basal_more
+        percent != null && percent < 100 ->
+            ComplicationR.drawable.ic_complication_basal_less
+        else -> ComplicationR.drawable.ic_complication_basal
+    }
+}
+
+private const val BASAL_COMPARE_EPSILON = 0.001
