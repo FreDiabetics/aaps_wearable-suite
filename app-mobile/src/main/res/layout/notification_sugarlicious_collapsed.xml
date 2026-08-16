@@ -7,7 +7,7 @@
     <ImageView
         android:id="@+id/notification_graph"
         android:layout_width="176dp"
-        android:layout_height="46dp"
+        android:layout_height="48dp"
         android:layout_alignParentEnd="true"
         android:layout_centerVertical="true"
         android:contentDescription="@null"

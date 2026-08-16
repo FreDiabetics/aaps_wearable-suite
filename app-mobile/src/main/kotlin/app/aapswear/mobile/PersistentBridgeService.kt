@@ -378,15 +378,10 @@ internal object NotificationGraphRenderer {
         val minValue = min(targetLow - 24.0, lowest - max(12.0, lowest * 0.08))
         val maxValue = max(targetHigh + 24.0, highest + max(12.0, highest * 0.08))
 
-        val topPadding = height * 0.07f
-        val bottomPadding = height * 0.07f
-        // Same plot width as before, shifted subtly left so the CGM stream is visually centered.
-        val leftPadding = width * 0.010f
-        val rightPadding = width * 0.026f
-        val plotLeft = leftPadding
-        val plotRight = width - rightPadding
-        val plotTop = topPadding
-        val plotBottom = height - bottomPadding
+        val plotLeft = bounds.left
+        val plotRight = bounds.right
+        val plotTop = bounds.top
+        val plotBottom = bounds.bottom
 
         fun y(value: Double): Float {
             val fraction = ((value - minValue) / (maxValue - minValue).coerceAtLeast(1.0))
@@ -410,13 +405,11 @@ internal object NotificationGraphRenderer {
             paint,
         )
         paint.color = graphColor(SugarliciousColorRole.TARGET_BAND)
-        canvas.drawRoundRect(
+        canvas.drawRect(
             plotLeft,
             y(targetHigh),
             plotRight,
             y(targetLow),
-            height * 0.025f,
-            height * 0.025f,
             paint,
         )
         paint.color = graphColor(SugarliciousColorRole.RANGE_LOW)
