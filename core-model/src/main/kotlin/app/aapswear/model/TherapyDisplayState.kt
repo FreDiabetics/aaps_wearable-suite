@@ -2,7 +2,7 @@ package app.aapswear.model
 
 import kotlinx.serialization.Serializable
 
-@Serializable enum class DataSourceId { ANDROID_APS, XDRIP_PLUS }
+@Serializable enum class DataSourceId { DEXCOM_G7_WATCH, ANDROID_APS, NIGHTSCOUT, XDRIP_PLUS, OTHER }
 @Serializable enum class GlucoseUnit { MG_DL, MMOL_L }
 @Serializable enum class Trend { DOUBLE_DOWN, SINGLE_DOWN, FORTY_FIVE_DOWN, FLAT, FORTY_FIVE_UP, SINGLE_UP, DOUBLE_UP, UNKNOWN }
 @Serializable enum class Freshness { CURRENT, DELAYED, STALE, NO_DATA }

@@ -1,6 +1,6 @@
 param(
     [Parameter(Position = 0)]
-    [ValidateSet("mobile", "wear", "all", "wfp")]
+    [ValidateSet("mobile", "wear", "g7", "all", "wfp")]
     [string]$Target = "mobile",
     [switch]$Test,
     [switch]$NoPull
@@ -43,6 +43,8 @@ function Test-WatchFacePushAssetsStale {
         "sugarlicious_rings_token.txt",
         "sugarlicious_graph.apk",
         "sugarlicious_graph_token.txt",
+        "sugarlicious_digital.apk",
+        "sugarlicious_digital_token.txt",
         "..\default_watchface.apk"
     )
 
@@ -59,6 +61,7 @@ function Test-WatchFacePushAssetsStale {
         Get-ChildItem .\watchfaces\sugarlicious-orbit -Recurse -File
         Get-ChildItem .\watchfaces\sugarlicious-rings -Recurse -File
         Get-ChildItem .\watchfaces\sugarlicious-graph -Recurse -File
+        Get-ChildItem .\watchfaces\sugarlicious-digital -Recurse -File
     ) | Where-Object {
         $_.FullName -notmatch '[\\/](build|\.gradle)[\\/]'
     }
@@ -109,14 +112,23 @@ if ($effectiveTarget -eq "mobile") {
 } elseif ($effectiveTarget -eq "wear") {
     if ($Test) { $gradleTasks += ":app-wear:testDebugUnitTest" }
     $gradleTasks += ":app-wear:assembleDebug"
+} elseif ($effectiveTarget -eq "g7") {
+    if ($Test) {
+        $gradleTasks += ":dexcom-g7:test"
+        $gradleTasks += ":g7watch:testDebugUnitTest"
+    }
+    $gradleTasks += ":g7watch:assembleDebug"
 } elseif ($effectiveTarget -eq "all") {
     if ($Test) {
         $gradleTasks += ":app-mobile:testDebugUnitTest"
         $gradleTasks += ":app-wear:testDebugUnitTest"
         $gradleTasks += ":complications:testDebugUnitTest"
+        $gradleTasks += ":dexcom-g7:test"
+        $gradleTasks += ":g7watch:testDebugUnitTest"
     }
     $gradleTasks += ":app-mobile:assembleDebug"
     $gradleTasks += ":app-wear:assembleDebug"
+    $gradleTasks += ":g7watch:assembleDebug"
 } else {
     throw "Unsupported target: $effectiveTarget"
 }
@@ -141,8 +153,24 @@ if (($effectiveTarget -eq "mobile") -or ($effectiveTarget -eq "all")) {
     Assert-LastExitCode "Mobile start"
 }
 
-if (($effectiveTarget -eq "wear") -or ($effectiveTarget -eq "all")) {
+if (($effectiveTarget -eq "wear") -or ($effectiveTarget -eq "g7") -or ($effectiveTarget -eq "all")) {
     $watch = Resolve-AdbSerial $watchWifi $watchWifi
+    if (($effectiveTarget -eq "g7") -or ($effectiveTarget -eq "all")) {
+        $g7WatchApk = Get-ChildItem .\g7watch\build\outputs\apk\debug\*.apk |
+            Sort-Object LastWriteTime -Descending |
+            Select-Object -First 1
+        if ($null -eq $g7WatchApk) { throw "G7 Watch Collector APK not found" }
+        Write-Host "Installing G7 Watch Collector on $watch..."
+        adb -s $watch install -r $g7WatchApk.FullName
+        Assert-LastExitCode "G7 Watch Collector install"
+    }
+
+    if (($effectiveTarget -ne "wear") -and ($effectiveTarget -ne "all")) {
+        Write-Host ""
+        Write-Host "OK: $effectiveTarget built and installed."
+        exit 0
+    }
+
     $wearApk = Get-ChildItem .\app-wear\build\outputs\apk\debug\*.apk |
         Sort-Object LastWriteTime -Descending |
         Select-Object -First 1

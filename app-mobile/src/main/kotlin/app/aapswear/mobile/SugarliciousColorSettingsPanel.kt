@@ -24,7 +24,9 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -295,7 +297,19 @@ private fun GraphSettingSwitch(
             Text(title, color = SugarliciousColors.TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.Medium)
             Text(description, color = SugarliciousColors.TextSecondary, fontSize = 10.sp)
         }
-        Switch(checked = checked, onCheckedChange = onCheckedChange)
+        Switch(
+            checked = checked,
+            onCheckedChange = onCheckedChange,
+            modifier = Modifier.size(width = 50.dp, height = 30.dp),
+            colors =
+                SwitchDefaults.colors(
+                    checkedThumbColor = Color.White,
+                    checkedTrackColor = SugarliciousColors.Primary,
+                    uncheckedThumbColor = SugarliciousColors.TextSecondary,
+                    uncheckedTrackColor = SugarliciousColors.SurfaceRaised,
+                    uncheckedBorderColor = SugarliciousColors.Border,
+                ),
+        )
     }
 }
 
@@ -328,6 +342,15 @@ private fun GraphSettingSlider(
             onValueChange = onValueChange,
             onValueChangeFinished = onValueChangeFinished,
             valueRange = valueRange,
+            modifier = Modifier.height(32.dp),
+            colors =
+                SliderDefaults.colors(
+                    thumbColor = SugarliciousColors.Primary,
+                    activeTrackColor = SugarliciousColors.Primary,
+                    inactiveTrackColor = SugarliciousColors.SurfaceRaised,
+                    activeTickColor = Color.Transparent,
+                    inactiveTickColor = Color.Transparent,
+                ),
         )
     }
 }

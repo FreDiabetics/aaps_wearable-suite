@@ -23,6 +23,7 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.ComponentActivity
+import androidx.health.connect.client.HealthConnectClient
 import androidx.core.content.edit
 import app.aapswear.mobile.ui.theme.SugarliciousColorRole
 import app.aapswear.mobile.ui.theme.SugarliciousColorStore
@@ -52,6 +53,17 @@ class MainActivity : ComponentActivity() {
     private var settingsSwipeStartX = 0f
     private var settingsSwipeStartY = 0f
     private var settingsSwipeTracking = false
+    private val healthPermissionsLauncher = registerForActivityResult(HealthConnectIntegration.permissionContract) { granted ->
+        scope.launch {
+            if (granted.any { it in HealthConnectIntegration.recordPermissions }) {
+                HealthConnectIntegration.schedule(applicationContext)
+                HealthConnectIntegration.sync(applicationContext)
+                SugarliciousWidgets.update(applicationContext)
+                Toast.makeText(this@MainActivity, "Health Connect verbunden", Toast.LENGTH_SHORT).show()
+            }
+            refresh(forceSettingsRender = true)
+        }
+    }
 
     private val diagnosticsListener = SharedPreferences.OnSharedPreferenceChangeListener { _, _ -> runOnUiThread(::refresh) }
     private val uiListener =
@@ -162,11 +174,15 @@ class MainActivity : ComponentActivity() {
                 uiPreferences.edit {
                     putInt(
                         "watchFaceIndex",
-                        it.coerceIn(0, 3),
+                        it.coerceIn(0, 4),
                     )
                 }
             },
             syncNow = ::syncNow,
+            connectHealthConnect = ::connectHealthConnect,
+            syncHealthConnect = ::syncHealthConnect,
+            manageHealthConnect = ::manageHealthConnect,
+            openProjectGitHub = ::openProjectGitHub,
             openContactEmail = ::openContactEmail,
         ))
         bindTopNavigation()
@@ -179,6 +195,33 @@ class MainActivity : ComponentActivity() {
             }
         }
         refresh(forceSettingsRender = true)
+    }
+
+    private fun connectHealthConnect() {
+        when (HealthConnectIntegration.availability(this)) {
+            HealthConnectClient.SDK_AVAILABLE -> healthPermissionsLauncher.launch(HealthConnectIntegration.permissions)
+            HealthConnectClient.SDK_UNAVAILABLE_PROVIDER_UPDATE_REQUIRED -> openExternal(Intent(Intent.ACTION_VIEW, Uri.parse("market://details?id=${HealthConnectIntegration.PROVIDER_PACKAGE}")))
+            else -> Toast.makeText(this, "Health Connect ist auf diesem Gerät nicht verfügbar", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun syncHealthConnect() {
+        scope.launch {
+            val synced = runCatching { HealthConnectIntegration.sync(applicationContext) }.getOrNull()
+            if (synced != null) {
+                SugarliciousWidgets.update(applicationContext)
+                Toast.makeText(this@MainActivity, "Gesundheitsdaten aktualisiert", Toast.LENGTH_SHORT).show()
+            } else {
+                Toast.makeText(this@MainActivity, "Health-Connect-Zugriff fehlt", Toast.LENGTH_SHORT).show()
+            }
+            refresh(forceSettingsRender = true)
+        }
+    }
+
+    private fun manageHealthConnect() {
+        if (HealthConnectIntegration.availability(this) == HealthConnectClient.SDK_AVAILABLE) {
+            openExternal(HealthConnectClient.getHealthConnectManageDataIntent(this, HealthConnectIntegration.PROVIDER_PACKAGE))
+        } else connectHealthConnect()
     }
 
     override fun dispatchTouchEvent(event: MotionEvent): Boolean {
@@ -390,7 +433,7 @@ class MainActivity : ComponentActivity() {
                         diagnostics = diagnosticState,
                         selectedFaceIndex = uiState.watchFaceIndex,
                         onSelectedFace = { index ->
-                            uiPreferences.edit { putInt("watchFaceIndex", index.coerceIn(0, 3)) }
+                            uiPreferences.edit { putInt("watchFaceIndex", index.coerceIn(0, 4)) }
                         },
                         onEdit = {},
                         interactive = false,
@@ -458,6 +501,15 @@ class MainActivity : ComponentActivity() {
         val intent = Intent(Intent.ACTION_SENDTO, Uri.fromParts("mailto", getString(R.string.contact_email), null))
             .putExtra(Intent.EXTRA_SUBJECT, "Sugarlicious")
         openExternal(intent)
+    }
+
+    private fun openProjectGitHub() {
+        openExternal(
+            Intent(
+                Intent.ACTION_VIEW,
+                Uri.parse("https://github.com/FreDiabetics/aaps_wearable-suite"),
+            ),
+        )
     }
 
     private fun openExternal(intent: Intent) {

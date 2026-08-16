@@ -175,7 +175,7 @@ data class DashboardUiPreferences(
                             "watchFaceIndex",
                             1,
                         )
-                        .coerceIn(0, 3),
+                        .coerceIn(0, 4),
                 dataSource = runCatching {
                     DataSourcePreference.valueOf(
                         preferences.getString("dataSource", "AUTOMATIC")!!,
@@ -266,6 +266,10 @@ data class DashboardCallbacks(
     val setNotificationGraphHours: (Int) -> Unit,
     val setWatchFaceIndex: (Int) -> Unit,
     val syncNow: () -> Unit,
+    val connectHealthConnect: () -> Unit,
+    val syncHealthConnect: () -> Unit,
+    val manageHealthConnect: () -> Unit,
+    val openProjectGitHub: () -> Unit,
     val openContactEmail: () -> Unit,
 )
 
@@ -286,14 +290,9 @@ class DashboardViewFactory(
         androidx.compose.runtime.mutableStateOf<ComposeRenderState?>(null)
     private var activeComposeScreen: DashboardScreen? = null
     private var activeComposeView: androidx.compose.ui.platform.ComposeView? = null
-    private val settingsUiPreferences =
-        context.getSharedPreferences("dashboard_settings_ui", Context.MODE_PRIVATE)
-    private var colorSettingsExpanded =
-        settingsUiPreferences.getBoolean("colors_expanded", false)
-    private var predictionSettingsExpanded =
-        settingsUiPreferences.getBoolean("predictions_expanded", false)
-    private var notificationGraphSettingsExpanded =
-        settingsUiPreferences.getBoolean("notification_graph_expanded", false)
+    private var colorSettingsExpanded = false
+    private var predictionSettingsExpanded = false
+    private var notificationGraphSettingsExpanded = false
 
     private val density =
         context.resources.displayMetrics.density
@@ -358,6 +357,7 @@ class DashboardViewFactory(
         preferences: DashboardUiPreferences,
         now: Long,
     ) {
+        collapseSettingsSections()
         overviewRenderState.value = ComposeRenderState(state, diagnostics, preferences, now)
         if (activeComposeScreen == DashboardScreen.OVERVIEW &&
             activeComposeView?.parent === parent
@@ -406,6 +406,7 @@ class DashboardViewFactory(
         preferences: DashboardUiPreferences,
         now: Long,
     ) {
+        collapseSettingsSections()
         watchRenderState.value = ComposeRenderState(state, diagnostics, preferences, now)
         if (activeComposeScreen == DashboardScreen.WATCH &&
             activeComposeView?.parent === parent
@@ -499,6 +500,19 @@ class DashboardViewFactory(
             cardParams(top = 4),
         )
 
+        parent.addView(settingsGroupLabel("HEALTH CONNECT"), fullWidth())
+        parent.addView(
+            tile(null).apply {
+                addView(actionRow("Google Health Connect", HealthConnectIntegration.statusLabel(context)) { callbacks.connectHealthConnect() })
+                addView(divider())
+                addView(actionRow("Gesundheitsdaten aktualisieren", "Synchronisieren") { callbacks.syncHealthConnect() })
+                addView(divider())
+                addView(actionRow("Zugriff verwalten", "Öffnen") { callbacks.manageHealthConnect() })
+                addView(helper("Puls, Ruhepuls, Schritte, Distanz, Aktivzeit, Kalorien, Training, Schlaf, Gewicht, Blutzucker, Sauerstoff, Atemfrequenz und VO₂max. Nur nach deiner Freigabe.", 3))
+            },
+            cardParams(top = 4),
+        )
+
         parent.addView(settingsGroupLabel("ANZEIGE"), fullWidth())
         val colorContainer =
             LinearLayout(context).apply {
@@ -561,7 +575,6 @@ class DashboardViewFactory(
                 addView(
                     actionRow("Farben & Darstellung", "Anpassen") {
                         colorSettingsExpanded = !colorSettingsExpanded
-                        settingsUiPreferences.edit().putBoolean("colors_expanded", colorSettingsExpanded).apply()
                         colorContainer.visibility = if (colorSettingsExpanded) View.VISIBLE else View.GONE
                     },
                 )
@@ -664,7 +677,6 @@ class DashboardViewFactory(
                             if (preferences.anyCgmPredictionEnabled) "Aktiv" else "Aus",
                         ) {
                             predictionSettingsExpanded = !predictionSettingsExpanded
-                            settingsUiPreferences.edit().putBoolean("predictions_expanded", predictionSettingsExpanded).apply()
                             predictionContainer.visibility = if (predictionSettingsExpanded) View.VISIBLE else View.GONE
                         },
                     )
@@ -695,6 +707,27 @@ class DashboardViewFactory(
                 orientation = LinearLayout.VERTICAL
                 visibility = if (notificationGraphSettingsExpanded) View.VISIBLE else View.GONE
                 addView(
+                    tile(null).apply {
+                        addView(
+                            choiceRow(
+                                "Graph-Skalierung",
+                                listOf(
+                                    Triple("1 h", preferences.notificationGraphHours == 1) {
+                                        callbacks.setNotificationGraphHours(1)
+                                    },
+                                    Triple("2 h", preferences.notificationGraphHours == 2) {
+                                        callbacks.setNotificationGraphHours(2)
+                                    },
+                                    Triple("3 h", preferences.notificationGraphHours == 3) {
+                                        callbacks.setNotificationGraphHours(3)
+                                    },
+                                ),
+                            ),
+                        )
+                    },
+                    fullWidth(),
+                )
+                addView(
                     androidx.compose.ui.platform.ComposeView(context).apply {
                         setViewCompositionStrategy(
                             androidx.compose.ui.platform.ViewCompositionStrategy.DisposeOnDetachedFromWindow,
@@ -717,7 +750,7 @@ class DashboardViewFactory(
                 addView(divider())
                 addView(
                     switchRowCompact(
-                        "Graph anzeigen",
+                        "CGM-Graph anzeigen",
                         preferences.notificationGraphEnabled,
                         View.generateViewId(),
                         callbacks.setNotificationGraphEnabled,
@@ -726,26 +759,8 @@ class DashboardViewFactory(
                 if (preferences.notificationGraphEnabled) {
                     addView(divider())
                     addView(
-                        choiceRow(
-                            "Graph-Zeitraum",
-                            listOf(
-                                Triple("1 h", preferences.notificationGraphHours == 1) {
-                                    callbacks.setNotificationGraphHours(1)
-                                },
-                                Triple("2 h", preferences.notificationGraphHours == 2) {
-                                    callbacks.setNotificationGraphHours(2)
-                                },
-                                Triple("3 h", preferences.notificationGraphHours == 3) {
-                                    callbacks.setNotificationGraphHours(3)
-                                },
-                            ),
-                        ),
-                    )
-                    addView(divider())
-                    addView(
-                        actionRow("CGM-Dots & Farben", "Anpassen") {
+                        actionRow("CGM-Graph", "Anpassen") {
                             notificationGraphSettingsExpanded = !notificationGraphSettingsExpanded
-                            settingsUiPreferences.edit().putBoolean("notification_graph_expanded", notificationGraphSettingsExpanded).apply()
                             notificationGraphCustomization.visibility = if (notificationGraphSettingsExpanded) View.VISIBLE else View.GONE
                         },
                     )
@@ -756,20 +771,14 @@ class DashboardViewFactory(
 
         parent.addView(notificationGraphCustomization, cardParams(top = 4))
 
-        parent.addView(settingsGroupLabel("UHR & WATCHFACES"), fullWidth())
-        parent.addView(
-            tile(null).apply {
-                addView(
-                    actionRow("Watchfaces", "Auswählen") {
-                        callbacks.navigate(DashboardScreen.WATCH)
-                    },
-                )
-            },
-            cardParams(top = 4),
-        )
-
-        parent.addView(settingsGroupLabel("INFO & SUPPORT"), fullWidth())
+        parent.addView(settingsGroupLabel("ÜBER"), fullWidth())
         parent.addView(aboutCard(), cardParams(top = 4, bottom = 10))
+    }
+
+    private fun collapseSettingsSections() {
+        colorSettingsExpanded = false
+        predictionSettingsExpanded = false
+        notificationGraphSettingsExpanded = false
     }
 
     private fun aboutCard(): View =
@@ -792,16 +801,59 @@ class DashboardViewFactory(
             )
 
             header.addView(value("Sugarlicious", text, 20f, 1).apply { gravity = Gravity.CENTER })
-            header.addView(helper("Unabhängiges Projekt · by FreDiabetics", 1).apply { gravity = Gravity.CENTER })
+            header.addView(helper("by FreDiabetics", 1).apply { gravity = Gravity.CENTER })
             addView(header)
-            addView(divider())
             addView(
-                actionRow("E-Mail", null) {
-                    callbacks.openContactEmail()
-                }.also {
-                    it.id = R.id.dashboard_contact_email
+                LinearLayout(context).apply {
+                    orientation = LinearLayout.HORIZONTAL
+                    gravity = Gravity.CENTER
+                    setPadding(0, 8.dp, 0, 1.dp)
+                    addView(
+                        aboutActionPill(
+                            icon = R.drawable.ic_github,
+                            label = "GitHub",
+                            action = callbacks.openProjectGitHub,
+                        ).also { it.id = R.id.dashboard_github },
+                        LinearLayout.LayoutParams(0, 44.dp, 1f).apply { marginEnd = 5.dp },
+                    )
+                    addView(
+                        aboutActionPill(
+                            icon = R.drawable.ic_mail,
+                            label = "E-Mail",
+                            action = callbacks.openContactEmail,
+                        ).also { it.id = R.id.dashboard_contact_email },
+                        LinearLayout.LayoutParams(0, 44.dp, 1f).apply { marginStart = 5.dp },
+                    )
                 },
             )
+        }
+
+    private fun aboutActionPill(
+        icon: Int,
+        label: String,
+        action: () -> Unit,
+    ) =
+        LinearLayout(context).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER
+            isClickable = true
+            isFocusable = true
+            background =
+                roundedBackground(
+                    SugarliciousColors.argb(SugarliciousColorRole.SURFACE_HIGH),
+                    SugarliciousColors.argb(SugarliciousColorRole.BORDER),
+                    999,
+                )
+            setOnClickListener { action() }
+            addView(
+                ImageView(context).apply {
+                    setImageResource(icon)
+                    imageTintList = ColorStateList.valueOf(accent)
+                    contentDescription = label
+                },
+                LinearLayout.LayoutParams(19.dp, 19.dp).apply { marginEnd = 7.dp },
+            )
+            addView(value(label, text, 13f, 1))
         }
 
     private fun settingsGroupLabel(label: String) =
@@ -908,13 +960,21 @@ class DashboardViewFactory(
                 Switch(context).apply {
                     this.id = id
                     isChecked = checked
+                    minWidth = 50.dp
+                    minimumHeight = 30.dp
+                    splitTrack = false
+                    scaleX = 0.92f
+                    scaleY = 0.92f
                     thumbTintList =
                         ColorStateList(
                             arrayOf(
                                 intArrayOf(android.R.attr.state_checked),
                                 intArrayOf(),
                             ),
-                            intArrayOf(accent, secondary),
+                            intArrayOf(
+                                android.graphics.Color.WHITE,
+                                SugarliciousColors.argb(SugarliciousColorRole.TEXT_SECONDARY),
+                            ),
                         )
                     trackTintList =
                         ColorStateList(
@@ -923,9 +983,7 @@ class DashboardViewFactory(
                                 intArrayOf(),
                             ),
                             intArrayOf(
-                                SugarliciousColors.argb(
-                                    SugarliciousColorRole.SURFACE_SELECTED,
-                                ),
+                                accent,
                                 SugarliciousColors.argb(
                                     SugarliciousColorRole.SURFACE_HIGH,
                                 ),

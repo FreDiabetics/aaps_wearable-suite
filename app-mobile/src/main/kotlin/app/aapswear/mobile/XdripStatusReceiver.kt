@@ -63,7 +63,16 @@ class XdripStatusReceiver : BroadcastReceiver() {
                     capabilities = parsed.capabilities + previous?.capabilities.orEmpty(),
                 )
                 val state = DisplayHistoryAccumulator.merge(previous, preserved, now)
+                if (previous?.copy(receivedAtEpochMs = state.receivedAtEpochMs) == state) {
+                    app.getSharedPreferences("diagnostics", Context.MODE_PRIVATE).edit {
+                        putLong("received", now)
+                        putString("lastSyncStatus", "unchanged")
+                    }
+                    return@launch
+                }
                 store.save(state)
+                runCatching { HealthConnectIntegration.exportCgmReading(app, state) }
+                SugarliciousWidgets.update(app)
                 publishState(app, state)
                 app.getSharedPreferences("diagnostics", Context.MODE_PRIVATE).edit {
                     putLong("received", now)

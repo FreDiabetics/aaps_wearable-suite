@@ -401,6 +401,14 @@ internal object NotificationGraphRenderer {
         }
 
         paint.style = Paint.Style.FILL
+        paint.color = graphColor(SugarliciousColorRole.RANGE_HIGH)
+        canvas.drawRect(
+            plotLeft,
+            plotTop,
+            plotRight,
+            y(targetHigh),
+            paint,
+        )
         paint.color = graphColor(SugarliciousColorRole.TARGET_BAND)
         canvas.drawRoundRect(
             plotLeft,
@@ -409,6 +417,14 @@ internal object NotificationGraphRenderer {
             y(targetLow),
             height * 0.025f,
             height * 0.025f,
+            paint,
+        )
+        paint.color = graphColor(SugarliciousColorRole.RANGE_LOW)
+        canvas.drawRect(
+            plotLeft,
+            y(targetLow),
+            plotRight,
+            plotBottom,
             paint,
         )
 

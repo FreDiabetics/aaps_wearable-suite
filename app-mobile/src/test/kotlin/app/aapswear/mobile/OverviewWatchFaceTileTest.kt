@@ -45,7 +45,7 @@ class OverviewWatchFaceTileTest {
 
     @Test
     fun `mobile watch previews use the fixed requested hand positions`() {
-        assertEquals(300f, fixedWatchPreviewHandAngles.hour, 0.001f)
+        assertEquals(303.5f, fixedWatchPreviewHandAngles.hour, 0.001f)
         assertEquals(42f, fixedWatchPreviewHandAngles.minute, 0.001f)
         assertEquals(192f, fixedWatchPreviewHandAngles.second, 0.001f)
     }
@@ -61,8 +61,8 @@ class OverviewWatchFaceTileTest {
     fun `multi type complications expose one selectable provider per type`() {
         val variants = SugarliciousComplicationCatalog.flatMap { it.variants }
 
-        assertEquals(35, variants.size)
-        assertEquals(35, variants.map { it.id }.distinct().size)
+        assertEquals(36, variants.size)
+        assertEquals(36, variants.map { it.id }.distinct().size)
         assertEquals(
             listOf(
                 ComplicationVariantType.SHORT_TEXT,

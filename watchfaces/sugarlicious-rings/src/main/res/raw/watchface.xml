@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Original Sugarlicious design. Independent baton-hand geometry; no Apple assets. AGPL-3.0-or-later. -->
 <WatchFace width="450" height="450" clipShape="CIRCLE">
-    <Metadata key="CLOCK_TYPE" value="ANALOG"/><Metadata key="PREVIEW_TIME" value="10:09:30"/>
+    <Metadata key="CLOCK_TYPE" value="ANALOG"/><Metadata key="PREVIEW_TIME" value="10:07:32"/>
     <UserConfigurations>
         <ColorConfiguration id="materialAccent" displayName="material_color_label" defaultValue="0">
             <ColorOption id="0" displayName="material_green" colors="#FF4CAF50" />

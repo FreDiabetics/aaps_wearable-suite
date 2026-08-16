@@ -1,11 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <complications>
     <complication type="SHORT_TEXT">
-        <text><plain value="80-160"/></text>
-        <title><plain value="ZIEL"/></title>
+        <text><plain value="120U"/></text>
+        <title><plain value="OK"/></title>
     </complication>
-    <complication type="LONG_TEXT">
-        <text><plain value="Target 80–160 mg/dL"/></text>
-        <title><plain value="Zielbereich"/></title>
+    <complication type="RANGED_VALUE" value="120" min="0" max="300">
+        <text><plain value="120U"/></text>
     </complication>
 </complications>

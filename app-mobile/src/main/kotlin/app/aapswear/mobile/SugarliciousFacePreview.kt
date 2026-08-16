@@ -31,13 +31,67 @@ import app.aapswear.model.TherapyDisplayState
 import kotlin.math.cos
 import kotlin.math.sin
 
-/** Product-fixed preview hands: hour at 10, minute at 10:07, second at 10:07:32. */
+/** Product-fixed preview hands at 10:07:32. */
 internal val fixedWatchPreviewHandAngles =
     WatchPreviewHandAngles(
-        hour = 300f,
+        hour = 303.5f,
         minute = 42f,
         second = 192f,
     )
+
+private const val PROFILE_PREVIEW_ID = -1
+private const val PHONE_BATTERY_PREVIEW_ID = -2
+
+/** Mirrors the DefaultProviderPolicy order in each packaged Sugarlicious WFF. */
+internal fun defaultSugarliciousPreviewIds(faceIndex: Int): List<Int> =
+    when (faceIndex.coerceIn(0, 4)) {
+        0 -> listOf(
+            SugarliciousComplicationIds.GLUCOSE_TREND_RANGED,
+            SugarliciousComplicationIds.GLUCOSE_AGE,
+            PROFILE_PREVIEW_ID,
+            SugarliciousComplicationIds.IOB,
+            SugarliciousComplicationIds.COB,
+            SugarliciousComplicationIds.BASAL,
+            SugarliciousComplicationIds.LOOP,
+            SugarliciousComplicationIds.GRAPH,
+        )
+        1, 2 -> listOf(
+            SugarliciousComplicationIds.GLUCOSE_TREND_RANGED,
+            SugarliciousComplicationIds.IOB,
+            SugarliciousComplicationIds.COB,
+            SugarliciousComplicationIds.GRAPH,
+        )
+        3 -> listOf(
+            SugarliciousComplicationIds.GLUCOSE_TREND_RANGED,
+            SugarliciousComplicationIds.GRAPH,
+            SugarliciousComplicationIds.IOB,
+            SugarliciousComplicationIds.COB,
+        )
+        else -> listOf(
+            SugarliciousComplicationIds.GLUCOSE_TREND_DELTA,
+            SugarliciousComplicationIds.GLUCOSE_AGE,
+            SugarliciousComplicationIds.GRAPH,
+            SugarliciousComplicationIds.IOB,
+            SugarliciousComplicationIds.COB,
+            SugarliciousComplicationIds.BASAL,
+            SugarliciousComplicationIds.LOOP,
+            PHONE_BATTERY_PREVIEW_ID,
+        )
+    }
+
+private fun orderedSugarliciousPreviewIds(
+    faceIndex: Int,
+    complicationIds: List<Int>,
+): List<Int> {
+    val defaults = defaultSugarliciousPreviewIds(faceIndex)
+    if (complicationIds.isEmpty()) return defaults
+
+    val selected = complicationIds.toSet()
+    val regularDefaults = defaults.filter { it >= 0 }
+    val includeBuiltInSlots = selected.containsAll(regularDefaults)
+    val orderedDefaults = defaults.filter { id -> id in selected || (id < 0 && includeBuiltInSlots) }
+    return (orderedDefaults + complicationIds.filterNot { it in orderedDefaults }).distinct()
+}
 
 @Composable
 internal fun SugarliciousFacePreview(
@@ -131,12 +185,52 @@ internal fun SugarliciousFacePreview(
                         cornerRadius = androidx.compose.ui.geometry.CornerRadius(size.minDimension * (28f / 450f)),
                     )
                 }
-                else -> drawCircle(Color(0xFF050B10), r)
+                else -> {
+                    drawCircle(Color(0xFF050B10), r)
+                    drawRoundRect(
+                        Color(0xFF091117),
+                        topLeft = Offset(size.width * (62f / 450f), size.height * (108f / 450f)),
+                        size = Size(size.width * (326f / 450f), size.height * (116f / 450f)),
+                        cornerRadius = androidx.compose.ui.geometry.CornerRadius(size.minDimension * (30f / 450f)),
+                    )
+                    drawRoundRect(
+                        Color(0xFF091117),
+                        topLeft = Offset(size.width * (45f / 450f), size.height * (238f / 450f)),
+                        size = Size(size.width * (360f / 450f), size.height * (91f / 450f)),
+                        cornerRadius = androidx.compose.ui.geometry.CornerRadius(size.minDimension * (22f / 450f)),
+                    )
+                }
+            }
+        }
+
+        if (faceIndex == 4) {
+            Column(
+                modifier =
+                    Modifier
+                        .align(Alignment.TopCenter)
+                        .offset(y = maxHeight * (32f / 450f)),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Text(
+                    text = "10:30",
+                    color = Color.White,
+                    fontSize = 25.sp,
+                    lineHeight = 25.sp,
+                    fontWeight = FontWeight.Bold,
+                )
+                Text(
+                    text = "SUGARLICIOUS",
+                    color = Color(0xFF19D7E8),
+                    fontSize = 5.5.sp,
+                    lineHeight = 6.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 1.sp,
+                )
             }
         }
 
         val slots = previewSlots(faceIndex, maxWidth, maxHeight)
-        complicationIds.take(slots.size).forEachIndexed { slotIndex, id ->
+        orderedSugarliciousPreviewIds(faceIndex, complicationIds).take(slots.size).forEachIndexed { slotIndex, id ->
             val slot = slots[slotIndex]
             PreviewComplication(
                 id = id,
@@ -149,7 +243,7 @@ internal fun SugarliciousFacePreview(
             )
         }
 
-        Canvas(Modifier.fillMaxSize()) {
+        if (faceIndex < 4) Canvas(Modifier.fillMaxSize()) {
             val scale = size.minDimension / 512f
             fun sx(value: Float): Float = (center.x - 256f * scale) + value * scale
             fun sy(value: Float): Float = (center.y - 256f * scale) + value * scale
@@ -216,7 +310,7 @@ private fun previewSlots(
         )
 
     return when (index) {
-        // Exact ComplicationSlot bounds from the four WFF watchface.xml files.
+        // Exact ComplicationSlot bounds from the five WFF watchface.xml files.
         0 -> listOf(
             slot(127f, 49f, 196f, 73f),
             slot(330f, 54f, 58f, 38f),
@@ -245,6 +339,16 @@ private fun previewSlots(
             slot(44f, 170f, 112f, 60f),
             slot(294f, 170f, 112f, 60f),
         )
+        4 -> listOf(
+            slot(84f, 121f, 282f, 96f),
+            slot(333f, 117f, 65f, 45f),
+            slot(55f, 247f, 340f, 72f),
+            slot(48f, 348f, 72f, 54f),
+            slot(142f, 348f, 72f, 54f),
+            slot(236f, 348f, 72f, 54f),
+            slot(330f, 348f, 72f, 54f),
+            slot(304f, 52f, 82f, 38f),
+        )
         else -> emptyList()
     }
 }
@@ -255,6 +359,26 @@ private fun PreviewComplication(
     state: TherapyDisplayState?,
     modifier: Modifier,
 ) {
+    if (id == PROFILE_PREVIEW_ID || id == PHONE_BATTERY_PREVIEW_ID) {
+        val text =
+            if (id == PROFILE_PREVIEW_ID) {
+                state?.profile?.name?.takeIf(String::isNotBlank) ?: "Profil"
+            } else {
+                state?.device?.phoneBatteryPercent?.let { "$it %" } ?: "Akku"
+            }
+        Text(
+            text = text,
+            modifier = modifier,
+            color = Color.White,
+            fontSize = 7.sp,
+            lineHeight = 8.sp,
+            fontWeight = FontWeight.Bold,
+            maxLines = 1,
+            textAlign = TextAlign.Center,
+        )
+        return
+    }
+
     if (id == SugarliciousComplicationIds.GRAPH) {
         MiniPreviewGraph(state, modifier)
         return

@@ -1,11 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <complications>
     <complication type="SHORT_TEXT">
-        <text><plain value="120%"/></text>
-        <title><plain value="TEMP"/></title>
+        <text><plain value="●"/></text>
     </complication>
-    <complication type="LONG_TEXT">
-        <text><plain value="Temp basal 120%"/></text>
-        <title><plain value="Temporäre Basalrate"/></title>
-    </complication>
+    <complication type="MONOCHROMATIC_IMAGE" monochromaticImage="@drawable/ic_complication_loop_closed" />
 </complications>

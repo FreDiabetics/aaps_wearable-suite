@@ -1,11 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <complications>
     <complication type="SHORT_TEXT">
-        <text><plain value="0.8U"/></text>
-        <title><plain value="BOLUS"/></title>
+        <text><plain value="—"/></text>
     </complication>
-    <complication type="LONG_TEXT">
-        <text><plain value="Bolus IOB 0.8 U"/></text>
-        <title><plain value="Bolus IOB"/></title>
+    <complication type="RANGED_VALUE" value="0" min="0" max="14">
+        <text><plain value="—"/></text>
     </complication>
 </complications>

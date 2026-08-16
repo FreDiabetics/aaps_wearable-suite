@@ -121,7 +121,7 @@ object WearProtocol {
     fun decodeRuntimeStatus(bytes: ByteArray): WatchRuntimeStatus {
         val decoded = json.decodeFromString<WatchRuntimeStatus>(bytes.decodeToString())
         return decoded.copy(
-            activeSugarliciousFaceIndex = decoded.activeSugarliciousFaceIndex?.coerceIn(0, 3),
+            activeSugarliciousFaceIndex = decoded.activeSugarliciousFaceIndex?.coerceIn(0, 4),
             activeComplicationIds = decoded.activeComplicationIds.distinct().take(12),
         )
     }

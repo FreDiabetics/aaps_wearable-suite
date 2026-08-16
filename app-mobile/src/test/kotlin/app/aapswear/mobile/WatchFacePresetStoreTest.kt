@@ -25,6 +25,7 @@ class WatchFacePresetStoreTest {
     fun `preset list stays aligned with every Sugarlicious watch face`() {
         assertEquals(sugarliciousWatchFaceCards.indices, WatchFacePresetStore.supportedFaceIndices)
         assertEquals(sugarliciousWatchFaceCards.size, WatchFacePresetStore.readAll(context).size)
+        assertEquals(List(sugarliciousWatchFaceCards.size) { emptyList<Int>() }, WatchFacePresetStore.readAll(context))
     }
 
     @Test

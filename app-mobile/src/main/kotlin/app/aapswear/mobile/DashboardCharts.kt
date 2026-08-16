@@ -385,6 +385,7 @@ internal class GlucoseDashboardChart @JvmOverloads constructor(
     private var cgmDotRadiusDp = 2.4f
     private var cgmDotOutlineEnabled = true
     private var cgmDotOutlineWidthDp = 0.95f
+    private var stateSignature: List<Any?>? = null
 
     fun bind(
         state: TherapyDisplayState?,
@@ -403,34 +404,52 @@ internal class GlucoseDashboardChart @JvmOverloads constructor(
         cgmDotOutlineEnabled: Boolean = true,
         cgmDotOutlineWidthDp: Float = 0.95f,
     ) {
-        this.state =
-            state
-        this.unit =
-            unit
-        this.showPredictions =
-            showPredictions
-        this.showTargetRange =
-            showTargetRange
-        this.showTargetValue =
-            showTargetValue
-        this.showBasal =
-            showBasal
-        this.showActivity =
-            showActivity
-        this.showPredictionIob =
-            showPredictionIob
-        this.showPredictionCob =
-            showPredictionCob
-        this.showPredictionUam =
-            showPredictionUam
-        this.showPredictionZeroTemp =
-            showPredictionZeroTemp
-        this.cgmDotRadiusDp =
-            cgmDotRadiusDp.coerceIn(1.5f, 6.0f)
-        this.cgmDotOutlineEnabled =
-            cgmDotOutlineEnabled
-        this.cgmDotOutlineWidthDp =
-            cgmDotOutlineWidthDp.coerceIn(0.25f, 3.0f)
+        val resolvedRadius = cgmDotRadiusDp.coerceIn(1.5f, 6.0f)
+        val resolvedOutlineWidth = cgmDotOutlineWidthDp.coerceIn(0.25f, 3.0f)
+        val newStateSignature =
+            state?.let {
+                buildList {
+                    add(it.source)
+                    add(it.glucose)
+                    add(it.glucoseHistory)
+                    add(it.glucosePredictions)
+                    add(it.target)
+                    if (showBasal || showActivity) add(it.therapyHistory)
+                }
+            }
+        val changed =
+            stateSignature != newStateSignature ||
+                this.unit != unit ||
+                this.showPredictions != showPredictions ||
+                this.showTargetRange != showTargetRange ||
+                this.showTargetValue != showTargetValue ||
+                this.showBasal != showBasal ||
+                this.showActivity != showActivity ||
+                this.showPredictionIob != showPredictionIob ||
+                this.showPredictionCob != showPredictionCob ||
+                this.showPredictionUam != showPredictionUam ||
+                this.showPredictionZeroTemp != showPredictionZeroTemp ||
+                this.cgmDotRadiusDp != resolvedRadius ||
+                this.cgmDotOutlineEnabled != cgmDotOutlineEnabled ||
+                this.cgmDotOutlineWidthDp != resolvedOutlineWidth
+
+        if (!changed) return
+
+        this.state = state
+        stateSignature = newStateSignature
+        this.unit = unit
+        this.showPredictions = showPredictions
+        this.showTargetRange = showTargetRange
+        this.showTargetValue = showTargetValue
+        this.showBasal = showBasal
+        this.showActivity = showActivity
+        this.showPredictionIob = showPredictionIob
+        this.showPredictionCob = showPredictionCob
+        this.showPredictionUam = showPredictionUam
+        this.showPredictionZeroTemp = showPredictionZeroTemp
+        this.cgmDotRadiusDp = resolvedRadius
+        this.cgmDotOutlineEnabled = cgmDotOutlineEnabled
+        this.cgmDotOutlineWidthDp = resolvedOutlineWidth
 
         if (
             !isAttachedToWindow
@@ -497,6 +516,17 @@ internal class GlucoseDashboardChart @JvmOverloads constructor(
             ) {
                 fillPaint.color =
                     SugarliciousColors.argb(
+                        SugarliciousColorRole.RANGE_HIGH,
+                    )
+                canvas.drawRect(
+                    plot.left,
+                    plot.top,
+                    plot.right,
+                    targetTop,
+                    fillPaint,
+                )
+                fillPaint.color =
+                    SugarliciousColors.argb(
                         SugarliciousColorRole.TARGET_BAND,
                     )
                 canvas.drawRect(
@@ -504,6 +534,17 @@ internal class GlucoseDashboardChart @JvmOverloads constructor(
                     targetTop,
                     plot.right,
                     targetBottom,
+                    fillPaint,
+                )
+                fillPaint.color =
+                    SugarliciousColors.argb(
+                        SugarliciousColorRole.RANGE_LOW,
+                    )
+                canvas.drawRect(
+                    plot.left,
+                    targetBottom,
+                    plot.right,
+                    plot.bottom,
                     fillPaint,
                 )
             }
@@ -989,9 +1030,21 @@ internal class MetabolicDashboardChart @JvmOverloads constructor(
     private val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
     private val timeFormat = SimpleDateFormat("HH:mm", Locale.getDefault())
     private var state: TherapyDisplayState? = null
+    private var boundDurationHours: Int? = null
+    private var stateSignature: List<Any?>? = null
 
     fun bind(state: TherapyDisplayState?, durationHours: Int) {
+        val newStateSignature =
+            state?.let {
+                listOf(
+                    it.glucose,
+                    it.therapyHistory,
+                )
+            }
+        if (stateSignature == newStateSignature && boundDurationHours == durationHours) return
         this.state = state
+        stateSignature = newStateSignature
+        boundDurationHours = durationHours
         if (!isAttachedToWindow) viewport.setHours(durationHours.toFloat())
         invalidate()
     }
@@ -1184,34 +1237,6 @@ internal class MetabolicDashboardChart @JvmOverloads constructor(
         linePaint.pathEffect =
             null
 
-        linePaint.color =
-            withAlpha(
-                SugarliciousColors.argb(
-                    SugarliciousColorRole.BORDER,
-                ),
-                130,
-            )
-        linePaint.strokeWidth =
-            0.7f.dp
-
-        canvas.drawLine(
-            iob.left,
-            iob.bottom +
-                (
-                    cob.top -
-                        iob.bottom
-                    ) /
-                2f,
-            iob.right,
-            iob.bottom +
-                (
-                    cob.top -
-                        iob.bottom
-                    ) /
-                2f,
-            linePaint,
-        )
-
         tick =
             firstAlignedTick(
                 start,
@@ -1287,10 +1312,6 @@ internal class MetabolicDashboardChart @JvmOverloads constructor(
         canvas.drawPath(area, fillPaint)
         fillPaint.shader = null
 
-        linePaint.color = withAlpha(SugarliciousColors.argb(SugarliciousColorRole.GRAPH_MUTED), 150)
-        linePaint.strokeWidth = 0.8f.dp
-        linePaint.pathEffect = null
-        canvas.drawLine(plot.left, zeroY, plot.right, zeroY, linePaint)
         linePaint.color =
             color
         linePaint.strokeWidth =

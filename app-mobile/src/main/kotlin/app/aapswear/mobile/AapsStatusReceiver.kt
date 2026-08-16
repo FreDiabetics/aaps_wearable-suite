@@ -48,8 +48,9 @@ class AapsStatusReceiver : BroadcastReceiver() {
                 val installation = AapsCapabilityDetector.detectInstallation(app)
                 val state = parsedState.copy(sourceVersion = installation?.versionName)
                 val store = TherapyStateStore(app)
+                val previous = store.state.first()
 
-                var displayState = DisplayHistoryAccumulator.merge(store.state.first(), state, now)
+                var displayState = DisplayHistoryAccumulator.merge(previous, state, now)
 
                 val glucose = displayState.glucose
                 if (glucose != null && glucose.trend == Trend.UNKNOWN) {
@@ -61,9 +62,19 @@ class AapsStatusReceiver : BroadcastReceiver() {
                     displayState = displayState.copy(glucose = glucose.copy(trend = resolved))
                 }
 
+                if (previous?.copy(receivedAtEpochMs = displayState.receivedAtEpochMs) == displayState) {
+                    app.diagnostics().edit {
+                        putLong("received", now)
+                        putString("lastSyncStatus", "unchanged")
+                    }
+                    return@launch
+                }
+
                 // Persistence is deliberately completed before Data Layer I/O. A phone
                 // without a paired watch must never lose a valid AAPS status broadcast.
                 store.save(displayState)
+                runCatching { HealthConnectIntegration.exportCgmReading(app, displayState) }
+                SugarliciousWidgets.update(app)
                 app.diagnostics().edit {
                     putLong("received", now)
                     putLong("measurement", displayState.glucose?.measuredAtEpochMs ?: 0L)
