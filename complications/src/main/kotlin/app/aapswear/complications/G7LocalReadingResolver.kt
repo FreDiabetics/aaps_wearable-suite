@@ -152,7 +152,7 @@ object G7LocalReadingResolver {
         )
     }
 
-    internal fun sourceState(state: TherapyDisplayState?): CgmSourceState? =
+    fun sourceState(state: TherapyDisplayState?): CgmSourceState? =
         state
             ?.sourceContract
             ?.takeIf { it.startsWith("CANONICAL_CGM_V2:") }
