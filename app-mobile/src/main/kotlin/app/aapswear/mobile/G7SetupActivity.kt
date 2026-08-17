@@ -116,8 +116,12 @@ class G7SetupActivity : Activity() {
             if (sent == 0) {
                 status.text = "Keine Watch erreichbar. Bluetooth/WLAN-Verbindung prüfen."
             } else {
+                // Direct-to-Watch must not disable the normal phone feed. AUTOMATIC lets a
+                // fresh local G7 reading win on the Watch while AAPS remains the fallback
+                // whenever the direct collector has no current value.
                 getSharedPreferences("dashboard_ui", MODE_PRIVATE).edit {
-                    putString("dataSource", DataSourcePreference.DEXCOM_G7_WATCH.name)
+                    putString("dataSource", DataSourcePreference.AUTOMATIC.name)
+                    putBoolean(G7_SOURCE_FALLBACK_MIGRATION_KEY, true)
                 }
                 scope.launch(Dispatchers.IO) { runCatching { publishWatchConfig(applicationContext) } }
                 pairingCode.text?.clear()
