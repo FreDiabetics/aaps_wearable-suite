@@ -28,22 +28,46 @@ class G7SessionManager(initial: G7PersistedState = G7PersistedState()) {
     var state: G7PersistedState = initial
         private set
 
+    /**
+     * Stores a newly entered sensor without enabling BLE collection. Sensor setup and collector
+     * activation are deliberately separate user actions so merely entering/syncing a code never
+     * starts an active scan.
+     */
+    fun prepareInitialSetup(sensor: G7Sensor): G7PersistedState = transition(
+        resetForSensor(sensor).copy(
+            collectorEnabled = false,
+            connectionState = G7ConnectionState.DISCONNECTED,
+            protocolState = G7ProtocolState.IDLE,
+            sessionState = G7SessionState.UNINITIALIZED,
+        ),
+    )
+
     fun beginInitialSetup(sensor: G7Sensor): G7PersistedState = transition(
-        state.copy(
-            sensor = sensor,
+        resetForSensor(sensor).copy(
             collectorEnabled = true,
-            collectorOwner = CollectorOwner.WATCH,
             connectionState = G7ConnectionState.SCANNING,
             protocolState = G7ProtocolState.SCANNING,
             sessionState = G7SessionState.INITIAL_SETUP,
-            authenticationState = G7AuthenticationState.REQUIRED,
-            lastReading = null,
-            lastSuccessfulConnectionEpochMs = null,
-            nextReconnectEpochMs = null,
-            retryCount = 0,
-            lastError = null,
         ),
     )
+
+    /** Enables an already configured collector only after an explicit user/source-selection start. */
+    fun startCollector(): G7PersistedState {
+        if (state.sensor == null) return state
+        if (state.collectorEnabled) return state
+        return transition(
+            state.copy(
+                collectorEnabled = true,
+                collectorOwner = CollectorOwner.WATCH,
+                connectionState = G7ConnectionState.DISCONNECTED,
+                protocolState = G7ProtocolState.IDLE,
+                sessionState = if (state.lastReading == null) G7SessionState.INITIAL_SETUP else G7SessionState.READY_FOR_RECONNECT,
+                nextReconnectEpochMs = null,
+                retryCount = 0,
+                lastError = null,
+            ),
+        )
+    }
 
     fun authenticationStarted(reconnect: Boolean): G7PersistedState = transition(
         state.copy(sessionState = if (reconnect) G7SessionState.REAUTHENTICATING else G7SessionState.AUTHENTICATING, authenticationState = G7AuthenticationState.AUTHENTICATING, protocolState = G7ProtocolState.AUTHENTICATING),
@@ -81,7 +105,29 @@ class G7SessionManager(initial: G7PersistedState = G7PersistedState()) {
         return transition(state.copy(sessionState = session, authenticationState = if (error.code.startsWith("AUTH")) G7AuthenticationState.FAILED else state.authenticationState, retryCount = plan.retryCount, nextReconnectEpochMs = plan.nextReconnectEpochMs, lastError = error))
     }
 
-    fun stop(): G7PersistedState = transition(state.copy(collectorEnabled = false, sessionState = G7SessionState.UNINITIALIZED, connectionState = G7ConnectionState.DISCONNECTED))
+    fun stop(): G7PersistedState = transition(
+        state.copy(
+            collectorEnabled = false,
+            sessionState = G7SessionState.UNINITIALIZED,
+            connectionState = G7ConnectionState.DISCONNECTED,
+            protocolState = G7ProtocolState.IDLE,
+            nextReconnectEpochMs = null,
+            retryCount = 0,
+        ),
+    )
+
+    private fun resetForSensor(sensor: G7Sensor): G7PersistedState =
+        state.copy(
+            sensor = sensor,
+            collectorOwner = CollectorOwner.WATCH,
+            authenticationState = G7AuthenticationState.REQUIRED,
+            lastReading = null,
+            lastSuccessfulConnectionEpochMs = null,
+            nextReconnectEpochMs = null,
+            retryCount = 0,
+            lastError = null,
+        )
+
     private fun transition(next: G7PersistedState): G7PersistedState = next.also { state = it }
 }
 
