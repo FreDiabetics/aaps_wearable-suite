@@ -19,6 +19,7 @@ import app.aapswear.g7.G7SessionManager
 import app.aapswear.g7.G7SessionState
 import app.aapswear.g7.toCgm
 import app.aapswear.model.DiagnosticSeverity
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -136,6 +137,8 @@ class G7CollectorService : Service() {
             )
             scheduleReconnect(next)
             updateForeground("${reading.glucoseMgDl.toInt()} mg/dL empfangen")
+        } catch (_: CancellationException) {
+            // Explicit stop/source switch: teardown is not a collector failure.
         } catch (error: G7BleException) {
             fail(store.read(), G7CollectorError(error.errorCode, error.recoverable, System.currentTimeMillis(), error.message))
         } catch (_: TimeoutCancellationException) {
