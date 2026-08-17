@@ -10,6 +10,7 @@ import app.aapswear.complications.ComplicationUpdatePlanner
 import app.aapswear.model.SugarliciousComplicationIds
 import app.aapswear.model.DiagnosticSeverity
 import app.aapswear.model.GlucoseSample
+import app.aapswear.model.TherapyDisplayState
 import app.aapswear.protocol.WatchRuntimeStatus
 import app.aapswear.protocol.WearProtocol
 import app.aapswear.storage.PersistentPredictionCache
@@ -30,8 +31,21 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.tasks.await
 
+internal fun shouldAcceptPhoneState(
+    previous: TherapyDisplayState?,
+    incoming: TherapyDisplayState,
+): Boolean {
+    if (previous == null) return true
+    if (incoming.receivedAtEpochMs >= previous.receivedAtEpochMs) return true
+
+    val previousGlucoseAt = previous.glucose?.measuredAtEpochMs ?: Long.MIN_VALUE
+    val incomingGlucoseAt = incoming.glucose?.measuredAtEpochMs ?: Long.MIN_VALUE
+    return incomingGlucoseAt > previousGlucoseAt
+}
+
 class StateDataLayerService : WearableListenerService() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val stateSyncMutex = Mutex()
 
     override fun onCreate() {
         super.onCreate()
@@ -71,6 +85,9 @@ class StateDataLayerService : WearableListenerService() {
 
     override fun onMessageReceived(event: MessageEvent) {
         when (event.path) {
+            WearProtocol.STATE_PATH ->
+                persistTherapyState(event.data, "message")
+
             WearProtocol.WATCH_FACE_APPLY_PATH ->
                 applyWatchFace(event)
 
@@ -257,87 +274,123 @@ class StateDataLayerService : WearableListenerService() {
     }
 
     private fun persistTherapyState(event: DataEvent) {
+        persistTherapyState(event.dataItem.data, "data_item")
+    }
+
+    private fun persistTherapyState(payload: ByteArray?, transport: String) {
         val incoming =
             runCatching {
-                WearProtocol.decode(
-                    event.dataItem.data ?: return,
-                )
+                WearProtocol.decode(payload ?: return)
             }.getOrNull()
         if (incoming == null) {
-            scope.launch { applicationContext.recordWatchDiagnostic("SOURCE", "SRC-PHONE-401", "Invalid phone state payload", DiagnosticSeverity.WARNING) }
+            scope.launch {
+                applicationContext.recordWatchDiagnostic(
+                    "SOURCE",
+                    "SRC-PHONE-401",
+                    "Invalid phone state payload",
+                    DiagnosticSeverity.WARNING,
+                    mapOf("transport" to transport),
+                )
+            }
             return
         }
 
         scope.launch {
-            val store =
-                TherapyStateStore(
-                    this@StateDataLayerService,
-                )
-            val old = store.state.first()
-            val now = System.currentTimeMillis()
-
-            val mergedByTimestamp =
-                linkedMapOf<Long, GlucoseSample>()
-
-            old
-                ?.glucoseHistory
-                .orEmpty()
-                .forEach {
-                    mergedByTimestamp[it.measuredAtEpochMs] = it
-                }
-
-            incoming
-                .glucoseHistory
-                .forEach {
-                    mergedByTimestamp[it.measuredAtEpochMs] = it
-                }
-
-            incoming.glucose?.let {
-                mergedByTimestamp[it.measuredAtEpochMs] =
-                    GlucoseSample(
-                        valueMgDl = it.valueMgDl,
-                        measuredAtEpochMs = it.measuredAtEpochMs,
+            stateSyncMutex.withLock {
+                val store =
+                    TherapyStateStore(
+                        this@StateDataLayerService,
                     )
-            }
+                val old = store.state.first()
+                val now = System.currentTimeMillis()
 
-            val history =
-                mergedByTimestamp
-                    .values
-                    .asSequence()
-                    .filter {
-                        it.valueMgDl in 20.0..1000.0 &&
-                            now - it.measuredAtEpochMs <= HISTORY_WINDOW_MS &&
-                            it.measuredAtEpochMs <= now + FUTURE_TOLERANCE_MS
+                // MessageClient and DataClient intentionally carry the same state. They are
+                // independent transports, so a delayed durable DataItem can arrive after a newer
+                // low-latency message. Never let that delayed copy roll the Watch backwards.
+                if (!shouldAcceptPhoneState(old, incoming)) {
+                    applicationContext.recordWatchDiagnostic(
+                        "SYNC",
+                        "SYNC-PHONE-202",
+                        "Older phone state ignored on Watch",
+                        metadata = mapOf(
+                            "transport" to transport,
+                            "incomingReceivedAt" to incoming.receivedAtEpochMs,
+                            "storedReceivedAt" to (old?.receivedAtEpochMs ?: 0L),
+                        ),
+                    )
+                    return@withLock
+                }
+
+                val mergedByTimestamp =
+                    linkedMapOf<Long, GlucoseSample>()
+
+                old
+                    ?.glucoseHistory
+                    .orEmpty()
+                    .forEach {
+                        mergedByTimestamp[it.measuredAtEpochMs] = it
                     }
-                    .sortedBy { it.measuredAtEpochMs }
-                    .toList()
-                    .takeLast(MAX_HISTORY_POINTS)
 
-            val merged =
-                PersistentPredictionCache.merge(
-                    previous = old,
-                    incoming = incoming.copy(glucoseHistory = history),
-                    nowEpochMs = now,
+                incoming
+                    .glucoseHistory
+                    .forEach {
+                        mergedByTimestamp[it.measuredAtEpochMs] = it
+                    }
+
+                incoming.glucose?.let {
+                    mergedByTimestamp[it.measuredAtEpochMs] =
+                        GlucoseSample(
+                            valueMgDl = it.valueMgDl,
+                            measuredAtEpochMs = it.measuredAtEpochMs,
+                        )
+                }
+
+                val history =
+                    mergedByTimestamp
+                        .values
+                        .asSequence()
+                        .filter {
+                            it.valueMgDl in 20.0..1000.0 &&
+                                now - it.measuredAtEpochMs <= HISTORY_WINDOW_MS &&
+                                it.measuredAtEpochMs <= now + FUTURE_TOLERANCE_MS
+                        }
+                        .sortedBy { it.measuredAtEpochMs }
+                        .toList()
+                        .takeLast(MAX_HISTORY_POINTS)
+
+                val merged =
+                    PersistentPredictionCache.merge(
+                        previous = old,
+                        incoming = incoming.copy(glucoseHistory = history),
+                        nowEpochMs = now,
+                    )
+                applicationContext.recordWatchDiagnostic(
+                    "PREDICTION",
+                    if (incoming.glucosePredictions.isEmpty() && merged.glucosePredictions.isNotEmpty()) "PRED-CACHE-203" else "PRED-DATA-200",
+                    if (incoming.glucosePredictions.isEmpty() && merged.glucosePredictions.isNotEmpty()) "Cached predictions retained on Watch" else "Phone state merged on Watch",
+                    metadata = mapOf(
+                        "incomingPredictions" to incoming.glucosePredictions.size,
+                        "displayPredictions" to merged.glucosePredictions.size,
+                        "historyCount" to history.size,
+                        "transport" to transport,
+                    ),
                 )
-            applicationContext.recordWatchDiagnostic(
-                "PREDICTION",
-                if (incoming.glucosePredictions.isEmpty() && merged.glucosePredictions.isNotEmpty()) "PRED-CACHE-203" else "PRED-DATA-200",
-                if (incoming.glucosePredictions.isEmpty() && merged.glucosePredictions.isNotEmpty()) "Cached predictions retained on Watch" else "Phone state merged on Watch",
-                metadata = mapOf(
-                    "incomingPredictions" to incoming.glucosePredictions.size,
-                    "displayPredictions" to merged.glucosePredictions.size,
-                    "historyCount" to history.size,
-                ),
-            )
-            val meaningfulState =
-                old?.copy(receivedAtEpochMs = merged.receivedAtEpochMs)
-            if (meaningfulState == merged) return@launch
+                val meaningfulState =
+                    old?.copy(receivedAtEpochMs = merged.receivedAtEpochMs)
+                if (meaningfulState == merged) return@withLock
 
-            store.save(merged)
-            requestComplicationUpdates(
-                ComplicationUpdatePlanner.affectedProviders(old, merged),
-            )
-            requestSugarliciousTileUpdates(this@StateDataLayerService)
+                store.save(merged)
+                requestComplicationUpdates(
+                    ComplicationUpdatePlanner.affectedProviders(old, merged),
+                )
+                requestSugarliciousTileUpdates(this@StateDataLayerService)
+                applicationContext.recordWatchDiagnostic(
+                    "SYNC",
+                    if (transport == "message") "SYNC-PHONE-201" else "SYNC-PHONE-200",
+                    if (transport == "message") "Immediate phone state applied on Watch" else "Durable phone state applied on Watch",
+                    metadata = mapOf("transport" to transport),
+                )
+            }
         }
     }
 
