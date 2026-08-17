@@ -298,8 +298,7 @@ class WearActivity : Activity() {
             cob.text = formatNumber(state?.carbs?.cobGrams, 0, " g")
             basal.text =
                 formatNumber(
-                    state?.basal?.tempAbsoluteUnitsPerHour
-                        ?: state?.basal?.currentUnitsPerHour,
+                    basalDisplayUnitsPerHour(state?.basal),
                     2,
                     " U/h",
                 )
@@ -566,6 +565,9 @@ class WearActivity : Activity() {
         private const val KEY_WFP_PERMISSION_REQUESTED = "watchface_permission_requested"
     }
 }
+
+internal fun basalDisplayUnitsPerHour(basal: BasalState?): Double? =
+    basal?.currentUnitsPerHour
 
 internal fun basalIconResource(basal: BasalState?): Int {
     val absolute = basal?.tempAbsoluteUnitsPerHour
