@@ -137,12 +137,12 @@ class G7CollectorService : Service() {
             )
             scheduleReconnect(next)
             updateForeground("${reading.glucoseMgDl.toInt()} mg/dL empfangen")
-        } catch (_: CancellationException) {
-            // Explicit stop/source switch: teardown is not a collector failure.
         } catch (error: G7BleException) {
             fail(store.read(), G7CollectorError(error.errorCode, error.recoverable, System.currentTimeMillis(), error.message))
         } catch (_: TimeoutCancellationException) {
             fail(store.read(), G7CollectorError("G7-BLE-111", true, System.currentTimeMillis(), "Zeitüberschreitung bei der Sensorverbindung"))
+        } catch (_: CancellationException) {
+            // Explicit stop/source switch: teardown is not a collector failure.
         } catch (_: SecurityException) {
             fail(store.read(), G7CollectorError("G7-PERM-401", false, System.currentTimeMillis(), "Bluetooth-Berechtigung fehlt"))
         } catch (_: Throwable) {
