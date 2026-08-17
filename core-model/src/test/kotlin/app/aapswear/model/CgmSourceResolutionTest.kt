@@ -187,6 +187,61 @@ class CgmSourceResolutionTest {
     }
 
     @Test
+    fun `same timestamp and glucose with different known sensor and session ids is not deduplicated`() {
+        val measured = now - 60_000L
+        val result =
+            CanonicalCgmSourceResolver.resolve(
+                mobile = identified(CgmCanonicalSource.MOBILE_AAPS, measured, 104.0, "sensor-a", "session-a"),
+                watch = identified(CgmCanonicalSource.WATCH_G7_DIRECT, measured, 104.0, "sensor-b", "session-b"),
+                nowEpochMs = now,
+            )
+
+        assertFalse(result.deduplicatedSameMeasurement)
+    }
+
+    @Test
+    fun `same timestamp and glucose with different known sensor id is not deduplicated`() {
+        val measured = now - 60_000L
+        val result =
+            CanonicalCgmSourceResolver.resolve(
+                mobile = identified(CgmCanonicalSource.MOBILE_AAPS, measured, 104.0, "sensor-a", "session"),
+                watch = identified(CgmCanonicalSource.WATCH_G7_DIRECT, measured, 104.0, "sensor-b", "session"),
+                nowEpochMs = now,
+            )
+
+        assertFalse(result.deduplicatedSameMeasurement)
+    }
+
+    @Test
+    fun `same timestamp and glucose with different known session id is not deduplicated`() {
+        val measured = now - 60_000L
+        val result =
+            CanonicalCgmSourceResolver.resolve(
+                mobile = identified(CgmCanonicalSource.MOBILE_AAPS, measured, 104.0, "sensor", "session-a"),
+                watch = identified(CgmCanonicalSource.WATCH_G7_DIRECT, measured, 104.0, "sensor", "session-b"),
+                nowEpochMs = now,
+            )
+
+        assertFalse(result.deduplicatedSameMeasurement)
+    }
+
+    @Test
+    fun `partial unknown identity uses timestamp and near glucose fallback when known ids do not conflict`() {
+        val measured = now - 60_000L
+        val mobile = identified(CgmCanonicalSource.MOBILE_AAPS, measured, 104.0, "sensor", null)
+        val watch = identified(CgmCanonicalSource.WATCH_G7_DIRECT, measured, 104.8, "sensor", "session")
+
+        val result =
+            CanonicalCgmSourceResolver.resolve(
+                mobile = mobile,
+                watch = watch,
+                nowEpochMs = now,
+            )
+
+        assertTrue(result.deduplicatedSameMeasurement)
+    }
+
+    @Test
     fun `phone can disappear during recovery without source flapping`() {
         val result =
             CanonicalCgmSourceResolver.resolve(
@@ -249,5 +304,21 @@ class CgmSourceResolutionTest {
             glucoseMgDl = value,
             measuredAtEpochMs = now - ageMs,
             receivedAtEpochMs = now - ageMs + 5_000L,
+        )
+
+    private fun identified(
+        source: CgmCanonicalSource,
+        measuredAtEpochMs: Long,
+        value: Double,
+        sensorId: String?,
+        sessionId: String?,
+    ): CgmSourceCandidate =
+        CgmSourceCandidate(
+            source = source,
+            glucoseMgDl = value,
+            measuredAtEpochMs = measuredAtEpochMs,
+            receivedAtEpochMs = now,
+            sensorId = sensorId,
+            sessionId = sessionId,
         )
 }
