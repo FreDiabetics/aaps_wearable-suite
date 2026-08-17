@@ -212,7 +212,7 @@ class G7WatchActivity : Activity() {
         addView(codeInput, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
             topMargin = 8.dp
         })
-        addView(actionButton(if (configured) "Neu verbinden" else "Verbinden", primary = true) {
+        addView(actionButton("Sensorcode speichern", primary = true) {
             val code = codeInput.text?.toString().orEmpty()
             val payload = runCatching { G7SetupPayload(code) }.getOrNull()
             if (payload == null) {
@@ -223,12 +223,18 @@ class G7WatchActivity : Activity() {
             val sensorId = "G7-${UUID.randomUUID().toString().take(8)}"
             val sensor = G7Sensor(sensorId, sensorId, "Dexcom G7")
             G7SensorStateStore(this@G7WatchActivity).save(
-                G7SessionManager(G7SensorStateStore(this@G7WatchActivity).read()).beginInitialSetup(sensor),
+                G7SessionManager(G7SensorStateStore(this@G7WatchActivity).read()).prepareInitialSetup(sensor),
             )
             codeInput.text?.clear()
-            G7CollectorService.start(this@G7WatchActivity)
             postDelayed({ render() }, 350L)
         }, buttonParams(top = 10))
+        addView(
+            label(
+                "Das Speichern startet keine Sensorsuche. Zum Verbinden anschließend bewusst „Collector starten“ wählen.",
+                9f,
+                TEXT_SECONDARY,
+            ).apply { gravity = Gravity.START },
+        )
     }
 
     private fun statusPill(active: Boolean, hasError: Boolean): TextView {
