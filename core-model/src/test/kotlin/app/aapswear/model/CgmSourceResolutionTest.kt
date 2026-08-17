@@ -67,11 +67,11 @@ class CgmSourceResolutionTest {
     @Test
     fun `Mobile recovery requires two distinct fresh readings`() {
         val firstMobile = mobile(minutesAgo = 1, value = 111.0)
-        val watch = watch(minutesAgo = 1, value = 111.0)
+        val watchReading = watch(minutesAgo = 1, value = 111.0)
         val first =
             CanonicalCgmSourceResolver.resolve(
                 mobile = firstMobile,
-                watch = watch,
+                watch = watchReading,
                 nowEpochMs = now,
                 previous = CgmResolverMemory(state = CgmSourceState.WATCH_DIRECT),
             )
@@ -82,7 +82,7 @@ class CgmSourceResolutionTest {
         val duplicate =
             CanonicalCgmSourceResolver.resolve(
                 mobile = firstMobile,
-                watch = watch,
+                watch = watchReading,
                 nowEpochMs = now,
                 previous = first.memory,
             )
