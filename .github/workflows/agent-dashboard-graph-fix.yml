@@ -1,3 +1,4 @@
+# second push intentionally triggers this one-shot workflow
 name: Apply dashboard graph fix
 
 on:
