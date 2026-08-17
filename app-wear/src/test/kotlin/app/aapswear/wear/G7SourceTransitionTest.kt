@@ -1,9 +1,9 @@
 package app.aapswear.wear
 
 import app.aapswear.protocol.WatchDataSource
-import kotlin.test.Test
-import kotlin.test.assertFalse
-import kotlin.test.assertTrue
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
+import org.junit.Test
 
 class G7SourceTransitionTest {
     @Test fun `repeated configuration sync does not retrigger collector`() {
