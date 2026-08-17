@@ -23,6 +23,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.time.Duration.Companion.seconds
 
 internal const val G7_SOURCE_FALLBACK_MIGRATION_KEY = "g7SetupAutomaticFallbackMigratedV1"
@@ -169,11 +170,37 @@ class AapsStatusReceiver : BroadcastReceiver() {
 }
 
 suspend fun publishState(context: Context, state: TherapyDisplayState) {
+    val payload = WearProtocol.encode(state)
     val request = PutDataRequest.create(WearProtocol.STATE_PATH)
-        .setData(WearProtocol.encode(state))
+        .setData(payload)
         .setUrgent()
+
+    // Keep the DataItem as the durable source of truth. It survives a temporarily disconnected
+    // Watch and will synchronize when the Wear network becomes available again.
     Wearable.getDataClient(context).putDataItem(request).await()
-    refreshReachableWatchNodeIds(context)
+
+    // A DataItem is synchronized by Google Play services and may still arrive later than desired
+    // for a five-minute CGM stream. When a Watch node is reachable, send the same payload over the
+    // low-latency MessageClient path as well. Failure here must never invalidate the durable item.
+    val immediatePushes = withTimeoutOrNull(IMMEDIATE_WATCH_PUSH_TIMEOUT_MS) {
+        val nodeIds = runCatching { refreshReachableWatchNodeIds(context) }.getOrDefault(emptyList())
+        nodeIds.count { nodeId ->
+            runCatching {
+                Wearable.getMessageClient(context)
+                    .sendMessage(nodeId, WearProtocol.STATE_PATH, payload)
+                    .await()
+            }.isSuccess
+        }
+    } ?: 0
+
+    context.recordMobileDiagnostic(
+        "SYNC",
+        if (immediatePushes > 0) "SYNC-PUSH-200" else "SYNC-PUSH-204",
+        if (immediatePushes > 0) "Immediate Watch state push queued" else "Durable Watch state queued; no immediate push completed",
+        metadata = mapOf("immediatePushes" to immediatePushes),
+    )
 }
+
+private const val IMMEDIATE_WATCH_PUSH_TIMEOUT_MS = 1_500L
 
 private fun Context.diagnostics() = getSharedPreferences("diagnostics", Context.MODE_PRIVATE)
