@@ -25,6 +25,18 @@ import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withTimeout
 import kotlin.time.Duration.Companion.seconds
 
+internal const val G7_SOURCE_FALLBACK_MIGRATION_KEY = "g7SetupAutomaticFallbackMigratedV1"
+
+internal fun migrateLegacyForcedG7Source(
+    current: DataSourcePreference,
+    migrationDone: Boolean,
+): DataSourcePreference =
+    if (!migrationDone && current == DataSourcePreference.DEXCOM_G7_WATCH) {
+        DataSourcePreference.AUTOMATIC
+    } else {
+        current
+    }
+
 class AapsStatusReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action != AapsPayloadAdapter.ACTION) return
@@ -34,12 +46,29 @@ class AapsStatusReceiver : BroadcastReceiver() {
         CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
             try {
                 val now = System.currentTimeMillis()
-                val sourcePreference = runCatching {
+                val sourcePreferences = app.getSharedPreferences("dashboard_ui", Context.MODE_PRIVATE)
+                val configuredSource = runCatching {
                     DataSourcePreference.valueOf(
-                        app.getSharedPreferences("dashboard_ui", Context.MODE_PRIVATE)
-                            .getString("dataSource", "AUTOMATIC")!!,
+                        sourcePreferences.getString("dataSource", DataSourcePreference.AUTOMATIC.name)!!,
                     )
                 }.getOrDefault(DataSourcePreference.AUTOMATIC)
+                val migrationDone = sourcePreferences.getBoolean(G7_SOURCE_FALLBACK_MIGRATION_KEY, false)
+                val sourcePreference = migrateLegacyForcedG7Source(configuredSource, migrationDone)
+                if (!migrationDone) {
+                    sourcePreferences.edit {
+                        if (sourcePreference != configuredSource) {
+                            putString("dataSource", sourcePreference.name)
+                        }
+                        putBoolean(G7_SOURCE_FALLBACK_MIGRATION_KEY, true)
+                    }
+                    if (sourcePreference != configuredSource) {
+                        app.recordMobileDiagnostic(
+                            "SOURCE",
+                            "SRC-G7-104",
+                            "Legacy G7-only source migrated to automatic AAPS fallback",
+                        )
+                    }
+                }
                 if (sourcePreference in setOf(DataSourcePreference.XDRIP_PLUS, DataSourcePreference.DEXCOM_G7_WATCH)) {
                     app.recordMobileDiagnostic("SOURCE", "SRC-AAPS-102", "AAPS payload ignored by explicit source selection")
                     return@launch
