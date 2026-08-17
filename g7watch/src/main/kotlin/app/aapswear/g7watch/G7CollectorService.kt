@@ -47,6 +47,7 @@ class G7CollectorService : Service() {
         if (intent?.action == ACTION_STOP) {
             collectionJob?.cancel()
             store.save(G7SessionManager(store.read()).stop())
+            cancelScheduledReconnect(this)
             finishService(startId)
             return START_NOT_STICKY
         }
@@ -65,7 +66,7 @@ class G7CollectorService : Service() {
         if (!persisted.collectorEnabled || configuredSensor == null) {
             fail(
                 persisted,
-                G7CollectorError("G7-SETUP-001", false, System.currentTimeMillis(), "Sensor muss zuerst eingerichtet werden"),
+                G7CollectorError("G7-SETUP-001", false, System.currentTimeMillis(), "Sensor muss zuerst eingerichtet und der Collector gestartet werden"),
             )
             finishService(startId)
             return
@@ -197,13 +198,9 @@ class G7CollectorService : Service() {
     }
 
     private fun scheduleReconnect(state: G7PersistedState) {
+        if (!state.collectorEnabled) return
         val at = state.nextReconnectEpochMs ?: return
-        val pending = PendingIntent.getBroadcast(
-            this,
-            0,
-            Intent(this, G7ReconnectReceiver::class.java),
-            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
-        )
+        val pending = reconnectPendingIntent(this)
         getSystemService(AlarmManager::class.java).setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, at, pending)
     }
 
@@ -246,13 +243,46 @@ class G7CollectorService : Service() {
         private const val NOTIFICATION_ID = 7001
         private const val COLLECTION_WAKE_LOCK_TIMEOUT_MS = 35L * 60L * 1000L
 
-        fun start(context: Context) = context.startForegroundService(
-            Intent(context, G7CollectorService::class.java).setAction(ACTION_START),
-        )
+        /**
+         * Explicit collector activation. Merely having credentials or a prepared sensor never starts
+         * BLE scanning; this method is called only from a user start or a G7 data-source transition.
+         */
+        fun start(context: Context) {
+            val app = context.applicationContext
+            val stateStore = G7SensorStateStore(app)
+            val current = stateStore.read()
+            if (current.sensor == null || G7CredentialStore(app).read() == null) return
+            if (!current.collectorEnabled) {
+                stateStore.save(G7SessionManager(current).startCollector())
+            }
+            app.startForegroundService(
+                Intent(app, G7CollectorService::class.java).setAction(ACTION_START),
+            )
+        }
 
-        fun stop(context: Context) = context.startService(
-            Intent(context, G7CollectorService::class.java).setAction(ACTION_STOP),
-        )
+        /** Stops collection immediately while preserving the configured sensor and credentials. */
+        fun stop(context: Context) {
+            val app = context.applicationContext
+            val stateStore = G7SensorStateStore(app)
+            stateStore.save(G7SessionManager(stateStore.read()).stop())
+            cancelScheduledReconnect(app)
+            app.stopService(Intent(app, G7CollectorService::class.java))
+            app.getSystemService(NotificationManager::class.java).cancel(NOTIFICATION_ID)
+        }
+
+        private fun reconnectPendingIntent(context: Context): PendingIntent =
+            PendingIntent.getBroadcast(
+                context,
+                0,
+                Intent(context, G7ReconnectReceiver::class.java),
+                PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+            )
+
+        private fun cancelScheduledReconnect(context: Context) {
+            val pending = reconnectPendingIntent(context)
+            context.getSystemService(AlarmManager::class.java).cancel(pending)
+            pending.cancel()
+        }
     }
 }
 
