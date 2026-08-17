@@ -1,0 +1,238 @@
+name: Apply dashboard graph fix
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/agent-dashboard-graph-fix.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  apply-fix:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Apply graph rendering fixes
+        shell: bash
+        run: |
+          git fetch origin main
+          git reset --hard origin/main
+          python3 <<'PY'
+          from pathlib import Path
+
+          dashboard = Path('app-mobile/src/main/kotlin/app/aapswear/mobile/DashboardCharts.kt')
+          text = dashboard.read_text()
+
+          def replace_once(source: str, old: str, new: str, label: str) -> str:
+              count = source.count(old)
+              if count != 1:
+                  raise SystemExit(f'{label}: expected exactly one match, found {count}')
+              return source.replace(old, new, 1)
+
+          text = replace_once(
+              text,
+              '''        val scaleContainer = RectF(0.5f.dp, 0.5f.dp, width - 0.5f.dp, height - 0.5f.dp)
+        val plot = RectF(scaleContainer)
+
+        if (plot.width() <= 24f || plot.height() <= 24f) return
+        val radius = GRAPH_CORNER_RADIUS_DP.dp
+        val clip = Path().apply { addRoundRect(scaleContainer, radius, radius, Path.Direction.CW) }
+        canvas.withClip(clip) {
+            fillPaint.color = SugarliciousColors.argb(SugarliciousColorRole.GRAPH_BACKGROUND)
+            canvas.drawRoundRect(scaleContainer, radius, radius, fillPaint)
+''',
+              '''        val outlineInset = 0.5f.dp
+        val scaleContainer = RectF(outlineInset, outlineInset, width - outlineInset, height - outlineInset)
+        val plot = RectF(scaleContainer)
+        val contentBounds = RectF(0f, 0f, width.toFloat(), height.toFloat())
+
+        if (plot.width() <= 24f || plot.height() <= 24f) return
+        val radius = GRAPH_CORNER_RADIUS_DP.dp
+        val contentClip = Path().apply {
+            addRoundRect(
+                contentBounds,
+                radius + outlineInset,
+                radius + outlineInset,
+                Path.Direction.CW,
+            )
+        }
+        canvas.withClip(contentClip) {
+            fillPaint.color = SugarliciousColors.argb(SugarliciousColorRole.GRAPH_BACKGROUND)
+            canvas.drawRect(contentBounds, fillPaint)
+''',
+              'outer content clip',
+          )
+
+          text = replace_once(
+              text,
+              '''                canvas.drawRect(
+                    plot.left,
+                    plot.top,
+                    plot.right,
+                    targetTop,
+                    fillPaint,
+                )
+''',
+              '''                canvas.drawRect(
+                    contentBounds.left,
+                    contentBounds.top,
+                    contentBounds.right,
+                    targetTop,
+                    fillPaint,
+                )
+''',
+              'high target fill',
+          )
+
+          text = replace_once(
+              text,
+              '''                canvas.drawRect(
+                    plot.left,
+                    targetTop,
+                    plot.right,
+                    targetBottom,
+                    fillPaint,
+                )
+''',
+              '''                canvas.drawRect(
+                    contentBounds.left,
+                    targetTop,
+                    contentBounds.right,
+                    targetBottom,
+                    fillPaint,
+                )
+''',
+              'target band fill',
+          )
+
+          text = replace_once(
+              text,
+              '''                canvas.drawRect(
+                    plot.left,
+                    targetBottom,
+                    plot.right,
+                    plot.bottom,
+                    fillPaint,
+                )
+''',
+              '''                canvas.drawRect(
+                    contentBounds.left,
+                    targetBottom,
+                    contentBounds.right,
+                    contentBounds.bottom,
+                    fillPaint,
+                )
+''',
+              'low target fill',
+          )
+
+          text = replace_once(
+              text,
+              '''            if (predictionLaneVisible) {
+                visiblePredictions.forEach { drawPrediction(canvas, it, plot, start, end) }
+            }
+''',
+              '''            if (predictionLaneVisible) {
+                val predictionAnchorY =
+                    history.lastOrNull()?.let { point ->
+                        mapGlucoseY(point.valueMgDl, plot)
+                    }
+                visiblePredictions.forEach {
+                    drawPrediction(
+                        canvas = canvas,
+                        series = it,
+                        plot = plot,
+                        start = start,
+                        end = end,
+                        anchorX = dividerX,
+                        anchorY = predictionAnchorY,
+                    )
+                }
+            }
+''',
+              'prediction call site',
+          )
+
+          text = replace_once(
+              text,
+              '''    private fun drawPrediction(
+        canvas: Canvas,
+        series: GlucosePrediction,
+        plot: RectF,
+        start: Long,
+        end: Long,
+    ) {
+''',
+              '''    private fun drawPrediction(
+        canvas: Canvas,
+        series: GlucosePrediction,
+        plot: RectF,
+        start: Long,
+        end: Long,
+        anchorX: Float,
+        anchorY: Float?,
+    ) {
+''',
+              'prediction signature',
+          )
+
+          text = replace_once(
+              text,
+              '''        series.samples.forEach { point ->
+            val x = mapX(point.measuredAtEpochMs, start, end, plot)
+            if (x > plot.right) return@forEach
+            val y = mapGlucoseY(point.valueMgDl, plot)
+            fillPaint.color = withAlpha(SugarliciousColors.argb(SugarliciousColorRole.GRAPH_CURRENT_OUTLINE), 190)
+            canvas.drawCircle(x, y, 2.45f.dp, fillPaint)
+            fillPaint.color = color
+            canvas.drawCircle(x, y, 1.75f.dp, fillPaint)
+        }
+''',
+              '''        series.samples.forEachIndexed { index, point ->
+            val mappedX = mapX(point.measuredAtEpochMs, start, end, plot)
+            if (mappedX > plot.right) return@forEachIndexed
+            val x = if (index == 0) anchorX else mappedX.coerceAtLeast(anchorX)
+            val y =
+                if (index == 0 && anchorY != null) {
+                    anchorY
+                } else {
+                    mapGlucoseY(point.valueMgDl, plot)
+                }
+            fillPaint.color = withAlpha(SugarliciousColors.argb(SugarliciousColorRole.GRAPH_CURRENT_OUTLINE), 190)
+            canvas.drawCircle(x, y, 2.45f.dp, fillPaint)
+            fillPaint.color = color
+            canvas.drawCircle(x, y, 1.75f.dp, fillPaint)
+        }
+''',
+              'prediction anchor rendering',
+          )
+
+          dashboard.write_text(text)
+
+          timeline = Path('wear-storage/src/main/kotlin/app/aapswear/storage/PredictionDisplayTimeline.kt')
+          timeline_text = timeline.read_text()
+          timeline_text = replace_once(
+              timeline_text,
+              '    const val LEAD_IN_MS = 15_000L\n',
+              '    const val LEAD_IN_MS = 0L\n',
+              'prediction lead-in',
+          )
+          timeline.write_text(timeline_text)
+          PY
+
+      - name: Commit fixed sources and remove runner
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app-mobile/src/main/kotlin/app/aapswear/mobile/DashboardCharts.kt wear-storage/src/main/kotlin/app/aapswear/storage/PredictionDisplayTimeline.kt
+          git rm .github/workflows/agent-dashboard-graph-fix.yml
+          git commit -m "Fix dashboard graph clipping and prediction anchors"
+          git push origin HEAD:main
