@@ -7,11 +7,11 @@ import app.aapswear.model.GlucosePrediction
  *
  * AAPS prediction packets commonly begin at the timestamp of the last CGM reading. If those
  * timestamps are drawn literally, their first dots overlap the CGM dot or drift left of the
- * current-time divider while a cached packet is retained. Re-anchoring keeps every curve directly
- * to the right of the divider without mutating the persisted source data.
+ * current-time divider while a cached packet is retained. Re-anchoring keeps every curve fixed
+ * to the divider without mutating the persisted source data.
  */
 object PredictionDisplayTimeline {
-    const val LEAD_IN_MS = 15_000L
+    const val LEAD_IN_MS = 0L
     const val MAX_DISPLAY_WINDOW_MS = 2L * 60L * 60_000L
 
     fun anchor(

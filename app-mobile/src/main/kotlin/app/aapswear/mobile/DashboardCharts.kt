@@ -470,15 +470,24 @@ internal class GlucoseDashboardChart @JvmOverloads constructor(
 
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
-        val scaleContainer = RectF(0.5f.dp, 0.5f.dp, width - 0.5f.dp, height - 0.5f.dp)
+        val outlineInset = 0.5f.dp
+        val scaleContainer = RectF(outlineInset, outlineInset, width - outlineInset, height - outlineInset)
         val plot = RectF(scaleContainer)
+        val contentBounds = RectF(0f, 0f, width.toFloat(), height.toFloat())
 
         if (plot.width() <= 24f || plot.height() <= 24f) return
         val radius = GRAPH_CORNER_RADIUS_DP.dp
-        val clip = Path().apply { addRoundRect(scaleContainer, radius, radius, Path.Direction.CW) }
-        canvas.withClip(clip) {
+        val contentClip = Path().apply {
+            addRoundRect(
+                contentBounds,
+                radius + outlineInset,
+                radius + outlineInset,
+                Path.Direction.CW,
+            )
+        }
+        canvas.withClip(contentClip) {
             fillPaint.color = SugarliciousColors.argb(SugarliciousColorRole.GRAPH_BACKGROUND)
-            canvas.drawRoundRect(scaleContainer, radius, radius, fillPaint)
+            canvas.drawRect(contentBounds, fillPaint)
             val now = System.currentTimeMillis()
             val targetLow = state?.target?.lowMgDl ?: 80.0
             val targetHigh = state?.target?.highMgDl ?: 160.0
@@ -525,9 +534,9 @@ internal class GlucoseDashboardChart @JvmOverloads constructor(
                         SugarliciousColorRole.RANGE_HIGH,
                     )
                 canvas.drawRect(
-                    plot.left,
-                    plot.top,
-                    plot.right,
+                    contentBounds.left,
+                    contentBounds.top,
+                    contentBounds.right,
                     targetTop,
                     fillPaint,
                 )
@@ -536,9 +545,9 @@ internal class GlucoseDashboardChart @JvmOverloads constructor(
                         SugarliciousColorRole.TARGET_BAND,
                     )
                 canvas.drawRect(
-                    plot.left,
+                    contentBounds.left,
                     targetTop,
-                    plot.right,
+                    contentBounds.right,
                     targetBottom,
                     fillPaint,
                 )
@@ -547,10 +556,10 @@ internal class GlucoseDashboardChart @JvmOverloads constructor(
                         SugarliciousColorRole.RANGE_LOW,
                     )
                 canvas.drawRect(
-                    plot.left,
+                    contentBounds.left,
                     targetBottom,
-                    plot.right,
-                    plot.bottom,
+                    contentBounds.right,
+                    contentBounds.bottom,
                     fillPaint,
                 )
             }
@@ -590,15 +599,15 @@ internal class GlucoseDashboardChart @JvmOverloads constructor(
             }
             if (
                 showActivity
-            ) {            drawInsulinActivity(
-                canvas,
-                RectF(plot.left, targetTop, plot.right, targetBottom),
-                start,
-                end,
-                now,
-                state?.therapyHistory.orEmpty(),
-            )
-
+            ) {
+                drawInsulinActivity(
+                    canvas,
+                    RectF(plot.left, targetTop, plot.right, targetBottom),
+                    start,
+                    end,
+                    now,
+                    state?.therapyHistory.orEmpty(),
+                )
             }
             val dividerX = mapX(now, start, end, plot).coerceIn(plot.left, plot.right)
             val predictionLaneVisible = visiblePredictions.isNotEmpty() && now in start..end
@@ -638,31 +647,46 @@ internal class GlucoseDashboardChart @JvmOverloads constructor(
                 }
             }
             if (predictionLaneVisible) {
-                visiblePredictions.forEach { drawPrediction(canvas, it, plot, start, end) }
+                val predictionAnchorY =
+                    history.lastOrNull()?.let { point ->
+                        mapGlucoseY(point.valueMgDl, plot)
+                    }
+                visiblePredictions.forEach {
+                    drawPrediction(
+                        canvas = canvas,
+                        series = it,
+                        plot = plot,
+                        start = start,
+                        end = end,
+                        anchorX = dividerX,
+                        anchorY = predictionAnchorY,
+                    )
+                }
             }
 
             if (
                 showTargetRange
-            ) {            drawTargetLabel(
-                canvas = canvas,
-                value = glucoseLabel(targetHigh),
-                x = plot.right - 1f.dp,
-                y =
-                    (targetTop - 4f.dp)
-                        .coerceAtLeast(
-                            plot.top + 12f.dp,
-                        ),
-            )
-            drawTargetLabel(
-                canvas = canvas,
-                value = glucoseLabel(targetLow),
-                x = plot.right - 1f.dp,
-                y =
-                    (targetBottom + 12f.dp)
-                        .coerceAtMost(
-                            plot.bottom - 6f.dp,
-                        ),
-            )
+            ) {
+                drawTargetLabel(
+                    canvas = canvas,
+                    value = glucoseLabel(targetHigh),
+                    x = plot.right - 1f.dp,
+                    y =
+                        (targetTop - 4f.dp)
+                            .coerceAtLeast(
+                                plot.top + 12f.dp,
+                            ),
+                )
+                drawTargetLabel(
+                    canvas = canvas,
+                    value = glucoseLabel(targetLow),
+                    x = plot.right - 1f.dp,
+                    y =
+                        (targetBottom + 12f.dp)
+                            .coerceAtMost(
+                                plot.bottom - 6f.dp,
+                            ),
+                )
             }
             if (history.size < 2) {
                 drawText(canvas, "Noch kein Verlauf", plot.centerX(), plot.centerY(), 10f, SugarliciousColors.argb(SugarliciousColorRole.GRAPH_MUTED), Paint.Align.CENTER)
@@ -966,6 +990,8 @@ internal class GlucoseDashboardChart @JvmOverloads constructor(
         plot: RectF,
         start: Long,
         end: Long,
+        anchorX: Float,
+        anchorY: Float?,
     ) {
         val color = when (series.kind) {
             PredictionKind.IOB -> SugarliciousColors.argb(SugarliciousColorRole.PREDICTION_IOB)
@@ -973,10 +999,16 @@ internal class GlucoseDashboardChart @JvmOverloads constructor(
             PredictionKind.UAM -> SugarliciousColors.argb(SugarliciousColorRole.PREDICTION_UAM)
             PredictionKind.ZERO_TEMP -> SugarliciousColors.argb(SugarliciousColorRole.PREDICTION_ZERO_TEMP)
         }
-        series.samples.forEach { point ->
-            val x = mapX(point.measuredAtEpochMs, start, end, plot)
-            if (x > plot.right) return@forEach
-            val y = mapGlucoseY(point.valueMgDl, plot)
+        series.samples.forEachIndexed { index, point ->
+            val mappedX = mapX(point.measuredAtEpochMs, start, end, plot)
+            if (mappedX > plot.right) return@forEachIndexed
+            val x = if (index == 0) anchorX else mappedX.coerceAtLeast(anchorX)
+            val y =
+                if (index == 0 && anchorY != null) {
+                    anchorY
+                } else {
+                    mapGlucoseY(point.valueMgDl, plot)
+                }
             fillPaint.color = withAlpha(SugarliciousColors.argb(SugarliciousColorRole.GRAPH_CURRENT_OUTLINE), 190)
             canvas.drawCircle(x, y, 2.45f.dp, fillPaint)
             fillPaint.color = color
@@ -1539,6 +1571,7 @@ internal class MetabolicDashboardChart @JvmOverloads constructor(
         linePaint.pathEffect =
             null
     }
+
     private fun drawSmbMarkers(
         canvas: Canvas,
         plot: RectF,
@@ -1831,6 +1864,7 @@ private fun recentNegativeSlope(
             2
     ]
 }
+
 internal fun toolkitSmbMarkerSide(units: Double): Float = when {
     abs(units) <= 0.1 -> 9f
     abs(units) < 0.5 -> 12f
@@ -2251,6 +2285,7 @@ private fun formatMetabolicScale(
                 value,
             )
     }
+
 private fun buildActivityProjection(last: Pair<Long, Double>, projectionStart: Long, end: Long): List<Pair<Long, Double>> {
     if (end <= projectionStart || last.second <= 0.0) return emptyList()
     val duration = 3L * HOUR_MS
