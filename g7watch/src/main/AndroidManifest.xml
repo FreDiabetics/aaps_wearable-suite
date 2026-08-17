@@ -42,6 +42,12 @@
             android:permission="app.aapswear.g7watch.permission.CONFIGURE_G7">
             <intent-filter><action android:name="app.aapswear.g7watch.CONFIGURE" /></intent-filter>
         </receiver>
+        <receiver
+            android:name=".G7SourceControlReceiver"
+            android:exported="true"
+            android:permission="app.aapswear.g7watch.permission.CONFIGURE_G7">
+            <intent-filter><action android:name="app.aapswear.g7watch.SET_SOURCE" /></intent-filter>
+        </receiver>
         <provider
             android:name=".G7ReadingProvider"
             android:authorities="app.aapswear.g7watch.readings"
