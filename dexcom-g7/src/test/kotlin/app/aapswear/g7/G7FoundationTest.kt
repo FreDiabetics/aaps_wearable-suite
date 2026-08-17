@@ -4,6 +4,7 @@ import app.aapswear.model.DataSourceId
 import app.aapswear.model.Trend
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -57,6 +58,51 @@ class G7FoundationTest {
         assertNull(state.lastReading)
         assertNull(state.lastSuccessfulConnectionEpochMs)
         assertNull(state.nextReconnectEpochMs)
+    }
+
+    @Test fun `entering a sensor code can prepare setup without enabling scan`() {
+        val stale = G7PersistedState(
+            sensor = G7Sensor("old"),
+            collectorEnabled = true,
+            protocolState = G7ProtocolState.ERROR,
+            sessionState = G7SessionState.RECOVERING,
+            nextReconnectEpochMs = now + 60_000L,
+            retryCount = 4,
+        )
+        val prepared = G7SessionManager(stale).prepareInitialSetup(G7Sensor("new"))
+        assertFalse(prepared.collectorEnabled)
+        assertEquals(G7ConnectionState.DISCONNECTED, prepared.connectionState)
+        assertEquals(G7ProtocolState.IDLE, prepared.protocolState)
+        assertEquals(G7SessionState.UNINITIALIZED, prepared.sessionState)
+        assertNull(prepared.nextReconnectEpochMs)
+        assertEquals(0, prepared.retryCount)
+    }
+
+    @Test fun `explicit collector start enables prepared sensor`() {
+        val prepared = G7SessionManager().prepareInitialSetup(G7Sensor("sensor"))
+        val started = G7SessionManager(prepared).startCollector()
+        assertTrue(started.collectorEnabled)
+        assertEquals(CollectorOwner.WATCH, started.collectorOwner)
+        assertEquals(G7SessionState.INITIAL_SETUP, started.sessionState)
+        assertEquals(G7ProtocolState.IDLE, started.protocolState)
+    }
+
+    @Test fun `collector stop prevents scheduled reconnect but keeps sensor configuration`() {
+        val configured = G7PersistedState(
+            sensor = G7Sensor("sensor"),
+            collectorEnabled = true,
+            protocolState = G7ProtocolState.WAITING_FOR_NEXT_READING,
+            sessionState = G7SessionState.WAITING_FOR_NEXT_READING,
+            nextReconnectEpochMs = now + 60_000L,
+            retryCount = 3,
+        )
+        val stopped = G7SessionManager(configured).stop()
+        assertFalse(stopped.collectorEnabled)
+        assertEquals("sensor", stopped.sensor?.sensorId)
+        assertEquals(G7ProtocolState.IDLE, stopped.protocolState)
+        assertEquals(G7SessionState.UNINITIALIZED, stopped.sessionState)
+        assertNull(stopped.nextReconnectEpochMs)
+        assertEquals(0, stopped.retryCount)
     }
 
     @Test fun `reading schedules autonomous reconnect and clears retries`() {

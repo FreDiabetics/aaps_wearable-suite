@@ -17,15 +17,14 @@ class G7SetupReceiver : BroadcastReceiver() {
         G7CredentialStore(context).saveSetup(payload)
         val sensorId = serial?.takeIf(String::isNotBlank)
             ?: "G7-${java.util.UUID.randomUUID().toString().take(8)}"
-        val initial = G7SessionManager(G7SensorStateStore(context).read()).beginInitialSetup(
+        val prepared = G7SessionManager(G7SensorStateStore(context).read()).prepareInitialSetup(
             G7Sensor(
                 sensorId = sensorId,
                 sessionId = serial ?: sensorId,
                 deviceName = "Dexcom G7",
             ),
         )
-        G7SensorStateStore(context).save(initial)
-        G7CollectorService.start(context)
+        G7SensorStateStore(context).save(prepared)
     }
 
     companion object {

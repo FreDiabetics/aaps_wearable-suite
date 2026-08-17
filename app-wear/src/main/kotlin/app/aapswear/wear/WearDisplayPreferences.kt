@@ -1,12 +1,19 @@
 package app.aapswear.wear
 
+import android.content.ComponentName
 import android.content.Context
+import android.content.Intent
 import app.aapswear.protocol.WatchConfig
 import app.aapswear.protocol.WatchGlucoseUnit
 import app.aapswear.protocol.WatchGraphColors
 import app.aapswear.protocol.WatchGraphStyle
 import app.aapswear.protocol.WatchUiColors
 import app.aapswear.protocol.WatchDataSource
+
+internal fun shouldApplyG7CollectorSourceTransition(
+    previous: WatchDataSource,
+    current: WatchDataSource,
+): Boolean = previous != current
 
 internal data class WearDisplayPreferences(
     val graphHours: Int = 3,
@@ -33,6 +40,11 @@ internal data class WearDisplayPreferences(
         private const val STYLE_DOT_RADIUS = "cgm_dot_radius_dp"
         private const val STYLE_OUTLINE_ENABLED = "cgm_dot_outline_enabled"
         private const val STYLE_OUTLINE_WIDTH = "cgm_dot_outline_width_dp"
+        private const val G7_PACKAGE = "app.aapswear.g7watch"
+        private const val G7_SOURCE_RECEIVER = "app.aapswear.g7watch.G7SourceControlReceiver"
+        private const val G7_SOURCE_ACTION = "app.aapswear.g7watch.SET_SOURCE"
+        private const val G7_SOURCE_EXTRA = "g7_selected"
+        private const val G7_CONFIG_PERMISSION = "app.aapswear.g7watch.permission.CONFIGURE_G7"
 
         val allowedGraphHours = listOf(1, 2, 3, 6, 12, 24)
 
@@ -130,6 +142,7 @@ internal data class WearDisplayPreferences(
             context: Context,
             config: WatchConfig,
         ) {
+            val previousSource = read(context).dataSource
             val preferences =
                 context.getSharedPreferences(
                     PREFS,
@@ -144,6 +157,7 @@ internal data class WearDisplayPreferences(
                     .putLong(KEY_SYNCED_AT, syncedAt)
                     .putString(KEY_DATA_SOURCE, config.dataSource.name)
                     .apply()
+                notifyG7CollectorSourceTransition(context, previousSource, config.dataSource)
                 return
             }
 
@@ -163,6 +177,7 @@ internal data class WearDisplayPreferences(
                     ),
                 markLocal = false,
             )
+            notifyG7CollectorSourceTransition(context, previousSource, config.dataSource)
         }
 
         fun saveLocal(
@@ -174,6 +189,19 @@ internal data class WearDisplayPreferences(
                 value = value,
                 markLocal = true,
             )
+        }
+
+        private fun notifyG7CollectorSourceTransition(
+            context: Context,
+            previous: WatchDataSource,
+            current: WatchDataSource,
+        ) {
+            if (!shouldApplyG7CollectorSourceTransition(previous, current)) return
+            val intent =
+                Intent(G7_SOURCE_ACTION)
+                    .setComponent(ComponentName(G7_PACKAGE, G7_SOURCE_RECEIVER))
+                    .putExtra(G7_SOURCE_EXTRA, current == WatchDataSource.DEXCOM_G7_WATCH)
+            context.sendBroadcast(intent, G7_CONFIG_PERMISSION)
         }
 
         private fun write(
