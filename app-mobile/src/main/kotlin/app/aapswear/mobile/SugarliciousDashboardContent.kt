@@ -84,8 +84,11 @@ class SugarliciousDashboardContent @JvmOverloads constructor(
                 }
             }
             for (index in 0 until view.childCount) styleTree(view.getChildAt(index))
-        } else if (view !is TextView && view.layoutParams?.height in 1..2.dp) {
-            view.setBackgroundColor(withAlpha(SugarliciousColors.argb(SugarliciousColorRole.BORDER), 0x72))
+        } else {
+            val height = view.layoutParams?.height
+            if (view !is TextView && height != null && height in 1..2.dp) {
+                view.setBackgroundColor(withAlpha(SugarliciousColors.argb(SugarliciousColorRole.BORDER), 0x72))
+            }
         }
     }
 
