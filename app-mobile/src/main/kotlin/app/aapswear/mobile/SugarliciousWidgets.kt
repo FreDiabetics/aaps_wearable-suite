@@ -44,14 +44,11 @@ import app.aapswear.model.GlucoseUnit
 import app.aapswear.model.TherapyDisplayFormatter
 import app.aapswear.model.TherapyDisplayState
 import app.aapswear.storage.TherapyStateStore
-import kotlinx.coroutines.flow.first
 import java.util.Locale
+import kotlinx.coroutines.flow.first
 
 private fun widgetColor(role: SugarliciousColorRole): ColorProvider =
-    DayNightColorProvider(
-        day = Color(role.lightArgb),
-        night = Color(role.defaultArgb),
-    )
+    DayNightColorProvider(day = Color(role.lightArgb), night = Color(role.defaultArgb))
 
 private fun blendedWidgetColor(
     surface: SugarliciousColorRole,
@@ -76,7 +73,6 @@ private fun blendArgb(base: Int, overlay: Int, fraction: Float): Int {
 }
 
 private val WidgetSurface = widgetColor(SugarliciousColorRole.SURFACE)
-private val WidgetSurfaceHigh = widgetColor(SugarliciousColorRole.SURFACE_HIGH)
 private val WidgetPrimary = widgetColor(SugarliciousColorRole.TEXT_PRIMARY)
 private val WidgetSecondary = widgetColor(SugarliciousColorRole.TEXT_SECONDARY)
 private val WidgetAccent = widgetColor(SugarliciousColorRole.PRIMARY)
@@ -127,12 +123,12 @@ private fun WidgetShell(kind: WidgetKind, state: TherapyDisplayState?) {
                 .fillMaxSize()
                 .background(background)
                 .cornerRadius(SugarliciousRadius.Navigation)
-                .padding(if (compact) SugarliciousSpacing.Md else SugarliciousSpacing.Lg)
+                .padding(if (compact) SugarliciousSpacing.Sm else SugarliciousSpacing.Lg)
                 .clickable(actionStartActivity<MainActivity>()),
         verticalAlignment = Alignment.Vertical.CenterVertically,
     ) {
         WidgetHeader(kind, state, compact)
-        Spacer(GlanceModifier.height(if (compact) SugarliciousSpacing.Sm else SugarliciousSpacing.Md))
+        Spacer(GlanceModifier.height(if (compact) SugarliciousSpacing.Xs else SugarliciousSpacing.Md))
         when (kind) {
             WidgetKind.GLUCOSE -> GlucoseWidgetContent(state, compact)
             WidgetKind.METABOLIC -> MetabolicWidgetContent(state, compact)
@@ -143,8 +139,7 @@ private fun WidgetShell(kind: WidgetKind, state: TherapyDisplayState?) {
 
 @Composable
 private fun WidgetHeader(kind: WidgetKind, state: TherapyDisplayState?, compact: Boolean) {
-    val now = System.currentTimeMillis()
-    val freshness = TherapyDisplayFormatter.freshness(state, now)
+    val freshness = TherapyDisplayFormatter.freshness(state, System.currentTimeMillis())
     Row(modifier = GlanceModifier.fillMaxWidth(), verticalAlignment = Alignment.Vertical.CenterVertically) {
         Image(
             ImageProvider(R.mipmap.ic_launcher),
@@ -159,7 +154,7 @@ private fun WidgetHeader(kind: WidgetKind, state: TherapyDisplayState?, compact:
             )
             if (!compact && kind != WidgetKind.ACTIVITY) {
                 Text(
-                    widgetStatusLabel(freshness),
+                    TherapyDisplayFormatter.freshnessLabel(freshness),
                     style = TextStyle(color = statusColor(freshness), fontWeight = FontWeight.Bold, fontSize = 10.sp),
                 )
             }
@@ -190,16 +185,20 @@ private fun GlucoseWidgetContent(state: TherapyDisplayState?, compact: Boolean) 
             style = TextStyle(
                 color = WidgetPrimary,
                 fontWeight = FontWeight.Bold,
-                fontSize = if (compact) 38.sp else 48.sp,
+                fontSize = if (compact) 36.sp else 48.sp,
             ),
         )
         Spacer(GlanceModifier.width(if (compact) SugarliciousSpacing.Sm else SugarliciousSpacing.Md))
         Column {
             Text(
                 listOf(arrow, delta).filter(String::isNotBlank).joinToString("  "),
-                style = TextStyle(color = if (displayable) WidgetPrimary else WidgetSecondary, fontWeight = FontWeight.Bold, fontSize = if (compact) 17.sp else 21.sp),
+                style = TextStyle(
+                    color = if (displayable) WidgetPrimary else WidgetSecondary,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = if (compact) 16.sp else 21.sp,
+                ),
             )
-            if (unit.isNotBlank()) Text(unit, style = TextStyle(color = WidgetSecondary, fontSize = 12.sp))
+            if (unit.isNotBlank()) Text(unit, style = TextStyle(color = WidgetSecondary, fontSize = if (compact) 10.sp else 12.sp))
             Text(
                 widgetStatusLine(state, freshness, now, compact),
                 style = TextStyle(color = statusColor(freshness), fontWeight = FontWeight.Medium, fontSize = if (compact) 9.sp else 11.sp),
@@ -213,16 +212,17 @@ private fun MetabolicWidgetContent(state: TherapyDisplayState?, compact: Boolean
     val now = System.currentTimeMillis()
     val freshness = TherapyDisplayFormatter.freshness(state, now)
     val displayable = TherapyDisplayFormatter.isGlucoseDisplayable(state, now)
-    val width = ((LocalSize.current.width - SugarliciousSpacing.Xxl) / 3).coerceAtLeast(56.dp)
+    val horizontalInset = if (compact) 16.dp else 32.dp
+    val width = ((LocalSize.current.width - horizontalInset) / 3).coerceAtLeast(if (compact) 48.dp else 56.dp)
 
     Row(modifier = GlanceModifier.fillMaxWidth(), verticalAlignment = Alignment.Vertical.CenterVertically) {
         FlatMetric("IOB", state?.insulin?.totalIob?.takeIf { displayable }?.let { String.format(Locale.US, "%.1f U", it) } ?: "–", WidgetIob, GlanceModifier.width(width), compact)
         FlatMetric("COB", state?.carbs?.cobGrams?.takeIf { displayable }?.let { String.format(Locale.US, "%.0f g", it) } ?: "–", WidgetCob, GlanceModifier.width(width), compact)
         FlatMetric("BASAL", state?.basal?.currentUnitsPerHour?.takeIf { displayable }?.let { String.format(Locale.US, "%.2f", it) } ?: "–", WidgetBasal, GlanceModifier.width(width), compact)
     }
-    Spacer(GlanceModifier.height(SugarliciousSpacing.Sm))
+    Spacer(GlanceModifier.height(if (compact) SugarliciousSpacing.Xs else SugarliciousSpacing.Sm))
     Text(
-        if (displayable) widgetStatusLine(state, freshness, now, compact) else widgetStatusLabel(freshness),
+        if (displayable) widgetStatusLine(state, freshness, now, compact) else TherapyDisplayFormatter.freshnessLabel(freshness),
         style = TextStyle(color = statusColor(freshness), fontWeight = FontWeight.Medium, fontSize = if (compact) 9.sp else 11.sp),
     )
 }
@@ -230,19 +230,20 @@ private fun MetabolicWidgetContent(state: TherapyDisplayState?, compact: Boolean
 @Composable
 private fun FlatMetric(label: String, value: String, accent: ColorProvider, modifier: GlanceModifier, compact: Boolean) {
     Column(modifier = modifier.padding(horizontal = SugarliciousSpacing.Xs)) {
-        Text(label, style = TextStyle(color = accent, fontWeight = FontWeight.Bold, fontSize = if (compact) 10.sp else 11.sp))
-        Text(value, style = TextStyle(color = WidgetPrimary, fontWeight = FontWeight.Bold, fontSize = if (compact) 16.sp else 19.sp))
+        Text(label, style = TextStyle(color = accent, fontWeight = FontWeight.Bold, fontSize = if (compact) 9.sp else 11.sp))
+        Text(value, style = TextStyle(color = WidgetPrimary, fontWeight = FontWeight.Bold, fontSize = if (compact) 15.sp else 19.sp))
     }
 }
 
 @Composable
 private fun ActivityWidgetContent(snapshot: HealthConnectSnapshot?, compact: Boolean) {
-    val width = ((LocalSize.current.width - SugarliciousSpacing.Xxl) / 2).coerceAtLeast(72.dp)
+    val horizontalInset = if (compact) 16.dp else 32.dp
+    val width = ((LocalSize.current.width - horizontalInset) / 2).coerceAtLeast(if (compact) 72.dp else 80.dp)
     Row(modifier = GlanceModifier.fillMaxWidth()) {
         FlatMetric("SCHRITTE", snapshot?.steps?.toString() ?: "–", WidgetCyan, GlanceModifier.width(width), compact)
         FlatMetric("PULS", snapshot?.latestHeartRate?.let { "$it bpm" } ?: "–", WidgetHeartRate, GlanceModifier.width(width), compact)
     }
-    Spacer(GlanceModifier.height(SugarliciousSpacing.Md))
+    Spacer(GlanceModifier.height(if (compact) SugarliciousSpacing.Sm else SugarliciousSpacing.Md))
     Row(modifier = GlanceModifier.fillMaxWidth()) {
         FlatMetric("AKTIV", snapshot?.activeMinutes?.let { "$it min" } ?: "–", WidgetBasal, GlanceModifier.width(width), compact)
         FlatMetric("KCAL", snapshot?.activeCaloriesKcal?.let { String.format(Locale.US, "%.0f", it) } ?: "–", WidgetCob, GlanceModifier.width(width), compact)
@@ -266,7 +267,11 @@ private fun glucoseSurface(state: TherapyDisplayState?): ColorProvider {
 private fun widgetStatusLine(state: TherapyDisplayState?, freshness: Freshness, now: Long, compact: Boolean): String {
     val source = TherapyDisplayFormatter.sourceName(state?.source)
     val age = TherapyDisplayFormatter.ageMinutesValue(state?.glucose?.measuredAtEpochMs, now)?.let { "$it min" }
-    val parts = if (compact) listOf(source, age.orEmpty()) else listOf(source, age.orEmpty(), widgetStatusLabel(freshness))
+    val parts = if (compact) {
+        listOf(source, age.orEmpty())
+    } else {
+        listOf(source, age.orEmpty(), TherapyDisplayFormatter.freshnessLabel(freshness))
+    }
     return parts.filter(String::isNotBlank).joinToString(" · ")
 }
 
@@ -274,11 +279,4 @@ private fun statusColor(freshness: Freshness): ColorProvider = when (freshness) 
     Freshness.CURRENT -> WidgetAccent
     Freshness.DELAYED -> WidgetWarning
     Freshness.STALE, Freshness.NO_DATA -> WidgetError
-}
-
-private fun widgetStatusLabel(freshness: Freshness): String = when (freshness) {
-    Freshness.CURRENT -> "AKTUELL"
-    Freshness.DELAYED -> "VERZÖGERT"
-    Freshness.STALE -> "VERALTET"
-    Freshness.NO_DATA -> "KEINE DATEN"
 }
