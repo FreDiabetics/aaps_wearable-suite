@@ -20,12 +20,8 @@ import java.util.Locale
 import kotlin.math.roundToInt
 
 /**
- * Hosts the dashboard body and gives the remaining classic-View settings hierarchy the same
- * Sugarlicious surface language as the Compose overview/watch configuration screens.
- *
- * Overview and Watch are Compose and therefore bypass this adapter. Settings are built as classic
- * Views in [DashboardViewFactory]; styling them here keeps that behaviour intact while removing the
- * generic Android-settings appearance without duplicating settings state or callbacks.
+ * Gives the remaining classic-View Settings hierarchy the same Sugarlicious surface language as
+ * the Compose Overview and Watch Configuration screens without duplicating settings behaviour.
  */
 class SugarliciousDashboardContent @JvmOverloads constructor(
     context: Context,
@@ -41,14 +37,12 @@ class SugarliciousDashboardContent @JvmOverloads constructor(
 
     private fun styleTopLevel(view: View) {
         when (view) {
-            is TextView -> {
-                if (view.text.toString().isSectionLabel()) {
-                    view.textSize = 11.5f
-                    view.setTextColor(SugarliciousColors.argb(SugarliciousColorRole.PRIMARY))
-                    view.typeface = Typeface.create("sans", Typeface.BOLD)
-                    view.letterSpacing = 0.08f
-                    view.setPadding(6.dp, 18.dp, 6.dp, 6.dp)
-                }
+            is TextView -> if (view.text.toString().isSectionLabel()) {
+                view.textSize = 11.5f
+                view.setTextColor(SugarliciousColors.argb(SugarliciousColorRole.PRIMARY))
+                view.typeface = Typeface.create("sans", Typeface.BOLD)
+                view.letterSpacing = 0.08f
+                view.setPadding(6.dp, 18.dp, 6.dp, 6.dp)
             }
 
             is LinearLayout -> {
@@ -62,7 +56,7 @@ class SugarliciousDashboardContent @JvmOverloads constructor(
                     view.background = cardBackground()
                     view.clipToOutline = true
                     view.setPadding(16.dp, 14.dp, 16.dp, 14.dp)
-                    (view.layoutParams as? MarginLayoutParams)?.let { params ->
+                    (view.layoutParams as? ViewGroup.MarginLayoutParams)?.let { params ->
                         params.topMargin = maxOf(params.topMargin, 6.dp)
                         params.bottomMargin = maxOf(params.bottomMargin, 2.dp)
                         view.layoutParams = params
@@ -79,7 +73,7 @@ class SugarliciousDashboardContent @JvmOverloads constructor(
         }
 
         if (view is ViewGroup && view !is ComposeView) {
-            if (view.isClickable && view !is Switch) {
+            if (view.isClickable) {
                 view.minimumHeight = maxOf(view.minimumHeight, 54.dp)
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                     view.foreground = RippleDrawable(
@@ -89,9 +83,7 @@ class SugarliciousDashboardContent @JvmOverloads constructor(
                     )
                 }
             }
-            for (index in 0 until view.childCount) {
-                styleTree(view.getChildAt(index))
-            }
+            for (index in 0 until view.childCount) styleTree(view.getChildAt(index))
         } else if (view !is TextView && view.layoutParams?.height in 1..2.dp) {
             view.setBackgroundColor(withAlpha(SugarliciousColors.argb(SugarliciousColorRole.BORDER), 0x72))
         }
