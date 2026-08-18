@@ -9,6 +9,7 @@ import android.app.Service
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
+import android.os.Build
 import android.os.IBinder
 import android.os.PowerManager
 import app.aapswear.g7.G7CollectorError
@@ -172,7 +173,7 @@ class G7CollectorService : Service() {
 
     private fun startForegroundCollector(message: String) {
         val notification = notification(message)
-        if (android.os.Build.VERSION.SDK_INT >= 34) {
+        if (Build.VERSION.SDK_INT >= 34) {
             startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE)
         } else {
             startForeground(NOTIFICATION_ID, notification)
@@ -202,9 +203,35 @@ class G7CollectorService : Service() {
 
     private fun scheduleReconnect(state: G7PersistedState) {
         if (!state.collectorEnabled) return
-        val at = state.nextReconnectEpochMs ?: return
+        val requestedAt = state.nextReconnectEpochMs ?: return
+        val triggerAt = maxOf(requestedAt, System.currentTimeMillis() + MIN_RECONNECT_LEAD_MS)
         val pending = reconnectPendingIntent(this)
-        getSystemService(AlarmManager::class.java).setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, at, pending)
+        val alarmManager = getSystemService(AlarmManager::class.java)
+        val exactAllowed = Build.VERSION.SDK_INT < Build.VERSION_CODES.S || alarmManager.canScheduleExactAlarms()
+        val exactScheduled = if (exactAllowed) {
+            runCatching {
+                alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAt, pending)
+                true
+            }.getOrElse {
+                alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAt, pending)
+                false
+            }
+        } else {
+            alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAt, pending)
+            false
+        }
+        scope.launch {
+            applicationContext.recordG7Diagnostic(
+                if (exactScheduled) "G7-SCHED-200" else "G7-SCHED-201",
+                if (exactScheduled) "Exact G7 reconnect scheduled" else "Exact alarm access unavailable; G7 reconnect timing may be delayed",
+                if (exactScheduled) DiagnosticSeverity.INFO else DiagnosticSeverity.WARNING,
+                mapOf(
+                    "requestedAtEpochMs" to requestedAt,
+                    "triggerAtEpochMs" to triggerAt,
+                    "exact" to exactScheduled,
+                ),
+            )
+        }
     }
 
     private fun acquireCycleWakeLock() {
@@ -245,6 +272,7 @@ class G7CollectorService : Service() {
         private const val CHANNEL = "g7_collector"
         private const val NOTIFICATION_ID = 7001
         private const val COLLECTION_WAKE_LOCK_TIMEOUT_MS = 35L * 60L * 1000L
+        private const val MIN_RECONNECT_LEAD_MS = 1_000L
 
         /**
          * Explicit collector activation. Merely having credentials or a prepared sensor never starts
