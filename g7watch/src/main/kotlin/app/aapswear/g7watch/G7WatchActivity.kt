@@ -2,6 +2,7 @@ package app.aapswear.g7watch
 
 import android.Manifest
 import android.app.Activity
+import android.app.AlarmManager
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.res.ColorStateList
@@ -141,9 +142,11 @@ class G7WatchActivity : Activity() {
                     Build.VERSION.SDK_INT < 33 ||
                         checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
                 val batteryUnrestricted = isBatteryUnrestricted()
+                val exactReconnectAllowed = canScheduleExactReconnects()
                 addView(valueRow("Geräte in der Nähe", if (nearbyAllowed) "Erlaubt" else "Freigeben"))
                 addView(valueRow("Benachrichtigungen", if (notificationsAllowed) "Erlaubt" else "Freigeben"))
                 addView(valueRow("Akku-Optimierung", if (batteryUnrestricted) "Uneingeschränkt" else "Optimiert"))
+                addView(valueRow("Präzise Sensor-Abfragen", if (exactReconnectAllowed) "Erlaubt" else "Freigeben"))
                 if (!nearbyAllowed || !notificationsAllowed) {
                     addView(
                         actionButton("Berechtigungen freigeben", primary = false) {
@@ -160,9 +163,17 @@ class G7WatchActivity : Activity() {
                         buttonParams(top = 10),
                     )
                 }
+                if (!exactReconnectAllowed) {
+                    addView(
+                        actionButton("Präzise Sensor-Abfragen freigeben", primary = false) {
+                            requestExactAlarmAccess()
+                        },
+                        buttonParams(top = 10),
+                    )
+                }
                 addView(
                     label(
-                        "Der Collector verbindet sich nur mit dem eingerichteten G7-Sensor und verwendet BLE niemals zur Standortbestimmung.",
+                        "Der Collector verbindet sich nur mit dem eingerichteten G7-Sensor. Präzise Sensor-Abfragen halten den 5-Minuten-Reconnect zeitnah, ohne einen dauerhaften BLE-Scan zu verwenden.",
                         9f,
                         TEXT_SECONDARY,
                     ).apply { gravity = Gravity.START },
@@ -345,6 +356,11 @@ class G7WatchActivity : Activity() {
     private fun isBatteryUnrestricted(): Boolean =
         getSystemService(PowerManager::class.java).isIgnoringBatteryOptimizations(packageName)
 
+    private fun canScheduleExactReconnects(): Boolean {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return true
+        return getSystemService(AlarmManager::class.java).canScheduleExactAlarms()
+    }
+
     private fun requestBatteryExemption() {
         runCatching {
             startActivity(
@@ -353,6 +369,18 @@ class G7WatchActivity : Activity() {
             )
         }.onFailure {
             runCatching { startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)) }
+        }
+    }
+
+    private fun requestExactAlarmAccess() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return
+        runCatching {
+            startActivity(
+                Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM)
+                    .setData(Uri.parse("package:$packageName")),
+            )
+        }.onFailure {
+            runCatching { startActivity(Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM)) }
         }
     }
 
