@@ -30,10 +30,21 @@ object G7DefaultGKey {
     private const val P3 = "308187020100301306072a8648ce3d020106082a8648ce3d030107046d306b0201010420007cfbd596f6e74477b8c0e9f6f7a174275e101ef6bf7d18caf01181d127b579a144034200045118c35e9e41e7e0654fee801c52a9c5dfc510ef09597d5cca8461e4af9c666714834f2bc903f16fabfc45755b0183f1a09745cdffcb4e2f799e50bed9a6b58c"
 }
 
+enum class G7ReceiverSlot {
+    PRIMARY,
+    WATCH_ALTERNATE,
+}
+
+internal fun G7ReceiverSlot.keksPersistence6(): ByteArray = when (this) {
+    G7ReceiverSlot.PRIMARY -> byteArrayOf(0x00)
+    G7ReceiverSlot.WATCH_ALTERNATE -> byteArrayOf(0x02)
+}
+
 class G7AuthenticationSession(
     pairingCode: String,
     gKey: G7GKeyParts = G7DefaultGKey.parts,
     persistedKey: ByteArray? = null,
+    receiverSlot: G7ReceiverSlot = G7ReceiverSlot.WATCH_ALTERNATE,
 ) {
     private val plugin = Plugin(pairingCode)
 
@@ -44,8 +55,9 @@ class G7AuthenticationSession(
         plugin.setPersistence(9, gKey.certificate)
         plugin.setPersistence(10, gKey.privateKey)
         persistedKey?.takeIf { it.size == 16 }?.let { plugin.setPersistence(2, it) }
-        // Samsung watches can create the bond without a privileged automatic confirmation.
-        plugin.setPersistence(6, byteArrayOf(0))
+        // KEKS channel 6 selects the receiver auth slot. A coexisting Wear collector uses
+        // the alternate slot so it does not contend with the phone-side Dexcom connection.
+        plugin.setPersistence(6, receiverSlot.keksPersistence6())
     }
 
     fun connected() = plugin.amConnected()
