@@ -6,12 +6,12 @@ param(
 $ErrorActionPreference = "Stop"
 
 if (-not (Get-Command gh -ErrorAction SilentlyContinue)) {
-    throw "GitHub CLI (gh) wurde nicht gefunden."
+    throw "GitHub CLI (gh) was not found."
 }
 
 gh auth status | Out-Host
 if ($LASTEXITCODE -ne 0) {
-    throw "GitHub CLI ist nicht authentifiziert."
+    throw "GitHub CLI is not authenticated."
 }
 
 $body = @{
@@ -42,13 +42,13 @@ $null = $body | ConvertFrom-Json
 $temp = [System.IO.Path]::GetTempFileName()
 try {
     # Windows PowerShell 5.1 writes a BOM for Set-Content -Encoding UTF8.
-    # GitHub's JSON parser rejects that BOM when gh api --input sends the file verbatim.
-    # Write explicit UTF-8 without BOM so this helper behaves identically in Windows
-    # PowerShell 5.1 and modern PowerShell.
+    # GitHub rejects a BOM when gh api --input forwards the file verbatim.
+    # Keep this script itself ASCII-only for Windows PowerShell 5.1 compatibility,
+    # while writing only the JSON request as explicit UTF-8 without BOM.
     $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
     [System.IO.File]::WriteAllText($temp, $body, $utf8NoBom)
 
-    Write-Host "`nAktiviere Branch-Schutz für $Repository/$Branch ..."
+    Write-Host "`nEnabling branch protection for $Repository/$Branch ..."
 
     $apiOutput = gh api --method PUT `
         -H "Accept: application/vnd.github+json" `
@@ -60,7 +60,7 @@ try {
 
     if ($apiExit -ne 0) {
         $details = ($apiOutput -join [Environment]::NewLine).Trim()
-        throw "Branch-Schutz konnte nicht aktiviert werden. GitHub API: $details"
+        throw "Branch protection could not be enabled. GitHub API: $details"
     }
 
     $protection = gh api `
@@ -69,23 +69,23 @@ try {
         "repos/$Repository/branches/$Branch/protection" | ConvertFrom-Json
 
     $contexts = @($protection.required_status_checks.contexts)
-    if (-not $protection.enforce_admins.enabled) { throw "Verifikation fehlgeschlagen: Admin-Schutz ist nicht aktiv." }
-    if (-not $protection.required_status_checks.strict) { throw "Verifikation fehlgeschlagen: Required status checks sind nicht strict." }
-    if ($contexts -notcontains "verify") { throw "Verifikation fehlgeschlagen: Status-Check 'verify' ist nicht verpflichtend." }
-    if ($protection.allow_force_pushes.enabled) { throw "Verifikation fehlgeschlagen: Force-Push ist weiterhin erlaubt." }
-    if ($protection.allow_deletions.enabled) { throw "Verifikation fehlgeschlagen: Branch-Löschung ist weiterhin erlaubt." }
-    if (-not $protection.required_conversation_resolution.enabled) { throw "Verifikation fehlgeschlagen: Conversation resolution ist nicht verpflichtend." }
-    if ($null -eq $protection.required_pull_request_reviews) { throw "Verifikation fehlgeschlagen: Pull-Request-Pflicht ist nicht aktiv." }
+    if (-not $protection.enforce_admins.enabled) { throw "Verification failed: admin enforcement is not enabled." }
+    if (-not $protection.required_status_checks.strict) { throw "Verification failed: required status checks are not strict." }
+    if ($contexts -notcontains "verify") { throw "Verification failed: required status check 'verify' is missing." }
+    if ($protection.allow_force_pushes.enabled) { throw "Verification failed: force pushes are still allowed." }
+    if ($protection.allow_deletions.enabled) { throw "Verification failed: branch deletion is still allowed." }
+    if (-not $protection.required_conversation_resolution.enabled) { throw "Verification failed: conversation resolution is not required." }
+    if ($null -eq $protection.required_pull_request_reviews) { throw "Verification failed: pull-request protection is not enabled." }
 
-    Write-Host "`nMAIN-SCHUTZ AKTIV"
-    Write-Host "- Änderungen nur über Pull Request"
-    Write-Host "- CI-Check 'verify' verpflichtend und Branch muss aktuell sein"
-    Write-Host "- Admin/Owner unterliegt den Regeln"
-    Write-Host "- Force-Push gesperrt"
-    Write-Host "- Branch-Löschung gesperrt"
-    Write-Host "- Review-Konversationen müssen gelöst sein"
-    Write-Host "- aktuell 0 Pflichtfreigaben, damit das Single-Maintainer-Repository nicht blockiert wird"
-    Write-Host "- CODEOWNERS ist vorhanden; bei zweitem Maintainer kann eine Pflichtfreigabe aktiviert werden"
+    Write-Host "`nMAIN PROTECTION ACTIVE"
+    Write-Host "- Changes only through pull requests"
+    Write-Host "- CI check 'verify' required and branch must be up to date"
+    Write-Host "- Admin/owner is subject to the rules"
+    Write-Host "- Force pushes blocked"
+    Write-Host "- Branch deletion blocked"
+    Write-Host "- Review conversations must be resolved"
+    Write-Host "- 0 required approvals so a single-maintainer repository is not blocked"
+    Write-Host "- CODEOWNERS exists; required approvals can be enabled when a second maintainer is added"
 }
 finally {
     Remove-Item $temp -Force -ErrorAction SilentlyContinue
