@@ -9,6 +9,7 @@ import android.app.Service
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
+import android.os.Build
 import android.os.IBinder
 import android.os.PowerManager
 import app.aapswear.g7.G7CollectorError
@@ -42,6 +43,7 @@ class G7CollectorService : Service() {
         getSystemService(NotificationManager::class.java).createNotificationChannel(
             NotificationChannel(CHANNEL, "G7 Direct to Watch", NotificationManager.IMPORTANCE_LOW),
         )
+        G7ErrorNotifier.ensureChannel(this)
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -135,6 +137,7 @@ class G7CollectorService : Service() {
                     "displayOnly" to reading.displayOnly,
                 ),
             )
+            G7ErrorNotifier.markRecovered(this)
             scheduleReconnect(next)
             updateForeground("${reading.glucoseMgDl.toInt()} mg/dL empfangen")
         } catch (error: G7BleException) {
@@ -153,26 +156,37 @@ class G7CollectorService : Service() {
     }
 
     private fun fail(state: G7PersistedState, error: G7CollectorError) {
-        val next = G7SessionManager(state).failure(error).copy(
+        val managed = G7SessionManager(state).failure(error)
+        val next = managed.copy(
             connectionState = G7ConnectionState.DISCONNECTED,
-            protocolState = G7ProtocolState.ERROR,
+            protocolState = if (error.recoverable && error.code == G7_GATT_133_ERROR_CODE) {
+                G7ProtocolState.RECOVERING
+            } else {
+                G7ProtocolState.ERROR
+            },
         )
         store.save(next)
         scheduleReconnect(next)
         updateForeground("${error.code}: ${error.safeMessage}")
+        G7ErrorNotifier.show(this, error)
         scope.launch {
             applicationContext.recordG7Diagnostic(
                 error.code,
                 error.safeMessage,
                 if (error.recoverable) DiagnosticSeverity.WARNING else DiagnosticSeverity.ERROR,
-                mapOf("recoverable" to error.recoverable, "retryCount" to next.retryCount),
+                mapOf(
+                    "recoverable" to error.recoverable,
+                    "retryCount" to next.retryCount,
+                    "nextReconnectEpochMs" to next.nextReconnectEpochMs,
+                    "sessionState" to next.sessionState.name,
+                ),
             )
         }
     }
 
     private fun startForegroundCollector(message: String) {
         val notification = notification(message)
-        if (android.os.Build.VERSION.SDK_INT >= 34) {
+        if (Build.VERSION.SDK_INT >= 34) {
             startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE)
         } else {
             startForeground(NOTIFICATION_ID, notification)
@@ -202,9 +216,35 @@ class G7CollectorService : Service() {
 
     private fun scheduleReconnect(state: G7PersistedState) {
         if (!state.collectorEnabled) return
-        val at = state.nextReconnectEpochMs ?: return
+        val requestedAt = state.nextReconnectEpochMs ?: return
+        val triggerAt = maxOf(requestedAt, System.currentTimeMillis() + MIN_RECONNECT_LEAD_MS)
         val pending = reconnectPendingIntent(this)
-        getSystemService(AlarmManager::class.java).setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, at, pending)
+        val alarmManager = getSystemService(AlarmManager::class.java)
+        val exactAllowed = Build.VERSION.SDK_INT < Build.VERSION_CODES.S || alarmManager.canScheduleExactAlarms()
+        val exactScheduled = if (exactAllowed) {
+            runCatching {
+                alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAt, pending)
+                true
+            }.getOrElse {
+                alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAt, pending)
+                false
+            }
+        } else {
+            alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAt, pending)
+            false
+        }
+        scope.launch {
+            applicationContext.recordG7Diagnostic(
+                if (exactScheduled) "G7-SCHED-200" else "G7-SCHED-201",
+                if (exactScheduled) "Exact G7 reconnect scheduled" else "Exact alarm access unavailable; G7 reconnect timing may be delayed",
+                if (exactScheduled) DiagnosticSeverity.INFO else DiagnosticSeverity.WARNING,
+                mapOf(
+                    "requestedAtEpochMs" to requestedAt,
+                    "triggerAtEpochMs" to triggerAt,
+                    "exact" to exactScheduled,
+                ),
+            )
+        }
     }
 
     private fun acquireCycleWakeLock() {
@@ -245,6 +285,7 @@ class G7CollectorService : Service() {
         private const val CHANNEL = "g7_collector"
         private const val NOTIFICATION_ID = 7001
         private const val COLLECTION_WAKE_LOCK_TIMEOUT_MS = 35L * 60L * 1000L
+        private const val MIN_RECONNECT_LEAD_MS = 1_000L
 
         /**
          * Explicit collector activation. Merely having credentials or a prepared sensor never starts
@@ -316,7 +357,9 @@ private fun G7ProtocolState.toSessionState(): G7SessionState = when (this) {
     G7ProtocolState.BONDING,
     -> G7SessionState.AUTHENTICATING
     G7ProtocolState.WAITING_FOR_NEXT_READING -> G7SessionState.WAITING_FOR_NEXT_READING
-    G7ProtocolState.ERROR -> G7SessionState.RECOVERING
+    G7ProtocolState.RECOVERING,
+    G7ProtocolState.ERROR,
+    -> G7SessionState.RECOVERING
     else -> G7SessionState.INITIAL_SETUP
 }
 
@@ -332,6 +375,7 @@ private fun G7ProtocolState.label(): String = when (this) {
     G7ProtocolState.AUTHENTICATED -> "Sensor ist authentifiziert"
     G7ProtocolState.REQUESTING_GLUCOSE -> "Glukosewert wird angefordert"
     G7ProtocolState.RECEIVING_GLUCOSE -> "Glukosewert wird geprüft"
+    G7ProtocolState.RECOVERING -> "Nächstes Sensorfenster wird abgewartet"
     else -> name.replace('_', ' ')
 }
 
@@ -342,6 +386,7 @@ private fun G7ProtocolState.diagnosticCode(): String = when (this) {
     G7ProtocolState.DISCOVERING_SERVICES,
     G7ProtocolState.ENABLING_NOTIFICATIONS,
     -> "G7-BLE-110"
+    G7ProtocolState.RECOVERING -> "G7-BLE-133"
     G7ProtocolState.AUTHENTICATION_START,
     G7ProtocolState.AUTHENTICATING,
     G7ProtocolState.BONDING,
