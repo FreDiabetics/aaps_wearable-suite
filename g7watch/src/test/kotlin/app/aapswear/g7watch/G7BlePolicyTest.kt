@@ -4,6 +4,8 @@ import android.bluetooth.BluetoothGatt
 import app.aapswear.g7.G7Sensor
 import java.util.UUID
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class G7BlePolicyTest {
@@ -19,6 +21,20 @@ class G7BlePolicyTest {
             G7_RECONNECT_SCAN_TIMEOUT_MS,
             g7ScanTimeoutMs(G7Sensor("known-sensor", deviceAddress = "AA:BB:CC:DD:EE:FF")),
         )
+    }
+
+    @Test fun `known sensor address rejects a different nearby G7`() {
+        assertFalse(knownG7AddressMatches("AA:BB:CC:DD:EE:FF", "11:22:33:44:55:66")!!)
+        assertTrue(knownG7AddressMatches("AA:BB:CC:DD:EE:FF", "aa:bb:cc:dd:ee:ff")!!)
+    }
+
+    @Test fun `missing known address leaves initial candidate selection open`() {
+        assertEquals(null, knownG7AddressMatches(null, "11:22:33:44:55:66"))
+    }
+
+    @Test fun `non connectable advertisement is never used for GATT`() {
+        assertFalse(isConnectableG7Advertisement(false))
+        assertTrue(isConnectableG7Advertisement(true))
     }
 
     @Test fun `successful stale write callback is ignored instead of rejected`() {
