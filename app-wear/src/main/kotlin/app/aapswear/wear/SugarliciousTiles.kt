@@ -16,9 +16,9 @@ import androidx.wear.tiles.TileBuilders.Tile
 import androidx.wear.tiles.TileService
 import app.aapswear.complications.G7LocalReadingResolver
 import app.aapswear.model.Freshness
+import app.aapswear.model.GlucoseUnit
 import app.aapswear.model.TherapyDisplayFormatter
 import app.aapswear.model.TherapyDisplayState
-import app.aapswear.model.Trend
 import app.aapswear.storage.TherapyStateStore
 import com.google.common.util.concurrent.Futures
 import kotlinx.coroutines.Dispatchers
@@ -71,8 +71,8 @@ class GlucoseTileService : SugarliciousTileService() {
     override fun primary(state: TherapyDisplayState?): String {
         val now = System.currentTimeMillis()
         val glucose = state?.glucose
-        return if (TherapyDisplayFormatter.isGlucoseDisplayable(state, now)) {
-            glucose?.valueMgDl?.let { String.format(Locale.US, "%.0f", it) } ?: "–"
+        return if (TherapyDisplayFormatter.isGlucoseDisplayable(state, now) && glucose != null) {
+            TherapyDisplayFormatter.glucose(glucose)
         } else {
             "–"
         }
@@ -86,18 +86,13 @@ class GlucoseTileService : SugarliciousTileService() {
             return freshness.statusLabel
         }
 
-        val arrow = when (glucose.trend) {
-            Trend.DOUBLE_DOWN -> "⇊"
-            Trend.SINGLE_DOWN -> "↓"
-            Trend.FORTY_FIVE_DOWN -> "↘"
-            Trend.FLAT -> "→"
-            Trend.FORTY_FIVE_UP -> "↗"
-            Trend.SINGLE_UP -> "↑"
-            Trend.DOUBLE_UP -> "⇈"
-            Trend.UNKNOWN -> ""
+        val arrow = TherapyDisplayFormatter.trendArrow(glucose.trend)
+        val delta = TherapyDisplayFormatter.signedDelta(glucose.deltaMgDl, glucose.displayUnit)
+        val unit = when (glucose.displayUnit) {
+            GlucoseUnit.MMOL_L -> "mmol/L"
+            GlucoseUnit.MG_DL -> "mg/dL"
         }
-        val delta = glucose.deltaMgDl?.let { String.format(Locale.US, "%+.0f", it) }.orEmpty()
-        val reading = listOf(arrow, delta, "mg/dL").filter(String::isNotBlank).joinToString("  ")
+        val reading = listOf(arrow, delta, unit).filter(String::isNotBlank).joinToString("  ")
         return if (freshness == Freshness.DELAYED) "$reading  ·  VERZÖGERT" else reading
     }
 
