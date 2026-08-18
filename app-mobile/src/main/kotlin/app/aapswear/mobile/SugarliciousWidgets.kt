@@ -1,6 +1,7 @@
 package app.aapswear.mobile
 
 import android.content.Context
+import android.graphics.Color as AndroidColor
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
@@ -35,7 +36,6 @@ import androidx.glance.text.Text
 import androidx.glance.text.TextStyle
 import androidx.glance.unit.ColorProvider
 import app.aapswear.mobile.ui.theme.SugarliciousColorRole
-import app.aapswear.mobile.ui.theme.SugarliciousComponentSize
 import app.aapswear.mobile.ui.theme.SugarliciousIconSize
 import app.aapswear.mobile.ui.theme.SugarliciousRadius
 import app.aapswear.mobile.ui.theme.SugarliciousSpacing
@@ -53,11 +53,34 @@ private fun widgetColor(role: SugarliciousColorRole): ColorProvider =
         night = Color(role.defaultArgb),
     )
 
-private val WidgetBackground = widgetColor(SugarliciousColorRole.BACKGROUND)
-private val WidgetCard = widgetColor(SugarliciousColorRole.SURFACE)
+private fun blendedWidgetColor(
+    surface: SugarliciousColorRole,
+    accent: SugarliciousColorRole,
+    fraction: Float,
+): ColorProvider =
+    DayNightColorProvider(
+        day = Color(blendArgb(surface.lightArgb, accent.lightArgb, fraction)),
+        night = Color(blendArgb(surface.defaultArgb, accent.defaultArgb, fraction)),
+    )
+
+private fun blendArgb(base: Int, overlay: Int, fraction: Float): Int {
+    val amount = fraction.coerceIn(0f, 1f)
+    fun channel(baseChannel: Int, overlayChannel: Int): Int =
+        (baseChannel + (overlayChannel - baseChannel) * amount).toInt().coerceIn(0, 255)
+    return AndroidColor.argb(
+        channel(AndroidColor.alpha(base), AndroidColor.alpha(overlay)),
+        channel(AndroidColor.red(base), AndroidColor.red(overlay)),
+        channel(AndroidColor.green(base), AndroidColor.green(overlay)),
+        channel(AndroidColor.blue(base), AndroidColor.blue(overlay)),
+    )
+}
+
+private val WidgetSurface = widgetColor(SugarliciousColorRole.SURFACE)
+private val WidgetSurfaceHigh = widgetColor(SugarliciousColorRole.SURFACE_HIGH)
 private val WidgetPrimary = widgetColor(SugarliciousColorRole.TEXT_PRIMARY)
 private val WidgetSecondary = widgetColor(SugarliciousColorRole.TEXT_SECONDARY)
-private val WidgetAccent = widgetColor(SugarliciousColorRole.SECONDARY)
+private val WidgetAccent = widgetColor(SugarliciousColorRole.PRIMARY)
+private val WidgetCyan = widgetColor(SugarliciousColorRole.SECONDARY)
 private val WidgetWarning = widgetColor(SugarliciousColorRole.YELLOW)
 private val WidgetError = widgetColor(SugarliciousColorRole.RED)
 private val WidgetIob = widgetColor(SugarliciousColorRole.BLUE)
@@ -70,7 +93,7 @@ private abstract class SugarliciousWidget : GlanceAppWidget() {
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
         val state = TherapyStateStore(context).state.first()
-        provideContent { WidgetSurface(kind, state) }
+        provideContent { WidgetShell(kind, state) }
     }
 }
 
@@ -93,45 +116,59 @@ internal object SugarliciousWidgets {
 }
 
 @Composable
-private fun WidgetSurface(kind: WidgetKind, state: TherapyDisplayState?) {
+private fun WidgetShell(kind: WidgetKind, state: TherapyDisplayState?) {
+    val size = LocalSize.current
+    val compact = size.width < 210.dp || size.height < 130.dp
+    val background = if (kind == WidgetKind.GLUCOSE) glucoseSurface(state) else WidgetSurface
+
     Column(
         modifier =
             GlanceModifier
                 .fillMaxSize()
-                .background(WidgetBackground)
+                .background(background)
                 .cornerRadius(SugarliciousRadius.Navigation)
-                .padding(SugarliciousSpacing.Lg)
+                .padding(if (compact) SugarliciousSpacing.Md else SugarliciousSpacing.Lg)
                 .clickable(actionStartActivity<MainActivity>()),
         verticalAlignment = Alignment.Vertical.CenterVertically,
     ) {
-        Row(verticalAlignment = Alignment.Vertical.CenterVertically) {
-            Image(
-                ImageProvider(R.mipmap.ic_launcher),
-                null,
-                GlanceModifier.size(SugarliciousIconSize.Default),
-            )
-            Spacer(GlanceModifier.width(SugarliciousSpacing.Sm))
-            Text(
-                "Sugarlicious",
-                style =
-                    TextStyle(
-                        color = WidgetPrimary,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 15.sp,
-                    ),
-            )
-        }
-        Spacer(GlanceModifier.height(SugarliciousSpacing.Md))
+        WidgetHeader(kind, state, compact)
+        Spacer(GlanceModifier.height(if (compact) SugarliciousSpacing.Sm else SugarliciousSpacing.Md))
         when (kind) {
-            WidgetKind.GLUCOSE -> GlucoseWidgetContent(state)
-            WidgetKind.METABOLIC -> MetabolicWidgetContent(state)
-            WidgetKind.ACTIVITY -> ActivityWidgetContent(HealthConnectIntegration.snapshot(LocalContext.current))
+            WidgetKind.GLUCOSE -> GlucoseWidgetContent(state, compact)
+            WidgetKind.METABOLIC -> MetabolicWidgetContent(state, compact)
+            WidgetKind.ACTIVITY -> ActivityWidgetContent(HealthConnectIntegration.snapshot(LocalContext.current), compact)
         }
     }
 }
 
 @Composable
-private fun GlucoseWidgetContent(state: TherapyDisplayState?) {
+private fun WidgetHeader(kind: WidgetKind, state: TherapyDisplayState?, compact: Boolean) {
+    val now = System.currentTimeMillis()
+    val freshness = TherapyDisplayFormatter.freshness(state, now)
+    Row(modifier = GlanceModifier.fillMaxWidth(), verticalAlignment = Alignment.Vertical.CenterVertically) {
+        Image(
+            ImageProvider(R.mipmap.ic_launcher),
+            null,
+            GlanceModifier.size(if (compact) SugarliciousIconSize.Small else SugarliciousIconSize.Default),
+        )
+        Spacer(GlanceModifier.width(SugarliciousSpacing.Sm))
+        Column {
+            Text(
+                "Sugarlicious",
+                style = TextStyle(color = WidgetPrimary, fontWeight = FontWeight.Bold, fontSize = if (compact) 13.sp else 15.sp),
+            )
+            if (!compact && kind != WidgetKind.ACTIVITY) {
+                Text(
+                    widgetStatusLabel(freshness),
+                    style = TextStyle(color = statusColor(freshness), fontWeight = FontWeight.Bold, fontSize = 10.sp),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun GlucoseWidgetContent(state: TherapyDisplayState?, compact: Boolean) {
     val now = System.currentTimeMillis()
     val glucose = state?.glucose
     val freshness = TherapyDisplayFormatter.freshness(state, now)
@@ -140,103 +177,103 @@ private fun GlucoseWidgetContent(state: TherapyDisplayState?) {
     val arrow = if (displayable && glucose != null) TherapyDisplayFormatter.trendArrow(glucose.trend) else ""
     val delta = if (displayable && glucose != null) {
         TherapyDisplayFormatter.signedDelta(glucose.deltaMgDl, glucose.displayUnit).ifBlank { "–" }
-    } else {
-        "–"
-    }
+    } else "–"
     val unit = when (glucose?.displayUnit) {
         GlucoseUnit.MMOL_L -> "mmol/L"
-        else -> "mg/dL"
-    }
-    val status = widgetStatusLine(state, freshness, now)
-    val statusColor = when (freshness) {
-        Freshness.CURRENT -> WidgetSecondary
-        Freshness.DELAYED -> WidgetWarning
-        Freshness.STALE, Freshness.NO_DATA -> WidgetError
+        GlucoseUnit.MG_DL -> "mg/dL"
+        null -> ""
     }
 
     Row(modifier = GlanceModifier.fillMaxWidth(), verticalAlignment = Alignment.Vertical.CenterVertically) {
-        Text(value, style = TextStyle(color = WidgetPrimary, fontWeight = FontWeight.Bold, fontSize = 42.sp))
-        Spacer(GlanceModifier.width(SugarliciousSpacing.Md))
+        Text(
+            value,
+            style = TextStyle(
+                color = WidgetPrimary,
+                fontWeight = FontWeight.Bold,
+                fontSize = if (compact) 38.sp else 48.sp,
+            ),
+        )
+        Spacer(GlanceModifier.width(if (compact) SugarliciousSpacing.Sm else SugarliciousSpacing.Md))
         Column {
             Text(
                 listOf(arrow, delta).filter(String::isNotBlank).joinToString("  "),
-                style = TextStyle(color = if (displayable) WidgetAccent else WidgetSecondary, fontWeight = FontWeight.Bold, fontSize = 20.sp),
+                style = TextStyle(color = if (displayable) WidgetPrimary else WidgetSecondary, fontWeight = FontWeight.Bold, fontSize = if (compact) 17.sp else 21.sp),
             )
-            Text(unit, style = TextStyle(color = WidgetSecondary, fontSize = 13.sp))
-            Text(status, style = TextStyle(color = statusColor, fontSize = 11.sp))
+            if (unit.isNotBlank()) Text(unit, style = TextStyle(color = WidgetSecondary, fontSize = 12.sp))
+            Text(
+                widgetStatusLine(state, freshness, now, compact),
+                style = TextStyle(color = statusColor(freshness), fontWeight = FontWeight.Medium, fontSize = if (compact) 9.sp else 11.sp),
+            )
         }
     }
 }
 
 @Composable
-private fun MetabolicWidgetContent(state: TherapyDisplayState?) {
+private fun MetabolicWidgetContent(state: TherapyDisplayState?, compact: Boolean) {
     val now = System.currentTimeMillis()
     val freshness = TherapyDisplayFormatter.freshness(state, now)
     val displayable = TherapyDisplayFormatter.isGlucoseDisplayable(state, now)
-    val pillWidth =
-        ((LocalSize.current.width - SugarliciousSpacing.Xxl - SugarliciousSpacing.Sm) / 2)
-            .coerceAtLeast(SugarliciousComponentSize.CompactMetricMinWidth)
+    val width = ((LocalSize.current.width - SugarliciousSpacing.Xxl) / 3).coerceAtLeast(56.dp)
 
-    Row(modifier = GlanceModifier.fillMaxWidth()) {
-        MetricPill(
-            "IOB",
-            state?.insulin?.totalIob?.takeIf { displayable }?.let { String.format(Locale.US, "%.1f U", it) } ?: "–",
-            WidgetIob,
-            GlanceModifier.width(pillWidth),
-        )
-        Spacer(GlanceModifier.width(SugarliciousSpacing.Sm))
-        MetricPill(
-            "COB",
-            state?.carbs?.cobGrams?.takeIf { displayable }?.let { String.format(Locale.US, "%.0f g", it) } ?: "–",
-            WidgetCob,
-            GlanceModifier.width(pillWidth),
-        )
+    Row(modifier = GlanceModifier.fillMaxWidth(), verticalAlignment = Alignment.Vertical.CenterVertically) {
+        FlatMetric("IOB", state?.insulin?.totalIob?.takeIf { displayable }?.let { String.format(Locale.US, "%.1f U", it) } ?: "–", WidgetIob, GlanceModifier.width(width), compact)
+        FlatMetric("COB", state?.carbs?.cobGrams?.takeIf { displayable }?.let { String.format(Locale.US, "%.0f g", it) } ?: "–", WidgetCob, GlanceModifier.width(width), compact)
+        FlatMetric("BASAL", state?.basal?.currentUnitsPerHour?.takeIf { displayable }?.let { String.format(Locale.US, "%.2f", it) } ?: "–", WidgetBasal, GlanceModifier.width(width), compact)
     }
     Spacer(GlanceModifier.height(SugarliciousSpacing.Sm))
-    MetricPill(
-        if (displayable) "Basal" else widgetStatusLabel(freshness),
-        state?.basal?.currentUnitsPerHour?.takeIf { displayable }?.let { String.format(Locale.US, "%.2f U/h", it) } ?: "–",
-        if (displayable) WidgetBasal else WidgetError,
-        GlanceModifier.fillMaxWidth(),
+    Text(
+        if (displayable) widgetStatusLine(state, freshness, now, compact) else widgetStatusLabel(freshness),
+        style = TextStyle(color = statusColor(freshness), fontWeight = FontWeight.Medium, fontSize = if (compact) 9.sp else 11.sp),
     )
 }
 
 @Composable
-private fun MetricPill(label: String, value: String, color: ColorProvider, modifier: GlanceModifier) {
-    Column(
-        modifier =
-            modifier
-                .background(WidgetCard)
-                .cornerRadius(SugarliciousRadius.Metric)
-                .padding(horizontal = SugarliciousSpacing.Md, vertical = 9.dp),
-    ) {
-        Text(label, style = TextStyle(color = color, fontWeight = FontWeight.Bold, fontSize = 12.sp))
-        Text(value, style = TextStyle(color = WidgetPrimary, fontWeight = FontWeight.Bold, fontSize = 18.sp))
+private fun FlatMetric(label: String, value: String, accent: ColorProvider, modifier: GlanceModifier, compact: Boolean) {
+    Column(modifier = modifier.padding(horizontal = SugarliciousSpacing.Xs)) {
+        Text(label, style = TextStyle(color = accent, fontWeight = FontWeight.Bold, fontSize = if (compact) 10.sp else 11.sp))
+        Text(value, style = TextStyle(color = WidgetPrimary, fontWeight = FontWeight.Bold, fontSize = if (compact) 16.sp else 19.sp))
     }
 }
 
 @Composable
-private fun ActivityWidgetContent(snapshot: HealthConnectSnapshot?) {
-    val pillWidth =
-        ((LocalSize.current.width - SugarliciousSpacing.Xxl - SugarliciousSpacing.Sm) / 2)
-            .coerceAtLeast(SugarliciousComponentSize.CompactMetricMinWidth)
+private fun ActivityWidgetContent(snapshot: HealthConnectSnapshot?, compact: Boolean) {
+    val width = ((LocalSize.current.width - SugarliciousSpacing.Xxl) / 2).coerceAtLeast(72.dp)
     Row(modifier = GlanceModifier.fillMaxWidth()) {
-        MetricPill("Schritte", snapshot?.steps?.toString() ?: "–", WidgetAccent, GlanceModifier.width(pillWidth))
-        Spacer(GlanceModifier.width(SugarliciousSpacing.Sm))
-        MetricPill("Puls", snapshot?.latestHeartRate?.let { "$it bpm" } ?: "–", WidgetHeartRate, GlanceModifier.width(pillWidth))
+        FlatMetric("SCHRITTE", snapshot?.steps?.toString() ?: "–", WidgetCyan, GlanceModifier.width(width), compact)
+        FlatMetric("PULS", snapshot?.latestHeartRate?.let { "$it bpm" } ?: "–", WidgetHeartRate, GlanceModifier.width(width), compact)
     }
-    Spacer(GlanceModifier.height(SugarliciousSpacing.Sm))
+    Spacer(GlanceModifier.height(SugarliciousSpacing.Md))
     Row(modifier = GlanceModifier.fillMaxWidth()) {
-        MetricPill("Aktiv", snapshot?.activeMinutes?.let { "$it min" } ?: "–", WidgetBasal, GlanceModifier.width(pillWidth))
-        Spacer(GlanceModifier.width(SugarliciousSpacing.Sm))
-        MetricPill("Kalorien", snapshot?.activeCaloriesKcal?.let { String.format(Locale.US, "%.0f kcal", it) } ?: "–", WidgetCob, GlanceModifier.width(pillWidth))
+        FlatMetric("AKTIV", snapshot?.activeMinutes?.let { "$it min" } ?: "–", WidgetBasal, GlanceModifier.width(width), compact)
+        FlatMetric("KCAL", snapshot?.activeCaloriesKcal?.let { String.format(Locale.US, "%.0f", it) } ?: "–", WidgetCob, GlanceModifier.width(width), compact)
     }
 }
 
-private fun widgetStatusLine(state: TherapyDisplayState?, freshness: Freshness, now: Long): String {
+private fun glucoseSurface(state: TherapyDisplayState?): ColorProvider {
+    val now = System.currentTimeMillis()
+    val glucose = state?.glucose
+    if (!TherapyDisplayFormatter.isGlucoseDisplayable(state, now) || glucose == null) return WidgetSurface
+    val low = state.target?.lowMgDl ?: 80.0
+    val high = state.target?.highMgDl ?: 160.0
+    val role = when {
+        glucose.valueMgDl < low -> SugarliciousColorRole.RANGE_LOW
+        glucose.valueMgDl > high -> SugarliciousColorRole.RANGE_HIGH
+        else -> SugarliciousColorRole.RANGE_IN_RANGE
+    }
+    return blendedWidgetColor(SugarliciousColorRole.SURFACE, role, 0.24f)
+}
+
+private fun widgetStatusLine(state: TherapyDisplayState?, freshness: Freshness, now: Long, compact: Boolean): String {
     val source = TherapyDisplayFormatter.sourceName(state?.source)
     val age = TherapyDisplayFormatter.ageMinutesValue(state?.glucose?.measuredAtEpochMs, now)?.let { "$it min" }
-    return listOf(widgetStatusLabel(freshness), source, age.orEmpty()).filter { it.isNotBlank() }.joinToString(" · ")
+    val parts = if (compact) listOf(source, age.orEmpty()) else listOf(source, age.orEmpty(), widgetStatusLabel(freshness))
+    return parts.filter(String::isNotBlank).joinToString(" · ")
+}
+
+private fun statusColor(freshness: Freshness): ColorProvider = when (freshness) {
+    Freshness.CURRENT -> WidgetAccent
+    Freshness.DELAYED -> WidgetWarning
+    Freshness.STALE, Freshness.NO_DATA -> WidgetError
 }
 
 private fun widgetStatusLabel(freshness: Freshness): String = when (freshness) {
