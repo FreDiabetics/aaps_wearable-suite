@@ -4,13 +4,13 @@ import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.Canvas
 import android.graphics.DashPathEffect
+import android.graphics.Outline
 import android.graphics.Paint
-import android.graphics.Path
-import android.graphics.RectF
 import android.graphics.Typeface
 import android.util.AttributeSet
 import android.util.TypedValue
 import android.view.View
+import android.view.ViewOutlineProvider
 import app.aapswear.model.GlucoseGraphScale
 import app.aapswear.model.GlucosePrediction
 import app.aapswear.model.GlucoseSample
@@ -61,6 +61,33 @@ class WearGlucoseChart @JvmOverloads constructor(
     private var graphStyle: WatchGraphStyle = WatchGraphStyle()
     private var stateSignature: List<Any?>? = null
 
+    init {
+        outlineProvider =
+            object : ViewOutlineProvider() {
+                override fun getOutline(view: View, outline: Outline) {
+                    if (view.width <= 0 || view.height <= 0) return
+                    outline.setRoundRect(
+                        0,
+                        0,
+                        view.width,
+                        view.height,
+                        TILE_RADIUS_DP * density,
+                    )
+                }
+            }
+        clipToOutline = true
+    }
+
+    override fun onSizeChanged(
+        w: Int,
+        h: Int,
+        oldw: Int,
+        oldh: Int,
+    ) {
+        super.onSizeChanged(w, h, oldw, oldh)
+        invalidateOutline()
+    }
+
     fun bind(
         newState: TherapyDisplayState?,
         graphHours: Int,
@@ -109,18 +136,7 @@ class WearGlucoseChart @JvmOverloads constructor(
         val viewBottom = height.toFloat()
         if (viewRight <= 0f || viewBottom <= 0f) return
 
-        val tileRadius = 18f.dp
-        val tileBounds = RectF(0f, 0f, viewRight, viewBottom)
-        val tileClip =
-            Path().apply {
-                addRoundRect(
-                    tileBounds,
-                    tileRadius,
-                    tileRadius,
-                    Path.Direction.CW,
-                )
-            }
-
+        val tileRadius = TILE_RADIUS_DP.dp
         val now = System.currentTimeMillis()
         val predictions =
             if (showPredictions) {
@@ -206,12 +222,9 @@ class WearGlucoseChart @JvmOverloads constructor(
         val targetTop = yFor(targetHigh)
         val targetBottom = yFor(targetLow)
 
-        // Paint the graph background and target bands full-bleed, clipped by the exact tile
-        // contour. Plot content keeps its inner padding, but there is no dark gutter between the
-        // colored graph area and the tile outline.
-        val clipSave = canvas.save()
-        canvas.clipPath(tileClip)
-
+        // The view itself owns the rounded clip. Every background/range fill can therefore paint
+        // truly full-bleed to the view edges without a second Path clip that leaves dark fringe
+        // pixels between the graph surface and the final tile contour on Wear hardware.
         fillPaint.color = colors.graphBackground
         canvas.drawRect(
             0f,
@@ -247,8 +260,6 @@ class WearGlucoseChart @JvmOverloads constructor(
             viewBottom,
             fillPaint,
         )
-
-        canvas.restoreToCount(clipSave)
 
         if (history.isEmpty() && visiblePredictions.isEmpty()) {
             canvas.drawText(
@@ -419,6 +430,7 @@ class WearGlucoseChart @JvmOverloads constructor(
     companion object {
         private const val TARGET_LOW = 80.0
         private const val TARGET_HIGH = 160.0
+        private const val TILE_RADIUS_DP = 18f
     }
 }
 
