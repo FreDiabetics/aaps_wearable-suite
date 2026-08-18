@@ -3,6 +3,7 @@ package app.aapswear.g7
 import app.aapswear.model.DataSourceId
 import app.aapswear.model.Trend
 import kotlin.test.Test
+import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertFailsWith
@@ -125,6 +126,11 @@ class G7FoundationTest {
         val state = manager.failure(G7CollectorError("G7-AUTH-211", false, now, "Rebond required"))
         assertEquals(G7SessionState.USER_INTERVENTION_REQUIRED, state.sessionState)
         assertNull(state.nextReconnectEpochMs)
+    }
+
+    @Test fun `watch collector selects alternate KEKS auth slot`() {
+        assertContentEquals(byteArrayOf(0x00), G7ReceiverSlot.PRIMARY.keksPersistence6())
+        assertContentEquals(byteArrayOf(0x02), G7ReceiverSlot.WATCH_ALTERNATE.keksPersistence6())
     }
 
     @Test fun `high alarm is not duplicated and resolves with hysteresis`() {
