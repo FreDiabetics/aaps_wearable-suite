@@ -5,6 +5,8 @@ import android.content.Context
 import android.graphics.Canvas
 import android.graphics.DashPathEffect
 import android.graphics.Paint
+import android.graphics.Path
+import android.graphics.RectF
 import android.graphics.Typeface
 import android.util.AttributeSet
 import android.util.TypedValue
@@ -103,24 +105,23 @@ class WearGlucoseChart @JvmOverloads constructor(
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
 
+        val viewRight = width.toFloat()
+        val viewBottom = height.toFloat()
+        if (viewRight <= 0f || viewBottom <= 0f) return
+
+        val tileRadius = 18f.dp
+        val tileBounds = RectF(0f, 0f, viewRight, viewBottom)
+        val tileClip =
+            Path().apply {
+                addRoundRect(
+                    tileBounds,
+                    tileRadius,
+                    tileRadius,
+                    Path.Direction.CW,
+                )
+            }
+
         val now = System.currentTimeMillis()
-        val outerLeft = 1f.dp
-        val outerTop = 1f.dp
-        val outerRight = width - 1f.dp
-        val outerBottom = height - 1f.dp
-        if (outerRight <= outerLeft || outerBottom <= outerTop) return
-
-        fillPaint.color = colors.graphBackground
-        canvas.drawRoundRect(
-            outerLeft,
-            outerTop,
-            outerRight,
-            outerBottom,
-            14f.dp,
-            14f.dp,
-            fillPaint,
-        )
-
         val predictions =
             if (showPredictions) {
                 PredictionDisplayTimeline.anchor(
@@ -183,29 +184,6 @@ class WearGlucoseChart @JvmOverloads constructor(
         val bottom = height - 5f.dp
         if (right <= left || bottom <= top) return
 
-        linePaint.color = colors.divider
-        linePaint.strokeWidth = 0.8f.dp
-        linePaint.pathEffect = null
-        canvas.drawRoundRect(
-            outerLeft,
-            outerTop,
-            outerRight,
-            outerBottom,
-            14f.dp,
-            14f.dp,
-            linePaint,
-        )
-
-        if (history.isEmpty() && visiblePredictions.isEmpty()) {
-            canvas.drawText(
-                "Noch keine CGM-Historie",
-                width / 2f,
-                height / 2f + 4f.dp,
-                emptyTextPaint,
-            )
-            return
-        }
-
         fun xFor(timestamp: Long): Float =
             left +
                 (
@@ -228,34 +206,60 @@ class WearGlucoseChart @JvmOverloads constructor(
         val targetTop = yFor(targetHigh)
         val targetBottom = yFor(targetLow)
 
+        // Paint the graph background and target bands full-bleed, clipped by the exact tile
+        // contour. Plot content keeps its inner padding, but there is no dark gutter between the
+        // colored graph area and the tile outline.
+        val clipSave = canvas.save()
+        canvas.clipPath(tileClip)
+
+        fillPaint.color = colors.graphBackground
+        canvas.drawRect(
+            0f,
+            0f,
+            viewRight,
+            viewBottom,
+            fillPaint,
+        )
+
         fillPaint.color = colors.rangeHigh
         canvas.drawRect(
-            left,
-            top,
-            right,
+            0f,
+            0f,
+            viewRight,
             targetTop,
             fillPaint,
         )
 
         fillPaint.color = colors.rangeInRange
-        canvas.drawRoundRect(
-            left,
+        canvas.drawRect(
+            0f,
             targetTop,
-            right,
+            viewRight,
             targetBottom,
-            5f.dp,
-            5f.dp,
             fillPaint,
         )
 
         fillPaint.color = colors.rangeLow
         canvas.drawRect(
-            left,
+            0f,
             targetBottom,
-            right,
-            bottom,
+            viewRight,
+            viewBottom,
             fillPaint,
         )
+
+        canvas.restoreToCount(clipSave)
+
+        if (history.isEmpty() && visiblePredictions.isEmpty()) {
+            canvas.drawText(
+                "Noch keine CGM-Historie",
+                width / 2f,
+                height / 2f + 4f.dp,
+                emptyTextPaint,
+            )
+            drawTileContour(canvas, tileRadius)
+            return
+        }
 
         linePaint.color = colors.divider
         linePaint.pathEffect = null
@@ -319,6 +323,29 @@ class WearGlucoseChart @JvmOverloads constructor(
                 yFor = ::yFor,
             )
         }
+
+        drawTileContour(canvas, tileRadius)
+    }
+
+    private fun drawTileContour(
+        canvas: Canvas,
+        radius: Float,
+    ) {
+        val strokeWidth = 1f.dp
+        val inset = strokeWidth / 2f
+
+        linePaint.color = colors.divider
+        linePaint.strokeWidth = strokeWidth
+        linePaint.pathEffect = null
+        canvas.drawRoundRect(
+            inset,
+            inset,
+            width - inset,
+            height - inset,
+            (radius - inset).coerceAtLeast(0f),
+            (radius - inset).coerceAtLeast(0f),
+            linePaint,
+        )
     }
 
     private fun drawCgmDot(
