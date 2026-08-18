@@ -180,11 +180,16 @@ internal class AndroidG7Collector(
         }
         var bondReconnectAttempts = 0
         var gatt133Retries = 0
+        var pendingGatt133: G7BleException? = null
 
         while (true) {
             onState(G7ProtocolState.SCANNING)
-            sensor = scanner.findKnownSensor(sensor, g7ScanTimeoutMs(sensor))
-                ?: throw G7BleException("G7-BLE-107", "Kein sendender Dexcom-G7-Sensor gefunden", true)
+            val discovered = scanner.findKnownSensor(sensor, g7ScanTimeoutMs(sensor))
+            if (discovered == null) {
+                pendingGatt133?.let { throw it }
+                throw G7BleException("G7-BLE-107", "Kein sendender Dexcom-G7-Sensor gefunden", true)
+            }
+            sensor = discovered
             if (sharedKey != null && credentials.sharedKeyAddress != null &&
                 !credentials.sharedKeyAddress.equals(sensor.deviceAddress, ignoreCase = true)
             ) {
@@ -211,12 +216,14 @@ internal class AndroidG7Collector(
                 if (bondReconnectAttempts >= MAX_BOND_RECONNECT_ATTEMPTS) {
                     throw G7BleException("G7-AUTH-207", "Sensor wurde gekoppelt, die erneute Verbindung schlug aber fehl", true, rebond)
                 }
+                pendingGatt133 = null
                 onState(G7ProtocolState.RECOVERING)
                 delay(BOND_RECONNECT_DELAY_MS)
             } catch (error: G7BleException) {
                 if (error.errorCode != G7_GATT_133_ERROR_CODE || gatt133Retries >= MAX_GATT_133_RETRIES_PER_CYCLE) {
                     throw error
                 }
+                pendingGatt133 = error
                 gatt133Retries += 1
                 onState(G7ProtocolState.RECOVERING)
                 delay(GATT_133_STACK_SETTLE_DELAY_MS)
@@ -260,7 +267,7 @@ private class G7GattConnection(
             serviceEvents.trySend(status)
         }
 
-        override fun onDescriptorWrite(gatt: BluetoothGatt, descriptor: BluetoothGattDescriptor, status: Int) {
+        override fun onDescriptorWrite(gatt: BluetoothGatt, descriptor: BluetoothGattGattDescriptor, status: Int) {
             descriptorEvents.trySend(descriptor.characteristic.uuid to status)
         }
 
