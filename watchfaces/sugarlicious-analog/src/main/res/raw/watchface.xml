@@ -47,7 +47,7 @@
 </Complication>
 <Complication type="LONG_TEXT">
 <PartText x="0" y="0" width="450" height="450">
-<TextCircular centerX="225" centerY="225" width="366" height="366" startAngle="250" endAngle="336" direction="CLOCKWISE" align="CENTER" ellipsis="TRUE" isAutoSize="TRUE">
+<TextCircular centerX="225" centerY="225" width="366" height="366" startAngle="250" endAngle="336" direction="CLOCKWISE" align="CENTER" ellipsis="TRUE">
 <Font family="SYNC_TO_DEVICE" size="21" weight="BOLD" color="#FFEB600A">
 <Template>%s<Parameter expression="[COMPLICATION.TEXT]" />
 </Template>
@@ -88,7 +88,7 @@
 </Complication>
 <Complication type="LONG_TEXT">
 <PartText x="0" y="0" width="450" height="450">
-<TextCircular centerX="225" centerY="225" width="366" height="366" startAngle="8" endAngle="67" direction="CLOCKWISE" align="CENTER" ellipsis="TRUE" isAutoSize="TRUE">
+<TextCircular centerX="225" centerY="225" width="366" height="366" startAngle="8" endAngle="67" direction="CLOCKWISE" align="CENTER" ellipsis="TRUE">
 <Font family="SYNC_TO_DEVICE" size="20" weight="BOLD" color="#FFEB600A">
 <Template>%s<Parameter expression="[COMPLICATION.TEXT]" />
 </Template>
@@ -129,7 +129,7 @@
 </Complication>
 <Complication type="LONG_TEXT">
 <PartText x="0" y="0" width="450" height="450">
-<TextCircular centerX="225" centerY="225" width="366" height="366" startAngle="96" endAngle="158" direction="CLOCKWISE" align="CENTER" ellipsis="TRUE" isAutoSize="TRUE">
+<TextCircular centerX="225" centerY="225" width="366" height="366" startAngle="96" endAngle="158" direction="CLOCKWISE" align="CENTER" ellipsis="TRUE">
 <Font family="SYNC_TO_DEVICE" size="20" weight="BOLD" color="#FFEB600A">
 <Template>%s<Parameter expression="[COMPLICATION.TEXT]" />
 </Template>
@@ -170,7 +170,7 @@
 </Complication>
 <Complication type="LONG_TEXT">
 <PartText x="0" y="0" width="450" height="450">
-<TextCircular centerX="225" centerY="225" width="366" height="366" startAngle="266" endAngle="190" direction="COUNTER_CLOCKWISE" align="CENTER" ellipsis="TRUE" isAutoSize="TRUE">
+<TextCircular centerX="225" centerY="225" width="366" height="366" startAngle="266" endAngle="190" direction="COUNTER_CLOCKWISE" align="CENTER" ellipsis="TRUE">
 <Font family="SYNC_TO_DEVICE" size="21" weight="BOLD" color="#FFEB600A">
 <Template>%s<Parameter expression="[COMPLICATION.TEXT]" />
 </Template>
