@@ -2,18 +2,26 @@
 
 ## Zielzustand für `main`
 
-`main` ist der Integrationszweig und soll ausschließlich über Pull Requests verändert werden.
-Empfohlene GitHub-Regeln:
+`main` ist der Integrationszweig und wird ausschließlich über Pull Requests verändert.
+Verbindliche GitHub-Regeln:
 
 - Pull Request vor Merge verpflichtend.
-- Status-Check `verify` aus `.github/workflows/build.yml` verpflichtend und aktuell.
+- Status-Check `verify` aus `.github/workflows/build.yml` verpflichtend; Branch muss aktuell sein.
 - Force-Push deaktivieren.
 - Branch-Löschung deaktivieren.
 - Conversation resolution vor Merge verlangen.
-- CODEOWNERS berücksichtigen; sobald mindestens ein unabhängiger Maintainer vorhanden ist, mindestens eine Freigabe verlangen.
-- Administratoren nicht von den Schutzregeln ausnehmen, sofern kein dokumentierter Recovery-Fall vorliegt.
+- Administratoren/Owner nicht von den Regeln ausnehmen.
+- CODEOWNERS ist aktiv; sobald mindestens ein unabhängiger Maintainer vorhanden ist, mindestens eine Pflichtfreigabe aktivieren.
 
-Bei einem Single-Maintainer-Repository darf eine Pflichtfreigabe durch den eigenen Account nicht so konfiguriert werden, dass reguläre PRs nicht mehr mergebar sind. CI und PR-Pflicht bleiben trotzdem verbindlich.
+Bei einem Single-Maintainer-Repository bleibt die Zahl verpflichtender Freigaben vorerst bei `0`, damit eigene PRs nicht unmergebar werden. PR- und CI-Pflicht gelten trotzdem.
+
+Die geprüfte Einmal-Konfiguration kann mit folgendem Repository-Skript angewendet und anschließend automatisch verifiziert werden:
+
+```powershell
+pwsh -File tools/protect-main.ps1
+```
+
+Das Skript benötigt eine mit Repository-Administrationsrechten authentifizierte GitHub CLI (`gh`).
 
 ## Tags und Releases
 
