@@ -3,7 +3,7 @@ package app.aapswear.model
 import java.util.Locale
 import kotlin.math.roundToInt
 
-/** Pure, deterministic display formatting shared by complications and tests. */
+/** Pure, deterministic display formatting shared by complications, Tiles, widgets and tests. */
 object TherapyDisplayFormatter {
     fun glucose(glucose: GlucoseState): String =
         if (glucose.displayUnit == GlucoseUnit.MMOL_L) {
@@ -39,7 +39,28 @@ object TherapyDisplayFormatter {
     fun percent(value: Int?): String = value?.let { "$it%" } ?: "—"
 
     fun ageMinutes(timestampEpochMs: Long?, nowEpochMs: Long): String =
-        timestampEpochMs?.let { "${((nowEpochMs - it).coerceAtLeast(0L) / 60_000L)}m" } ?: "—"
+        ageMinutesValue(timestampEpochMs, nowEpochMs)?.let { "${it}m" } ?: "—"
+
+    fun ageMinutesValue(timestampEpochMs: Long?, nowEpochMs: Long): Long? =
+        timestampEpochMs?.let { ((nowEpochMs - it).coerceAtLeast(0L) / 60_000L) }
+
+    fun freshness(state: TherapyDisplayState?, nowEpochMs: Long): Freshness =
+        FreshnessPolicy.classify(state?.glucose?.measuredAtEpochMs, nowEpochMs)
+
+    fun isGlucoseDisplayable(state: TherapyDisplayState?, nowEpochMs: Long): Boolean =
+        when (freshness(state, nowEpochMs)) {
+            Freshness.CURRENT, Freshness.DELAYED -> true
+            Freshness.STALE, Freshness.NO_DATA -> false
+        }
+
+    fun sourceName(source: DataSourceId?): String = when (source) {
+        DataSourceId.DEXCOM_G7_WATCH -> "Watch Direct"
+        DataSourceId.ANDROID_APS -> "AndroidAPS"
+        DataSourceId.NIGHTSCOUT -> "Nightscout"
+        DataSourceId.XDRIP_PLUS -> "xDrip+"
+        DataSourceId.OTHER -> "Andere Quelle"
+        null -> ""
+    }
 
     fun target(target: TargetState?, unit: GlucoseUnit): String {
         if (target?.lowMgDl == null && target?.highMgDl == null) return "—"
@@ -49,4 +70,3 @@ object TherapyDisplayFormatter {
         }
     }
 }
-
