@@ -1,7 +1,10 @@
 package app.aapswear.mobile
 
 import android.app.Activity
-import android.graphics.Color
+import android.content.Context
+import android.content.res.ColorStateList
+import android.graphics.Typeface
+import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
 import android.text.InputFilter
 import android.text.InputType
@@ -13,12 +16,15 @@ import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
 import androidx.core.content.edit
+import app.aapswear.mobile.ui.theme.SugarliciousColorRole
+import app.aapswear.mobile.ui.theme.SugarliciousColorStore
+import app.aapswear.mobile.ui.theme.SugarliciousColors
 import app.aapswear.protocol.G7SetupCommand
 import app.aapswear.protocol.WearProtocol
-import com.google.mlkit.vision.codescanner.GmsBarcodeScannerOptions
-import com.google.mlkit.vision.codescanner.GmsBarcodeScanning
 import com.google.android.gms.wearable.Wearable
 import com.google.mlkit.vision.barcode.common.Barcode
+import com.google.mlkit.vision.codescanner.GmsBarcodeScannerOptions
+import com.google.mlkit.vision.codescanner.GmsBarcodeScanning
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -36,39 +42,75 @@ class G7SetupActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(ScrollView(this).apply { addView(content()) })
+        SugarliciousColors.apply(
+            SugarliciousColorStore.load(getSharedPreferences("dashboard_ui", Context.MODE_PRIVATE)),
+        )
+        setContentView(ScrollView(this).apply {
+            isFillViewport = true
+            setBackgroundColor(color(SugarliciousColorRole.BACKGROUND))
+            addView(content())
+        })
     }
 
     private fun content() = LinearLayout(this).apply {
         orientation = LinearLayout.VERTICAL
-        setPadding(24.dp, 28.dp, 24.dp, 28.dp)
-        setBackgroundColor(Color.rgb(15, 20, 24))
-        addView(label("Dexcom G7 Watch", 25f, Color.WHITE))
-        addView(label("Sensor direkt mit der Galaxy Watch verbinden", 15f, Color.rgb(25, 215, 232)))
-        addView(label("Beende dafür den G7-Collector in Juggluco. Ein Sensor kann immer nur einen aktiven Collector beliefern.", 13f, Color.LTGRAY))
+        setPadding(20.dp, 22.dp, 20.dp, 28.dp)
+        setBackgroundColor(color(SugarliciousColorRole.BACKGROUND))
 
-        pairingCode = EditText(this@G7SetupActivity).apply {
-            hint = "4-stelliger Sensorcode"
-            inputType = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_VARIATION_PASSWORD
-            filters = arrayOf(InputFilter.LengthFilter(4))
-            setTextColor(Color.WHITE)
-            setHintTextColor(Color.GRAY)
-            gravity = Gravity.CENTER
-            textSize = 22f
+        addView(label("SUGARLICIOUS", 11f, color(SugarliciousColorRole.PRIMARY), bold = true).apply { letterSpacing = 0.1f })
+        addView(label("Dexcom G7 Watch", 28f, color(SugarliciousColorRole.TEXT_PRIMARY), bold = true))
+        addView(label("Sensor direkt mit der Galaxy Watch verbinden", 14f, color(SugarliciousColorRole.SECONDARY), bold = true))
+        addView(label("Beende dafür den G7-Collector in Juggluco. Ein Sensor kann immer nur einen aktiven Collector beliefern.", 12f, color(SugarliciousColorRole.TEXT_SECONDARY)).apply {
+            setPadding(2.dp, 7.dp, 2.dp, 12.dp)
+        })
+
+        addView(
+            LinearLayout(this@G7SetupActivity).apply {
+                orientation = LinearLayout.VERTICAL
+                setPadding(16.dp, 15.dp, 16.dp, 16.dp)
+                background = cardBackground()
+
+                addView(label("SENSORCODE", 11f, color(SugarliciousColorRole.PRIMARY), bold = true))
+                pairingCode = EditText(this@G7SetupActivity).apply {
+                    hint = "4-stelliger Code"
+                    inputType = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_VARIATION_PASSWORD
+                    filters = arrayOf(InputFilter.LengthFilter(4))
+                    setTextColor(color(SugarliciousColorRole.TEXT_PRIMARY))
+                    setHintTextColor(color(SugarliciousColorRole.TEXT_SECONDARY))
+                    background = inputBackground()
+                    gravity = Gravity.CENTER
+                    textSize = 24f
+                    typeface = Typeface.create("sans", Typeface.BOLD)
+                    setPadding(14.dp, 9.dp, 14.dp, 9.dp)
+                }
+                addView(pairingCode, rowParams())
+                addView(actionButton("Data-Matrix-Code scannen") { scanApplicator() }, rowParams())
+                addView(actionButton("Sensor auf der Watch einrichten", primary = true) { sendSetup() }, rowParams())
+            },
+            rowParams(),
+        )
+
+        status = label("Noch nicht übertragen", 12f, color(SugarliciousColorRole.TEXT_SECONDARY), bold = true).apply {
+            setPadding(14.dp, 12.dp, 14.dp, 12.dp)
+            background = statusBackground()
         }
-        addView(pairingCode, rowParams())
-        addView(Button(this@G7SetupActivity).apply {
-            text = "Data-Matrix-Code scannen"
-            setOnClickListener { scanApplicator() }
-        }, rowParams())
-        addView(Button(this@G7SetupActivity).apply {
-            text = "Sensor auf der Watch einrichten"
-            setOnClickListener { sendSetup() }
-        }, rowParams())
-        status = label("Noch nicht übertragen", 13f, Color.LTGRAY)
         addView(status, rowParams())
-        addView(label("Der Sensorcode und der Sitzungsschlüssel bleiben verschlüsselt auf der Watch. Sie werden weder in Diagnosen geschrieben noch an Health Connect übertragen.", 11f, Color.GRAY))
+        addView(label("Sensorcode und Sitzungsschlüssel bleiben verschlüsselt auf der Watch. Sie werden weder in Diagnosen geschrieben noch an Health Connect übertragen.", 11f, color(SugarliciousColorRole.TEXT_SECONDARY)).apply {
+            setPadding(4.dp, 10.dp, 4.dp, 0)
+        })
     }
+
+    private fun actionButton(text: String, primary: Boolean = false, action: () -> Unit) =
+        Button(this).apply {
+            this.text = text
+            isAllCaps = false
+            textSize = 13f
+            typeface = Typeface.create("sans", Typeface.BOLD)
+            setTextColor(if (primary) color(SugarliciousColorRole.ON_PRIMARY) else color(SugarliciousColorRole.TEXT_PRIMARY))
+            background = if (primary) primaryActionBackground() else secondaryActionBackground()
+            backgroundTintList = null
+            setOnClickListener { action() }
+        }
 
     private fun scanApplicator() {
         status.text = "Scanner wird geöffnet …"
@@ -78,8 +120,7 @@ class G7SetupActivity : Activity() {
             .build()
         GmsBarcodeScanning.getClient(this, options).startScan()
             .addOnSuccessListener { barcode ->
-                val raw = barcode.rawValue
-                    ?: barcode.rawBytes?.toString(Charsets.ISO_8859_1)
+                val raw = barcode.rawValue ?: barcode.rawBytes?.toString(Charsets.ISO_8859_1)
                 val parsed = raw?.let(G7ApplicatorBarcodeParser::parse)
                 if (parsed == null) {
                     status.text = "G7-Code nicht erkannt. Bitte den 4-stelligen Code eingeben."
@@ -116,9 +157,6 @@ class G7SetupActivity : Activity() {
             if (sent == 0) {
                 status.text = "Keine Watch erreichbar. Bluetooth/WLAN-Verbindung prüfen."
             } else {
-                // Direct-to-Watch must not disable the normal phone feed. AUTOMATIC lets a
-                // fresh local G7 reading win on the Watch while AAPS remains the fallback
-                // whenever the direct collector has no current value.
                 getSharedPreferences("dashboard_ui", MODE_PRIVATE).edit {
                     putString("dataSource", DataSourcePreference.AUTOMATIC.name)
                     putBoolean(G7_SOURCE_FALLBACK_MIGRATION_KEY, true)
@@ -135,16 +173,55 @@ class G7SetupActivity : Activity() {
         super.onDestroy()
     }
 
-    private fun label(value: String, size: Float, color: Int) = TextView(this).apply {
+    private fun label(value: String, size: Float, color: Int, bold: Boolean = false) = TextView(this).apply {
         text = value
         textSize = size
         setTextColor(color)
-        gravity = Gravity.CENTER
-        setPadding(4.dp, 8.dp, 4.dp, 8.dp)
+        gravity = Gravity.START
+        if (bold) typeface = Typeface.create("sans", Typeface.BOLD)
+        setPadding(2.dp, 4.dp, 2.dp, 4.dp)
     }
 
+    private fun cardBackground() = roundedBackground(
+        fill = color(SugarliciousColorRole.SURFACE),
+        border = color(SugarliciousColorRole.BORDER),
+        radius = 24,
+    )
+
+    private fun inputBackground() = roundedBackground(
+        fill = color(SugarliciousColorRole.SURFACE_HIGH),
+        border = color(SugarliciousColorRole.BORDER),
+        radius = 18,
+    )
+
+    private fun statusBackground() = roundedBackground(
+        fill = color(SugarliciousColorRole.SURFACE),
+        border = color(SugarliciousColorRole.BORDER),
+        radius = 18,
+    )
+
+    private fun primaryActionBackground() = roundedBackground(
+        fill = color(SugarliciousColorRole.PRIMARY),
+        border = color(SugarliciousColorRole.PRIMARY),
+        radius = 22,
+    )
+
+    private fun secondaryActionBackground() = roundedBackground(
+        fill = color(SugarliciousColorRole.SURFACE_HIGH),
+        border = color(SugarliciousColorRole.BORDER),
+        radius = 22,
+    )
+
+    private fun roundedBackground(fill: Int, border: Int, radius: Int) = GradientDrawable().apply {
+        cornerRadius = radius.dp.toFloat()
+        setColor(fill)
+        setStroke(1.dp, border)
+    }
+
+    private fun color(role: SugarliciousColorRole): Int = SugarliciousColors.argb(role)
+
     private fun rowParams() = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
-        setMargins(0, 8.dp, 0, 0)
+        setMargins(0, 7.dp, 0, 0)
     }
 
     private val Int.dp: Int get() = (this * resources.displayMetrics.density).toInt()
