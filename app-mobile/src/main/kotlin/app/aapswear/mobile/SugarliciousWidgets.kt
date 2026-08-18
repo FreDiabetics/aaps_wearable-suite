@@ -40,9 +40,9 @@ import app.aapswear.mobile.ui.theme.SugarliciousIconSize
 import app.aapswear.mobile.ui.theme.SugarliciousRadius
 import app.aapswear.mobile.ui.theme.SugarliciousSpacing
 import app.aapswear.model.Freshness
+import app.aapswear.model.GlucoseUnit
 import app.aapswear.model.TherapyDisplayFormatter
 import app.aapswear.model.TherapyDisplayState
-import app.aapswear.model.Trend
 import app.aapswear.storage.TherapyStateStore
 import kotlinx.coroutines.flow.first
 import java.util.Locale
@@ -136,22 +136,17 @@ private fun GlucoseWidgetContent(state: TherapyDisplayState?) {
     val glucose = state?.glucose
     val freshness = TherapyDisplayFormatter.freshness(state, now)
     val displayable = TherapyDisplayFormatter.isGlucoseDisplayable(state, now)
-    val value = if (displayable) glucose?.valueMgDl?.let { String.format(Locale.US, "%.0f", it) } ?: "–" else "–"
-    val arrow = if (displayable) {
-        when (glucose?.trend) {
-            Trend.DOUBLE_DOWN -> "⇊"
-            Trend.SINGLE_DOWN -> "↓"
-            Trend.FORTY_FIVE_DOWN -> "↘"
-            Trend.FLAT -> "→"
-            Trend.FORTY_FIVE_UP -> "↗"
-            Trend.SINGLE_UP -> "↑"
-            Trend.DOUBLE_UP -> "⇈"
-            else -> ""
-        }
+    val value = if (displayable && glucose != null) TherapyDisplayFormatter.glucose(glucose) else "–"
+    val arrow = if (displayable && glucose != null) TherapyDisplayFormatter.trendArrow(glucose.trend) else ""
+    val delta = if (displayable && glucose != null) {
+        TherapyDisplayFormatter.signedDelta(glucose.deltaMgDl, glucose.displayUnit).ifBlank { "–" }
     } else {
-        ""
+        "–"
     }
-    val delta = if (displayable) glucose?.deltaMgDl?.let { String.format(Locale.US, "%+.0f", it) } ?: "–" else "–"
+    val unit = when (glucose?.displayUnit) {
+        GlucoseUnit.MMOL_L -> "mmol/L"
+        else -> "mg/dL"
+    }
     val status = widgetStatusLine(state, freshness, now)
     val statusColor = when (freshness) {
         Freshness.CURRENT -> WidgetSecondary
@@ -167,7 +162,7 @@ private fun GlucoseWidgetContent(state: TherapyDisplayState?) {
                 listOf(arrow, delta).filter(String::isNotBlank).joinToString("  "),
                 style = TextStyle(color = if (displayable) WidgetAccent else WidgetSecondary, fontWeight = FontWeight.Bold, fontSize = 20.sp),
             )
-            Text("mg/dL", style = TextStyle(color = WidgetSecondary, fontSize = 13.sp))
+            Text(unit, style = TextStyle(color = WidgetSecondary, fontSize = 13.sp))
             Text(status, style = TextStyle(color = statusColor, fontSize = 11.sp))
         }
     }
