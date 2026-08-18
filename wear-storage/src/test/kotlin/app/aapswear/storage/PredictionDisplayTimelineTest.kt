@@ -4,12 +4,11 @@ import app.aapswear.model.GlucosePrediction
 import app.aapswear.model.GlucoseSample
 import app.aapswear.model.PredictionKind
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class PredictionDisplayTimelineTest {
     @Test
-    fun `all prediction kinds begin immediately right of current time`() {
+    fun `all prediction kinds begin at current time divider`() {
         val now = 1_000_000L
         val predictions =
             listOf(
@@ -21,7 +20,7 @@ class PredictionDisplayTimelineTest {
 
         anchored.forEach { series ->
             assertEquals(now + PredictionDisplayTimeline.LEAD_IN_MS, series.samples.first().measuredAtEpochMs)
-            assertTrue(series.samples.first().measuredAtEpochMs > now)
+            assertEquals(now, series.samples.first().measuredAtEpochMs)
             assertEquals(5 * 60_000L, series.samples[1].measuredAtEpochMs - series.samples[0].measuredAtEpochMs)
         }
     }
