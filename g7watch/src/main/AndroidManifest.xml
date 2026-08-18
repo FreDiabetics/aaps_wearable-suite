@@ -37,6 +37,7 @@
             <intent-filter><action android:name="android.intent.action.BOOT_COMPLETED" /></intent-filter>
         </receiver>
         <receiver android:name=".G7ReconnectReceiver" android:exported="false" />
+        <receiver android:name=".G7ErrorAcknowledgeReceiver" android:exported="false" />
         <receiver
             android:name=".G7SetupReceiver"
             android:exported="true"
