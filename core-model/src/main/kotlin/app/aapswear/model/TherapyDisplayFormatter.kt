@@ -66,7 +66,7 @@ object TherapyDisplayFormatter {
         DataSourceId.NIGHTSCOUT -> "Nightscout"
         DataSourceId.XDRIP_PLUS -> "xDrip+"
         DataSourceId.OTHER -> "Andere Quelle"
-        null -> ""
+        null -> "Keine Quelle"
     }
 
     fun target(target: TargetState?, unit: GlucoseUnit): String {
