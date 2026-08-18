@@ -39,9 +39,8 @@ import app.aapswear.mobile.ui.theme.SugarliciousComponentSize
 import app.aapswear.mobile.ui.theme.SugarliciousIconSize
 import app.aapswear.mobile.ui.theme.SugarliciousRadius
 import app.aapswear.mobile.ui.theme.SugarliciousSpacing
-import app.aapswear.model.DataSourceId
 import app.aapswear.model.Freshness
-import app.aapswear.model.FreshnessPolicy
+import app.aapswear.model.TherapyDisplayFormatter
 import app.aapswear.model.TherapyDisplayState
 import app.aapswear.model.Trend
 import app.aapswear.storage.TherapyStateStore
@@ -133,9 +132,10 @@ private fun WidgetSurface(kind: WidgetKind, state: TherapyDisplayState?) {
 
 @Composable
 private fun GlucoseWidgetContent(state: TherapyDisplayState?) {
+    val now = System.currentTimeMillis()
     val glucose = state?.glucose
-    val freshness = FreshnessPolicy.classify(glucose?.measuredAtEpochMs, System.currentTimeMillis())
-    val displayable = freshness == Freshness.CURRENT || freshness == Freshness.DELAYED
+    val freshness = TherapyDisplayFormatter.freshness(state, now)
+    val displayable = TherapyDisplayFormatter.isGlucoseDisplayable(state, now)
     val value = if (displayable) glucose?.valueMgDl?.let { String.format(Locale.US, "%.0f", it) } ?: "–" else "–"
     val arrow = if (displayable) {
         when (glucose?.trend) {
@@ -152,7 +152,7 @@ private fun GlucoseWidgetContent(state: TherapyDisplayState?) {
         ""
     }
     val delta = if (displayable) glucose?.deltaMgDl?.let { String.format(Locale.US, "%+.0f", it) } ?: "–" else "–"
-    val status = widgetStatusLine(state, freshness)
+    val status = widgetStatusLine(state, freshness, now)
     val statusColor = when (freshness) {
         Freshness.CURRENT -> WidgetSecondary
         Freshness.DELAYED -> WidgetWarning
@@ -175,8 +175,9 @@ private fun GlucoseWidgetContent(state: TherapyDisplayState?) {
 
 @Composable
 private fun MetabolicWidgetContent(state: TherapyDisplayState?) {
-    val freshness = FreshnessPolicy.classify(state?.glucose?.measuredAtEpochMs, System.currentTimeMillis())
-    val displayable = freshness == Freshness.CURRENT || freshness == Freshness.DELAYED
+    val now = System.currentTimeMillis()
+    val freshness = TherapyDisplayFormatter.freshness(state, now)
+    val displayable = TherapyDisplayFormatter.isGlucoseDisplayable(state, now)
     val pillWidth =
         ((LocalSize.current.width - SugarliciousSpacing.Xxl - SugarliciousSpacing.Sm) / 2)
             .coerceAtLeast(SugarliciousComponentSize.CompactMetricMinWidth)
@@ -237,13 +238,10 @@ private fun ActivityWidgetContent(snapshot: HealthConnectSnapshot?) {
     }
 }
 
-private fun widgetStatusLine(state: TherapyDisplayState?, freshness: Freshness): String {
-    val source = sourceLabel(state?.source)
-    val age = state?.glucose?.measuredAtEpochMs?.let {
-        val minutes = ((System.currentTimeMillis() - it).coerceAtLeast(0L) / 60_000L)
-        "${minutes} min"
-    }
-    return listOf(widgetStatusLabel(freshness), source, age).filter { it.isNotBlank() }.joinToString(" · ")
+private fun widgetStatusLine(state: TherapyDisplayState?, freshness: Freshness, now: Long): String {
+    val source = TherapyDisplayFormatter.sourceName(state?.source)
+    val age = TherapyDisplayFormatter.ageMinutesValue(state?.glucose?.measuredAtEpochMs, now)?.let { "$it min" }
+    return listOf(widgetStatusLabel(freshness), source, age.orEmpty()).filter { it.isNotBlank() }.joinToString(" · ")
 }
 
 private fun widgetStatusLabel(freshness: Freshness): String = when (freshness) {
@@ -251,13 +249,4 @@ private fun widgetStatusLabel(freshness: Freshness): String = when (freshness) {
     Freshness.DELAYED -> "VERZÖGERT"
     Freshness.STALE -> "VERALTET"
     Freshness.NO_DATA -> "KEINE DATEN"
-}
-
-private fun sourceLabel(source: DataSourceId?): String = when (source) {
-    DataSourceId.DEXCOM_G7_WATCH -> "Watch Direct"
-    DataSourceId.ANDROID_APS -> "AndroidAPS"
-    DataSourceId.NIGHTSCOUT -> "Nightscout"
-    DataSourceId.XDRIP_PLUS -> "xDrip+"
-    DataSourceId.OTHER -> "Andere Quelle"
-    null -> ""
 }
