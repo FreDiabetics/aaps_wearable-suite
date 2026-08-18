@@ -37,12 +37,16 @@ class TherapyDisplayFormatterTest {
     }
 
     @Test
-    fun `shares canonical freshness and displayability decisions`() {
+    fun `shares canonical freshness displayability and labels`() {
         val now = 20L * 60_000L
         assertEquals(Freshness.CURRENT, TherapyDisplayFormatter.freshness(stateAt(now - 5 * 60_000L), now))
         assertEquals(Freshness.DELAYED, TherapyDisplayFormatter.freshness(stateAt(now - 8 * 60_000L), now))
         assertEquals(Freshness.STALE, TherapyDisplayFormatter.freshness(stateAt(now - 13 * 60_000L), now))
         assertEquals(Freshness.NO_DATA, TherapyDisplayFormatter.freshness(null, now))
+        assertEquals("AKTUELL", TherapyDisplayFormatter.freshnessLabel(Freshness.CURRENT))
+        assertEquals("VERZÖGERT", TherapyDisplayFormatter.freshnessLabel(Freshness.DELAYED))
+        assertEquals("VERALTET", TherapyDisplayFormatter.freshnessLabel(Freshness.STALE))
+        assertEquals("KEINE DATEN", TherapyDisplayFormatter.freshnessLabel(Freshness.NO_DATA))
         assertTrue(TherapyDisplayFormatter.isGlucoseDisplayable(stateAt(now - 8 * 60_000L), now))
         assertFalse(TherapyDisplayFormatter.isGlucoseDisplayable(stateAt(now - 13 * 60_000L), now))
     }
