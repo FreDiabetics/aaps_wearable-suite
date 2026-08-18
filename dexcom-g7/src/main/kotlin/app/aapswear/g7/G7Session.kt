@@ -8,6 +8,8 @@ object G7ReconnectScheduler {
     const val EXPECTED_READING_INTERVAL_MS = 5 * 60_000L
     private const val PRECONNECT_MS = 30_000L
     private const val MAX_BACKOFF_MS = 15 * 60_000L
+    private const val GATT_133_INITIAL_RETRY_MS = 15_000L
+    private const val MIN_WINDOW_LEAD_MS = 1_000L
 
     fun afterReading(readingEpochMs: Long): G7ReconnectPlan =
         G7ReconnectPlan(readingEpochMs + EXPECTED_READING_INTERVAL_MS - PRECONNECT_MS, 0, EXPECTED_READING_INTERVAL_MS - PRECONNECT_MS)
@@ -16,6 +18,27 @@ object G7ReconnectScheduler {
         val count = (retryCount + 1).coerceAtMost(10)
         val delay = min(15_000L * (1L shl count.coerceAtMost(6)), MAX_BACKOFF_MS)
         return G7ReconnectPlan(nowEpochMs + delay, count, delay)
+    }
+
+    /**
+     * GATT 133 is a transient Android BLE connection failure, not an authentication/session
+     * failure. After bounded in-window retries have been exhausted, wait for the next expected
+     * Dexcom advertising/connection window instead of entering the generic exponential backoff.
+     */
+    fun afterGatt133(nowEpochMs: Long, lastReadingEpochMs: Long?): G7ReconnectPlan {
+        if (lastReadingEpochMs == null) {
+            return G7ReconnectPlan(nowEpochMs + GATT_133_INITIAL_RETRY_MS, 0, GATT_133_INITIAL_RETRY_MS)
+        }
+        val firstWindow = lastReadingEpochMs + EXPECTED_READING_INTERVAL_MS - PRECONNECT_MS
+        val minimumTrigger = nowEpochMs + MIN_WINDOW_LEAD_MS
+        val trigger = if (firstWindow > minimumTrigger) {
+            firstWindow
+        } else {
+            val elapsed = minimumTrigger - firstWindow
+            val cycles = elapsed / EXPECTED_READING_INTERVAL_MS + 1L
+            firstWindow + cycles * EXPECTED_READING_INTERVAL_MS
+        }
+        return G7ReconnectPlan(trigger, 0, trigger - nowEpochMs)
     }
 }
 
@@ -92,6 +115,19 @@ class G7SessionManager(initial: G7PersistedState = G7PersistedState()) {
                 ),
             )
         }
+        if (error.code == GATT_133_ERROR_CODE) {
+            val plan = G7ReconnectScheduler.afterGatt133(error.occurredAtEpochMs, state.lastReading?.timestampEpochMs)
+            return transition(
+                state.copy(
+                    sessionState = G7SessionState.RECOVERING,
+                    connectionState = G7ConnectionState.DISCONNECTED,
+                    protocolState = G7ProtocolState.RECOVERING,
+                    retryCount = 0,
+                    nextReconnectEpochMs = plan.nextReconnectEpochMs,
+                    lastError = error,
+                ),
+            )
+        }
         val step = G7RecoveryChain.stepForFailure(state.retryCount)
         val plan = G7ReconnectScheduler.afterFailure(error.occurredAtEpochMs, state.retryCount)
         val session = when (step) {
@@ -129,6 +165,10 @@ class G7SessionManager(initial: G7PersistedState = G7PersistedState()) {
         )
 
     private fun transition(next: G7PersistedState): G7PersistedState = next.also { state = it }
+
+    private companion object {
+        const val GATT_133_ERROR_CODE = "G7-GATT-133"
+    }
 }
 
 class CollectorOwnershipManager(initial: CollectorOwner = CollectorOwner.UNKNOWN) {
