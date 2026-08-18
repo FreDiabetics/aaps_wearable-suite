@@ -4,11 +4,13 @@ import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.Canvas
 import android.graphics.DashPathEffect
+import android.graphics.Outline
 import android.graphics.Paint
 import android.graphics.Typeface
 import android.util.AttributeSet
 import android.util.TypedValue
 import android.view.View
+import android.view.ViewOutlineProvider
 import app.aapswear.model.GlucoseGraphScale
 import app.aapswear.model.GlucosePrediction
 import app.aapswear.model.GlucoseSample
@@ -59,6 +61,33 @@ class WearGlucoseChart @JvmOverloads constructor(
     private var graphStyle: WatchGraphStyle = WatchGraphStyle()
     private var stateSignature: List<Any?>? = null
 
+    init {
+        outlineProvider =
+            object : ViewOutlineProvider() {
+                override fun getOutline(view: View, outline: Outline) {
+                    if (view.width <= 0 || view.height <= 0) return
+                    outline.setRoundRect(
+                        0,
+                        0,
+                        view.width,
+                        view.height,
+                        TILE_RADIUS_DP * density,
+                    )
+                }
+            }
+        clipToOutline = true
+    }
+
+    override fun onSizeChanged(
+        w: Int,
+        h: Int,
+        oldw: Int,
+        oldh: Int,
+    ) {
+        super.onSizeChanged(w, h, oldw, oldh)
+        invalidateOutline()
+    }
+
     fun bind(
         newState: TherapyDisplayState?,
         graphHours: Int,
@@ -103,24 +132,12 @@ class WearGlucoseChart @JvmOverloads constructor(
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
 
+        val viewRight = width.toFloat()
+        val viewBottom = height.toFloat()
+        if (viewRight <= 0f || viewBottom <= 0f) return
+
+        val tileRadius = TILE_RADIUS_DP.dp
         val now = System.currentTimeMillis()
-        val outerLeft = 1f.dp
-        val outerTop = 1f.dp
-        val outerRight = width - 1f.dp
-        val outerBottom = height - 1f.dp
-        if (outerRight <= outerLeft || outerBottom <= outerTop) return
-
-        fillPaint.color = colors.graphBackground
-        canvas.drawRoundRect(
-            outerLeft,
-            outerTop,
-            outerRight,
-            outerBottom,
-            14f.dp,
-            14f.dp,
-            fillPaint,
-        )
-
         val predictions =
             if (showPredictions) {
                 PredictionDisplayTimeline.anchor(
@@ -183,29 +200,6 @@ class WearGlucoseChart @JvmOverloads constructor(
         val bottom = height - 5f.dp
         if (right <= left || bottom <= top) return
 
-        linePaint.color = colors.divider
-        linePaint.strokeWidth = 0.8f.dp
-        linePaint.pathEffect = null
-        canvas.drawRoundRect(
-            outerLeft,
-            outerTop,
-            outerRight,
-            outerBottom,
-            14f.dp,
-            14f.dp,
-            linePaint,
-        )
-
-        if (history.isEmpty() && visiblePredictions.isEmpty()) {
-            canvas.drawText(
-                "Noch keine CGM-Historie",
-                width / 2f,
-                height / 2f + 4f.dp,
-                emptyTextPaint,
-            )
-            return
-        }
-
         fun xFor(timestamp: Long): Float =
             left +
                 (
@@ -228,34 +222,55 @@ class WearGlucoseChart @JvmOverloads constructor(
         val targetTop = yFor(targetHigh)
         val targetBottom = yFor(targetLow)
 
+        // The view itself owns the rounded clip. Every background/range fill can therefore paint
+        // truly full-bleed to the view edges without a second Path clip that leaves dark fringe
+        // pixels between the graph surface and the final tile contour on Wear hardware.
+        fillPaint.color = colors.graphBackground
+        canvas.drawRect(
+            0f,
+            0f,
+            viewRight,
+            viewBottom,
+            fillPaint,
+        )
+
         fillPaint.color = colors.rangeHigh
         canvas.drawRect(
-            left,
-            top,
-            right,
+            0f,
+            0f,
+            viewRight,
             targetTop,
             fillPaint,
         )
 
         fillPaint.color = colors.rangeInRange
-        canvas.drawRoundRect(
-            left,
+        canvas.drawRect(
+            0f,
             targetTop,
-            right,
+            viewRight,
             targetBottom,
-            5f.dp,
-            5f.dp,
             fillPaint,
         )
 
         fillPaint.color = colors.rangeLow
         canvas.drawRect(
-            left,
+            0f,
             targetBottom,
-            right,
-            bottom,
+            viewRight,
+            viewBottom,
             fillPaint,
         )
+
+        if (history.isEmpty() && visiblePredictions.isEmpty()) {
+            canvas.drawText(
+                "Noch keine CGM-Historie",
+                width / 2f,
+                height / 2f + 4f.dp,
+                emptyTextPaint,
+            )
+            drawTileContour(canvas, tileRadius)
+            return
+        }
 
         linePaint.color = colors.divider
         linePaint.pathEffect = null
@@ -319,6 +334,29 @@ class WearGlucoseChart @JvmOverloads constructor(
                 yFor = ::yFor,
             )
         }
+
+        drawTileContour(canvas, tileRadius)
+    }
+
+    private fun drawTileContour(
+        canvas: Canvas,
+        radius: Float,
+    ) {
+        val strokeWidth = 1f.dp
+        val inset = strokeWidth / 2f
+
+        linePaint.color = colors.divider
+        linePaint.strokeWidth = strokeWidth
+        linePaint.pathEffect = null
+        canvas.drawRoundRect(
+            inset,
+            inset,
+            width - inset,
+            height - inset,
+            (radius - inset).coerceAtLeast(0f),
+            (radius - inset).coerceAtLeast(0f),
+            linePaint,
+        )
     }
 
     private fun drawCgmDot(
@@ -392,6 +430,7 @@ class WearGlucoseChart @JvmOverloads constructor(
     companion object {
         private const val TARGET_LOW = 80.0
         private const val TARGET_HIGH = 160.0
+        private const val TILE_RADIUS_DP = 18f
     }
 }
 
