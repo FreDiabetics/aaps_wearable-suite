@@ -13,6 +13,20 @@ jobs:
           java-version: '21'
       - uses: android-actions/setup-android@v3
       - run: sdkmanager "platforms;android-36" "build-tools;36.0.0"
+      - name: Validate branch protection helper with PowerShell 7
+        shell: pwsh
+        run: |
+          $tokens = $null
+          $errors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile(
+            (Join-Path $PWD 'tools/protect-main.ps1'),
+            [ref]$tokens,
+            [ref]$errors
+          ) | Out-Null
+          if ($errors.Count -gt 0) {
+            $errors | Format-List *
+            throw 'tools/protect-main.ps1 failed PowerShell 7 parsing.'
+          }
       - name: Prepare Watch Face Push marketplace assets
         shell: pwsh
         run: ./tools/watchface-push/Prepare-WatchFacePushAssets.ps1
