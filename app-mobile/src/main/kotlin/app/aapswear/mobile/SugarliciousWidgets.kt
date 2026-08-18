@@ -10,7 +10,6 @@ import androidx.glance.GlanceId
 import androidx.glance.GlanceModifier
 import androidx.glance.Image
 import androidx.glance.ImageProvider
-import androidx.glance.LocalContext
 import androidx.glance.LocalSize
 import androidx.glance.action.actionStartActivity
 import androidx.glance.action.clickable
@@ -18,9 +17,9 @@ import androidx.glance.appwidget.GlanceAppWidget
 import androidx.glance.appwidget.GlanceAppWidgetReceiver
 import androidx.glance.appwidget.cornerRadius
 import androidx.glance.appwidget.provideContent
+import androidx.glance.appwidget.unit.ColorProvider as DayNightColorProvider
 import androidx.glance.appwidget.updateAll
 import androidx.glance.background
-import androidx.glance.color.ColorProvider as DayNightColorProvider
 import androidx.glance.layout.Alignment
 import androidx.glance.layout.Column
 import androidx.glance.layout.Row
@@ -84,16 +83,17 @@ private val WidgetCob = widgetColor(SugarliciousColorRole.ORANGE)
 private val WidgetBasal = widgetColor(SugarliciousColorRole.GREEN)
 private val WidgetHeartRate = widgetColor(SugarliciousColorRole.RED)
 
+enum class WidgetKind { GLUCOSE, METABOLIC, ACTIVITY }
+
 private abstract class SugarliciousWidget : GlanceAppWidget() {
     protected abstract val kind: WidgetKind
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
         val state = TherapyStateStore(context).state.first()
-        provideContent { WidgetShell(kind, state) }
+        val activitySnapshot = if (kind == WidgetKind.ACTIVITY) HealthConnectIntegration.snapshot(context) else null
+        provideContent { WidgetShell(kind, state, activitySnapshot) }
     }
 }
-
-private enum class WidgetKind { GLUCOSE, METABOLIC, ACTIVITY }
 
 private class GlucoseWidget : SugarliciousWidget() { override val kind = WidgetKind.GLUCOSE }
 private class MetabolicWidget : SugarliciousWidget() { override val kind = WidgetKind.METABOLIC }
@@ -112,7 +112,7 @@ internal object SugarliciousWidgets {
 }
 
 @Composable
-private fun WidgetShell(kind: WidgetKind, state: TherapyDisplayState?) {
+private fun WidgetShell(kind: WidgetKind, state: TherapyDisplayState?, activitySnapshot: HealthConnectSnapshot?) {
     val size = LocalSize.current
     val compact = size.width < 210.dp || size.height < 130.dp
     val background = if (kind == WidgetKind.GLUCOSE) glucoseSurface(state) else WidgetSurface
@@ -132,7 +132,7 @@ private fun WidgetShell(kind: WidgetKind, state: TherapyDisplayState?) {
         when (kind) {
             WidgetKind.GLUCOSE -> GlucoseWidgetContent(state, compact)
             WidgetKind.METABOLIC -> MetabolicWidgetContent(state, compact)
-            WidgetKind.ACTIVITY -> ActivityWidgetContent(HealthConnectIntegration.snapshot(LocalContext.current), compact)
+            WidgetKind.ACTIVITY -> ActivityWidgetContent(activitySnapshot, compact)
         }
     }
 }
@@ -182,11 +182,7 @@ private fun GlucoseWidgetContent(state: TherapyDisplayState?, compact: Boolean) 
     Row(modifier = GlanceModifier.fillMaxWidth(), verticalAlignment = Alignment.Vertical.CenterVertically) {
         Text(
             value,
-            style = TextStyle(
-                color = WidgetPrimary,
-                fontWeight = FontWeight.Bold,
-                fontSize = if (compact) 36.sp else 48.sp,
-            ),
+            style = TextStyle(color = WidgetPrimary, fontWeight = FontWeight.Bold, fontSize = if (compact) 36.sp else 48.sp),
         )
         Spacer(GlanceModifier.width(if (compact) SugarliciousSpacing.Sm else SugarliciousSpacing.Md))
         Column {
@@ -267,11 +263,7 @@ private fun glucoseSurface(state: TherapyDisplayState?): ColorProvider {
 private fun widgetStatusLine(state: TherapyDisplayState?, freshness: Freshness, now: Long, compact: Boolean): String {
     val source = TherapyDisplayFormatter.sourceName(state?.source)
     val age = TherapyDisplayFormatter.ageMinutesValue(state?.glucose?.measuredAtEpochMs, now)?.let { "$it min" }
-    val parts = if (compact) {
-        listOf(source, age.orEmpty())
-    } else {
-        listOf(source, age.orEmpty(), TherapyDisplayFormatter.freshnessLabel(freshness))
-    }
+    val parts = if (compact) listOf(source, age.orEmpty()) else listOf(source, age.orEmpty(), TherapyDisplayFormatter.freshnessLabel(freshness))
     return parts.filter(String::isNotBlank).joinToString(" · ")
 }
 
