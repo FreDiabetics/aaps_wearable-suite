@@ -1,9 +1,15 @@
+#requires -Version 7.0
+
 param(
     [string]$Repository = "FreDiabetics/sugarlicious",
     [string]$Branch = "main"
 )
 
 $ErrorActionPreference = "Stop"
+
+if ($PSVersionTable.PSEdition -ne "Core") {
+    throw "PowerShell 7+ (pwsh) is required."
+}
 
 if (-not (Get-Command gh -ErrorAction SilentlyContinue)) {
     throw "GitHub CLI (gh) was not found."
@@ -41,11 +47,9 @@ $null = $body | ConvertFrom-Json
 
 $temp = [System.IO.Path]::GetTempFileName()
 try {
-    # Windows PowerShell 5.1 writes a BOM for Set-Content -Encoding UTF8.
-    # GitHub rejects a BOM when gh api --input forwards the file verbatim.
-    # Keep this script itself ASCII-only for Windows PowerShell 5.1 compatibility,
-    # while writing only the JSON request as explicit UTF-8 without BOM.
-    $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+    # gh api --input forwards the request file verbatim. Keep the JSON request
+    # explicitly UTF-8 without BOM even though PowerShell 7 already defaults to UTF-8.
+    $utf8NoBom = [System.Text.UTF8Encoding]::new($false)
     [System.IO.File]::WriteAllText($temp, $body, $utf8NoBom)
 
     Write-Host "`nEnabling branch protection for $Repository/$Branch ..."
