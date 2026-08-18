@@ -393,26 +393,29 @@ class WearSettingsActivity : Activity() {
 
     private fun compactActionBackground(): GradientDrawable = GradientDrawable().apply {
         cornerRadius = 20.dp.toFloat()
-        setColor(current.uiColors.tileBackground)
-        setStroke(1.dp, current.uiColors.tileBorder)
+        setColor(this@WearSettingsActivity.current.uiColors.tileBackground)
+        setStroke(1.dp, this@WearSettingsActivity.current.uiColors.tileBorder)
     }
 
     private fun cardBackground(radiusDp: Float = 20f): GradientDrawable = GradientDrawable().apply {
         cornerRadius = radiusDp * resources.displayMetrics.density
-        setColor(current.uiColors.tileBackground)
-        setStroke(1.dp, current.uiColors.tileBorder)
+        setColor(this@WearSettingsActivity.current.uiColors.tileBackground)
+        setStroke(1.dp, this@WearSettingsActivity.current.uiColors.tileBorder)
     }
 
     private fun pillBackground(selected: Boolean): GradientDrawable = GradientDrawable().apply {
         cornerRadius = 17.dp.toFloat()
-        setColor(if (selected) current.uiColors.accent else current.uiColors.tileBackground)
-        setStroke(1.dp, if (selected) current.uiColors.accent else current.uiColors.tileBorder)
+        setColor(if (selected) this@WearSettingsActivity.current.uiColors.accent else this@WearSettingsActivity.current.uiColors.tileBackground)
+        setStroke(1.dp, if (selected) this@WearSettingsActivity.current.uiColors.accent else this@WearSettingsActivity.current.uiColors.tileBorder)
     }
 
     private fun colorCircle(color: Int, selected: Boolean = false): GradientDrawable = GradientDrawable().apply {
         shape = GradientDrawable.OVAL
         setColor(color)
-        setStroke(if (selected) 3.dp else 1.dp, if (selected) current.uiColors.accent else current.uiColors.tileBorder)
+        setStroke(
+            if (selected) 3.dp else 1.dp,
+            if (selected) this@WearSettingsActivity.current.uiColors.accent else this@WearSettingsActivity.current.uiColors.tileBorder,
+        )
     }
 
     private fun fullWidth() = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT)
