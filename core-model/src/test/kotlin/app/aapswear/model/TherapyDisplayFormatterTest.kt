@@ -57,7 +57,7 @@ class TherapyDisplayFormatterTest {
         assertEquals("AndroidAPS", TherapyDisplayFormatter.sourceName(DataSourceId.ANDROID_APS))
         assertEquals("Nightscout", TherapyDisplayFormatter.sourceName(DataSourceId.NIGHTSCOUT))
         assertEquals("xDrip+", TherapyDisplayFormatter.sourceName(DataSourceId.XDRIP_PLUS))
-        assertEquals("", TherapyDisplayFormatter.sourceName(null))
+        assertEquals("Keine Quelle", TherapyDisplayFormatter.sourceName(null))
     }
 
     private fun glucose(valueMgDl: Double, unit: GlucoseUnit) = GlucoseState(
