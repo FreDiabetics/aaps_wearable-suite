@@ -267,7 +267,7 @@ private class G7GattConnection(
             serviceEvents.trySend(status)
         }
 
-        override fun onDescriptorWrite(gatt: BluetoothGatt, descriptor: BluetoothGattGattDescriptor, status: Int) {
+        override fun onDescriptorWrite(gatt: BluetoothGatt, descriptor: BluetoothGattDescriptor, status: Int) {
             descriptorEvents.trySend(descriptor.characteristic.uuid to status)
         }
 
