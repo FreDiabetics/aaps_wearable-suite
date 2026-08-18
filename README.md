@@ -1,85 +1,86 @@
 # Sugarlicious
 
-Sugarlicious ist eine eigenständige, strikt lesende Android-/Wear-OS-Anwendung für lokal von
-AndroidAPS bereitgestellte Statusdaten. Keine Therapiekommandos, keine Cloud,
-keine Telemetrie und keine Werbung. Das Projekt steht unter GNU AGPL v3.
+Sugarlicious ist eine strikt lesende Android-/Wear-OS-Suite für zuverlässige CGM- und AndroidAPS-Statusdaten auf Smartphone und Uhr. Im Mittelpunkt stehen Datenintegrität, eindeutige Quellenzuordnung, nachvollziehbare Freshness-/Fehlerzustände und ein gemeinsamer kanonischer Datenpfad für UI, Watchfaces, Complications und Alarme.
+
+Sugarlicious ist kein Medizinprodukt und sendet keine Therapiekommandos an AndroidAPS oder eine Pumpe.
+
+## Architektur
+
+Der primäre Datenweg lautet:
+
+`AndroidAPS → Sugarlicious Mobile → Wear Data Layer → kanonischer Resolver → Watch UI / Complications / Watchfaces`
+
+Zusätzlich enthält das Projekt einen direkten Dexcom-G7-Collector ausschließlich für Wear OS:
+
+`Dexcom G7 → G7 Direct to Watch → kanonischer Resolver`
+
+Wichtige Architekturregeln:
+
+- kein eigener G7-BLE-Collector auf Sugarlicious Mobile,
+- Mobile- und Watch-Rohdaten bleiben getrennt,
+- nur der zentrale Source Resolver bestimmt die aktive Quelle,
+- alte, doppelte oder ungültige Daten dürfen keine frischeren gültigen Werte überschreiben,
+- Stale-/NO_SOURCE-/Fehlerzustände werden explizit dargestellt,
+- Complications, Watchfaces und Alarme verwenden denselben validierten Datenlayer.
 
 ## Enthalten
 
-- Mobile Bridge für den offiziellen lokalen AAPS-Status-Broadcast und optional
-  den lokalen xDrip+-Glukose-Broadcast
-- versioniertes, fehlertolerantes Datenmodell und Wear-Data-Layer-Protokoll
-- DataStore-Persistenz und klare Kennzeichnung aktueller/verzögerter/veralteter Daten
-- kachelbasiertes Smartphone-Dashboard mit echten AAPS-Graphdaten, flacher
-  Navigation und direkt erreichbaren Anzeigeeinstellungen
-- neutrale graue Tile-Oberfläche mit FreDiabetics-Grün als Systemakzent,
-  pillenförmigen Menüs und ohne farbige Kartenumrandungen
-- normale dauerhafte Hintergrund-Benachrichtigung mit Glukose, Trend, Alter
-  und Minigraph sowie optionaler Android-16-/One-UI-Live-Status
-- 27 frei auswählbare Complication-Provider
-- 28 veröffentlichbare, codefreie WFF-v1-Watchface-Pakete plus technisches Testface
-- fünf originale Sugarlicious-Watchfaces: Digital sowie vier analoge Varianten
-  Analog, Orbit, Rings und Graph mit eigenständig gezeichneten Baton-Zeigern
-- sichere CWF-Analyse, degradationsbewusster WFF-Generator und PNG-Vergleichswerkzeug
-- CI, gepinnter offizieller WFF-Validator, No-DEX-Prüfung und DIY-Release-Skript
+- Mobile Bridge für lokale AndroidAPS-Statusdaten,
+- Wear-App mit Data-Layer-Persistenz und Source Resolver,
+- Complication-Provider und Watchfaces,
+- AndroidAPS-nahe Graph-/Statusdarstellung,
+- direkter Dexcom-G7-Watch-Collector als getrennt auslagerbarer Bestandteil,
+- Diagnose-, Qualitäts-, Deduplizierungs- und Recovery-Logik,
+- CI für Tests, APK-Builds und Watch-Face-Validierung.
 
-Der Datenfluss lautet:
+## Entwicklungsstatus
 
-`AndroidAPS External Companion Apps / xDrip+ → Mobile Bridge → DataClient → Watch DataStore → Complications → WFF`
+Mobile, Wear, Resolver, Complications und Watchfaces werden gemeinsam weiterentwickelt. Der direkte G7-Watch-Collector ist weiterhin **hardware-gated**: Pairing, KEKS-Authentifizierung, Bonding und der Empfang eines echten G7-Werts wurden auf realer Wear-OS-Hardware nachgewiesen; der robuste automatische Reconnect über mehrere 5-Minuten-Zyklen wird vor dem Merge des Collector-Branches weiter validiert.
 
-Der aktuelle AndroidAPS-Kontrollstand ist `dev` bei
-`7fc8205e9a73259cec2982fc199f3d2055f84347`. Die reproduzierbare 0.3.0-
-Release-Baseline bleibt `18101c8a2c0204a08d417f3d5fbac3e9ceae380f`.
-Details und der geprüfte Delta-Einfluss stehen in `docs/SOURCE_BASELINE.md`.
+Der Collector darf erst als stabil gelten, wenn mehrere aufeinanderfolgende echte Sensorwerte ohne manuellen Eingriff empfangen werden und die parallele Dexcom-App auf dem Smartphone unbeeinträchtigt weiterarbeitet.
 
-Die Smartphone- und Wear-App tragen das FreDiabetics-Logo und dieselbe neutrale
-Graustufen-Tile-Palette. Das Icon-Grün kennzeichnet Systemaktionen und aktive
-Auswahlen; Datenserien behalten ihre semantischen Graphfarben. Die Dashboard-
-Optik folgt der für das Projekt gelieferten Bildvorlage. Wo die
-Vorlage technische Graphdetails offenlässt, werden die Darstellungsprinzipien
-des lokal geprüften Nightscout Data Toolkits verwendet. GlucoDataHandler ist
-ausschließlich eine Referenz für Provider-/Hintergrundlogik und keine
-Designquelle.
+## Bauen und installieren
 
-## In Android Studio öffnen
+Voraussetzungen:
 
-In Android Studio **File → New → Project from Version Control** wählen und
-folgende Repository-Adresse verwenden:
+- Android Studio mit Android SDK 36,
+- JDK 21,
+- ADB für lokale Geräteinstallation.
 
-```text
-https://github.com/FreDiabetics/aaps_wearable-suite.git
-```
-
-Als Zielordner einen neuen, leeren Ordner auswählen und anschließend die
-Gradle-Synchronisierung abwarten. Alternativ kann das Projekt zuerst geklont
-werden:
-
-```powershell
-git clone https://github.com/FreDiabetics/aaps_wearable-suite.git
-```
-
-## Bauen
-
-Voraussetzungen sind JDK 21 und Android SDK 36.
+Gesamtprüfung:
 
 ```powershell
 .\gradlew.bat test assembleDebug
-pwsh -File tools\wff-validator\validate.ps1
-pwsh -File tools\verify-codefree-watchfaces.ps1
-pwsh -File tools\build-release.ps1
 ```
 
-Das letzte Kommando erzeugt ein prüfbares DIY-Vorschaupaket unter `dist/` mit
-SHA-256-Liste. Mobile-/Wear-APK und WFF-Pakete sind dort nur entwicklersigniert;
-vor einer öffentlichen Store-/Release-Veröffentlichung ist ein eigener
-signierter Release-Build erforderlich.
+Zusätzliche Watch-Face-Prüfungen:
 
-Installation und Nutzung: `docs/INSTALLATION.md`. Verifizierte Tests und offen
-gebliebene Hardwarepunkte: `docs/TEST_REPORT.md` und
-`docs/KNOWN_LIMITATIONS.md`.
+```powershell
+pwsh -File tools\wff-validator\validate.ps1
+pwsh -File tools\verify-codefree-watchfaces.ps1
+```
 
-PinkFloydTheWall ist wegen ungeklärter Rechte an Drittmotiven bewusst nicht
-enthalten. Nichtkommerzielle Nutzung ersetzt keine erforderliche Erlaubnis.
+Installation und projektspezifische Hinweise: `docs/INSTALLATION.md`.
 
-Kontakt: `typ1.diafreddy@gmail.com` ·
-[GitHub](https://github.com/FreDiabetics/aaps_wearable-suite)
+Repository klonen:
+
+```powershell
+git clone https://github.com/FreDiabetics/sugarlicious.git
+```
+
+## Repository-Sicherheit und Backup
+
+`main` soll ausschließlich über Pull Requests mit erfolgreichem CI-Check `verify` geändert werden. Force-Push und Branch-Löschung sollen für `main` gesperrt sein. CODEOWNERS und zusätzliche Recovery-Regeln liegen im Repository.
+
+Ein Backup im selben Repository schützt nicht vor Repository-Löschung. Deshalb ist ein externer vollständiger Git-Mirror vorgesehen. Details: `docs/REPOSITORY_SECURITY.md` und `SECURITY.md`.
+
+Secrets, produktive Tokens, Keystores und private Schlüssel gehören nicht in Git.
+
+## Lizenz und Urheberhinweise
+
+Der Quellcode steht unter der **GNU Affero General Public License v3 (AGPL-3.0)**, soweit in `LICENSES/` für einzelne Bestandteile nichts Abweichendes dokumentiert ist. Drittquellen und Asset-Hinweise sind in `NOTICE.md` und `LICENSES/` aufgeführt.
+
+Die AGPL erlaubt Weitergabe und Veröffentlichung ausdrücklich unter ihren Bedingungen. Eine pauschale Untersagung von Kopien wäre damit unvereinbar. **Nicht zulässig ist eine Weiterveröffentlichung, die die tatsächlich anwendbaren Lizenzpflichten, Copyright-/Lizenzhinweise oder erforderliche Bereitstellung des korrespondierenden Quellcodes missachtet.** Für Logos, Marken oder separat gekennzeichnete Assets können zusätzliche Rechtehinweise gelten.
+
+Kontakt: `typ1.diafreddy@gmail.com`  
+GitHub: `FreDiabetics/sugarlicious`

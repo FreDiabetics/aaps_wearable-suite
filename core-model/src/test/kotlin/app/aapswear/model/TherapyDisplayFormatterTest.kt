@@ -2,6 +2,8 @@ package app.aapswear.model
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 
 class TherapyDisplayFormatterTest {
     @Test
@@ -23,6 +25,7 @@ class TherapyDisplayFormatterTest {
         assertEquals("—", TherapyDisplayFormatter.units(null, "U", 2))
         assertEquals("—", TherapyDisplayFormatter.percent(null))
         assertEquals("0m", TherapyDisplayFormatter.ageMinutes(2_000L, 1_000L))
+        assertEquals(0L, TherapyDisplayFormatter.ageMinutesValue(2_000L, 1_000L))
         assertEquals("—", TherapyDisplayFormatter.target(null, GlucoseUnit.MG_DL))
     }
 
@@ -33,6 +36,26 @@ class TherapyDisplayFormatterTest {
         assertEquals("4.0–10.0", TherapyDisplayFormatter.target(target, GlucoseUnit.MMOL_L))
     }
 
+    @Test
+    fun `shares canonical freshness and displayability decisions`() {
+        val now = 20L * 60_000L
+        assertEquals(Freshness.CURRENT, TherapyDisplayFormatter.freshness(stateAt(now - 5 * 60_000L), now))
+        assertEquals(Freshness.DELAYED, TherapyDisplayFormatter.freshness(stateAt(now - 8 * 60_000L), now))
+        assertEquals(Freshness.STALE, TherapyDisplayFormatter.freshness(stateAt(now - 13 * 60_000L), now))
+        assertEquals(Freshness.NO_DATA, TherapyDisplayFormatter.freshness(null, now))
+        assertTrue(TherapyDisplayFormatter.isGlucoseDisplayable(stateAt(now - 8 * 60_000L), now))
+        assertFalse(TherapyDisplayFormatter.isGlucoseDisplayable(stateAt(now - 13 * 60_000L), now))
+    }
+
+    @Test
+    fun `uses stable source labels across display surfaces`() {
+        assertEquals("Watch Direct", TherapyDisplayFormatter.sourceName(DataSourceId.DEXCOM_G7_WATCH))
+        assertEquals("AndroidAPS", TherapyDisplayFormatter.sourceName(DataSourceId.ANDROID_APS))
+        assertEquals("Nightscout", TherapyDisplayFormatter.sourceName(DataSourceId.NIGHTSCOUT))
+        assertEquals("xDrip+", TherapyDisplayFormatter.sourceName(DataSourceId.XDRIP_PLUS))
+        assertEquals("", TherapyDisplayFormatter.sourceName(null))
+    }
+
     private fun glucose(valueMgDl: Double, unit: GlucoseUnit) = GlucoseState(
         valueMgDl = valueMgDl,
         displayUnit = unit,
@@ -41,5 +64,15 @@ class TherapyDisplayFormatterTest {
         deltaMgDl = null,
         averageDeltaMgDl = null,
     )
-}
 
+    private fun stateAt(timestamp: Long) = TherapyDisplayState(
+        source = DataSourceId.ANDROID_APS,
+        receivedAtEpochMs = timestamp,
+        glucose = GlucoseState(
+            valueMgDl = 123.0,
+            displayUnit = GlucoseUnit.MG_DL,
+            trend = Trend.FLAT,
+            measuredAtEpochMs = timestamp,
+        ),
+    )
+}
