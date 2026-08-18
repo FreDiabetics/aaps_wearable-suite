@@ -36,19 +36,31 @@ $body = @{
     allow_fork_syncing = $true
 } | ConvertTo-Json -Depth 8
 
+# Fail locally before calling GitHub if request serialization ever becomes invalid.
+$null = $body | ConvertFrom-Json
+
 $temp = [System.IO.Path]::GetTempFileName()
 try {
-    Set-Content -Path $temp -Value $body -Encoding UTF8
+    # Windows PowerShell 5.1 writes a BOM for Set-Content -Encoding UTF8.
+    # GitHub's JSON parser rejects that BOM when gh api --input sends the file verbatim.
+    # Write explicit UTF-8 without BOM so this helper behaves identically in Windows
+    # PowerShell 5.1 and modern PowerShell.
+    $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+    [System.IO.File]::WriteAllText($temp, $body, $utf8NoBom)
 
     Write-Host "`nAktiviere Branch-Schutz für $Repository/$Branch ..."
-    gh api --method PUT `
+
+    $apiOutput = gh api --method PUT `
         -H "Accept: application/vnd.github+json" `
         -H "X-GitHub-Api-Version: 2026-03-10" `
         "repos/$Repository/branches/$Branch/protection" `
-        --input $temp | Out-Null
+        --input $temp 2>&1
 
-    if ($LASTEXITCODE -ne 0) {
-        throw "Branch-Schutz konnte nicht aktiviert werden. Der GitHub-Account benötigt Administration(write) für das Repository."
+    $apiExit = $LASTEXITCODE
+
+    if ($apiExit -ne 0) {
+        $details = ($apiOutput -join [Environment]::NewLine).Trim()
+        throw "Branch-Schutz konnte nicht aktiviert werden. GitHub API: $details"
     }
 
     $protection = gh api `
@@ -58,6 +70,7 @@ try {
 
     $contexts = @($protection.required_status_checks.contexts)
     if (-not $protection.enforce_admins.enabled) { throw "Verifikation fehlgeschlagen: Admin-Schutz ist nicht aktiv." }
+    if (-not $protection.required_status_checks.strict) { throw "Verifikation fehlgeschlagen: Required status checks sind nicht strict." }
     if ($contexts -notcontains "verify") { throw "Verifikation fehlgeschlagen: Status-Check 'verify' ist nicht verpflichtend." }
     if ($protection.allow_force_pushes.enabled) { throw "Verifikation fehlgeschlagen: Force-Push ist weiterhin erlaubt." }
     if ($protection.allow_deletions.enabled) { throw "Verifikation fehlgeschlagen: Branch-Löschung ist weiterhin erlaubt." }
