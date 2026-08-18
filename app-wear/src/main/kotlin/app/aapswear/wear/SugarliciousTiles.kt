@@ -15,9 +15,8 @@ import androidx.wear.tiles.RequestBuilders.ResourcesRequest
 import androidx.wear.tiles.TileBuilders.Tile
 import androidx.wear.tiles.TileService
 import app.aapswear.complications.G7LocalReadingResolver
-import app.aapswear.model.DataSourceId
 import app.aapswear.model.Freshness
-import app.aapswear.model.FreshnessPolicy
+import app.aapswear.model.TherapyDisplayFormatter
 import app.aapswear.model.TherapyDisplayState
 import app.aapswear.model.Trend
 import app.aapswear.storage.TherapyStateStore
@@ -70,8 +69,9 @@ class GlucoseTileService : SugarliciousTileService() {
     override fun title() = "SUGARLICIOUS"
 
     override fun primary(state: TherapyDisplayState?): String {
+        val now = System.currentTimeMillis()
         val glucose = state?.glucose
-        return if (tileFreshness(state).isDisplayable) {
+        return if (TherapyDisplayFormatter.isGlucoseDisplayable(state, now)) {
             glucose?.valueMgDl?.let { String.format(Locale.US, "%.0f", it) } ?: "–"
         } else {
             "–"
@@ -79,9 +79,10 @@ class GlucoseTileService : SugarliciousTileService() {
     }
 
     override fun secondary(state: TherapyDisplayState?): String {
-        val freshness = tileFreshness(state)
+        val now = System.currentTimeMillis()
+        val freshness = TherapyDisplayFormatter.freshness(state, now)
         val glucose = state?.glucose
-        if (!freshness.isDisplayable || glucose == null) {
+        if (!TherapyDisplayFormatter.isGlucoseDisplayable(state, now) || glucose == null) {
             return freshness.statusLabel
         }
 
@@ -101,9 +102,10 @@ class GlucoseTileService : SugarliciousTileService() {
     }
 
     override fun footer(state: TherapyDisplayState?): String {
-        val freshness = tileFreshness(state)
-        val source = tileSourceLabel(state?.source)
-        val age = tileAgeLabel(state)
+        val now = System.currentTimeMillis()
+        val freshness = TherapyDisplayFormatter.freshness(state, now)
+        val source = TherapyDisplayFormatter.sourceName(state?.source)
+        val age = TherapyDisplayFormatter.ageMinutesValue(state?.glucose?.measuredAtEpochMs, now)?.let { "vor $it min" }.orEmpty()
         return when (freshness) {
             Freshness.CURRENT -> listOf(source, age).filter(String::isNotBlank).joinToString(" · ")
             Freshness.DELAYED -> listOf(source, age, "verzögert").filter(String::isNotBlank).joinToString(" · ")
@@ -116,16 +118,19 @@ class GlucoseTileService : SugarliciousTileService() {
 class TherapyTileService : SugarliciousTileService() {
     override fun title() = "THERAPIEÜBERSICHT"
 
-    override fun primary(state: TherapyDisplayState?): String =
-        if (tileFreshness(state).isDisplayable) {
+    override fun primary(state: TherapyDisplayState?): String {
+        val now = System.currentTimeMillis()
+        return if (TherapyDisplayFormatter.isGlucoseDisplayable(state, now)) {
             state?.insulin?.totalIob?.let { String.format(Locale.US, "%.1f U", it) } ?: "– U"
         } else {
             "– U"
         }
+    }
 
     override fun secondary(state: TherapyDisplayState?): String {
-        val freshness = tileFreshness(state)
-        if (!freshness.isDisplayable) return freshness.statusLabel
+        val now = System.currentTimeMillis()
+        val freshness = TherapyDisplayFormatter.freshness(state, now)
+        if (!TherapyDisplayFormatter.isGlucoseDisplayable(state, now)) return freshness.statusLabel
 
         val cob = state?.carbs?.cobGrams?.let { String.format(Locale.US, "COB %.0f g", it) } ?: "COB –"
         val basal = state?.basal?.currentUnitsPerHour?.let { String.format(Locale.US, "Basal %.2f U/h", it) } ?: "Basal –"
@@ -133,17 +138,16 @@ class TherapyTileService : SugarliciousTileService() {
     }
 
     override fun footer(state: TherapyDisplayState?): String {
-        val freshness = tileFreshness(state)
-        if (!freshness.isDisplayable) {
-            return listOf(tileSourceLabel(state?.source), freshness.statusLabel.lowercase()).filter(String::isNotBlank).joinToString(" · ")
+        val now = System.currentTimeMillis()
+        val freshness = TherapyDisplayFormatter.freshness(state, now)
+        val source = TherapyDisplayFormatter.sourceName(state?.source)
+        if (!TherapyDisplayFormatter.isGlucoseDisplayable(state, now)) {
+            return listOf(source, freshness.statusLabel.lowercase()).filter(String::isNotBlank).joinToString(" · ")
         }
         val loop = state?.loop?.status?.takeIf(String::isNotBlank) ?: "Nur Anzeige"
-        return listOf(tileSourceLabel(state?.source), loop).filter(String::isNotBlank).joinToString(" · ")
+        return listOf(source, loop).filter(String::isNotBlank).joinToString(" · ")
     }
 }
-
-private val Freshness.isDisplayable: Boolean
-    get() = this == Freshness.CURRENT || this == Freshness.DELAYED
 
 private val Freshness.statusLabel: String
     get() = when (this) {
@@ -152,24 +156,6 @@ private val Freshness.statusLabel: String
         Freshness.STALE -> "VERALTET · KEINE AKTUELLEN DATEN"
         Freshness.NO_DATA -> "KEINE DATEN"
     }
-
-private fun tileFreshness(state: TherapyDisplayState?): Freshness =
-    FreshnessPolicy.classify(state?.glucose?.measuredAtEpochMs, System.currentTimeMillis())
-
-private fun tileAgeLabel(state: TherapyDisplayState?): String =
-    state?.glucose?.measuredAtEpochMs?.let { measured ->
-        val minutes = ((System.currentTimeMillis() - measured).coerceAtLeast(0L) / 60_000L)
-        "vor $minutes min"
-    }.orEmpty()
-
-private fun tileSourceLabel(source: DataSourceId?): String = when (source) {
-    DataSourceId.DEXCOM_G7_WATCH -> "Watch Direct"
-    DataSourceId.ANDROID_APS -> "AndroidAPS"
-    DataSourceId.NIGHTSCOUT -> "Nightscout"
-    DataSourceId.XDRIP_PLUS -> "xDrip+"
-    DataSourceId.OTHER -> "Andere Quelle"
-    null -> ""
-}
 
 internal fun requestSugarliciousTileUpdates(context: android.content.Context) {
     val updater = TileService.getUpdater(context)
