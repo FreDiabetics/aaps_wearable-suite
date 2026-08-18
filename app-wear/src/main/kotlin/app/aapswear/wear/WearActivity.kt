@@ -5,14 +5,15 @@ import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
 import android.content.res.ColorStateList
+import android.graphics.Color
 import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
 import android.view.View
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
-import app.aapswear.complications.R as ComplicationR
 import app.aapswear.complications.G7LocalReadingResolver
+import app.aapswear.complications.R as ComplicationR
 import app.aapswear.model.BasalState
 import app.aapswear.model.DataSourceId
 import app.aapswear.model.Freshness
@@ -35,10 +36,7 @@ import java.util.Locale
 import kotlin.math.roundToInt
 
 class WearActivity : Activity() {
-    private val scope =
-        CoroutineScope(
-            SupervisorJob() + Dispatchers.Main,
-        )
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
 
     private var refreshJob: Job? = null
     private var latest: TherapyDisplayState? = null
@@ -54,6 +52,7 @@ class WearActivity : Activity() {
     private lateinit var trendArrow2: ImageView
     private lateinit var delta: TextView
     private lateinit var age: TextView
+    private lateinit var glucoseStatus: TextView
     private lateinit var source: TextView
     private lateinit var connection: TextView
     private lateinit var syncHint: TextView
@@ -77,25 +76,16 @@ class WearActivity : Activity() {
         setContentView(R.layout.activity_wear)
         bindViews()
 
-        findViewById<View>(R.id.wear_connection_card)
-            .setOnClickListener { requestPhoneRefresh() }
-        findViewById<View>(R.id.wear_settings_action)
-            .setOnClickListener {
-                startActivity(
-                    Intent(
-                        this,
-                        WearSettingsActivity::class.java,
-                    ),
-                )
-            }
+        findViewById<View>(R.id.wear_connection_card).setOnClickListener { requestPhoneRefresh() }
+        findViewById<View>(R.id.wear_settings_action).setOnClickListener {
+            startActivity(Intent(this, WearSettingsActivity::class.java))
+        }
 
         scope.launch {
-            TherapyStateStore(this@WearActivity)
-                .state
-                .collectLatest {
-                    latest = it
-                    render()
-                }
+            TherapyStateStore(this@WearActivity).state.collectLatest {
+                latest = it
+                render()
+            }
         }
 
         requestWatchFacePermissionOnFirstLaunch()
@@ -105,34 +95,22 @@ class WearActivity : Activity() {
 
     override fun onStart() {
         super.onStart()
+        getSharedPreferences(WearDisplayPreferences.PREFS, Context.MODE_PRIVATE)
+            .registerOnSharedPreferenceChangeListener(displayPreferencesListener)
 
-        getSharedPreferences(
-            WearDisplayPreferences.PREFS,
-            Context.MODE_PRIVATE,
-        ).registerOnSharedPreferenceChangeListener(
-            displayPreferencesListener,
-        )
-
-        refreshJob =
-            scope.launch {
-                while (true) {
-                    render(refreshClock = true)
-                    delay(30_000L)
-                }
+        refreshJob = scope.launch {
+            while (true) {
+                render(refreshClock = true)
+                delay(30_000L)
             }
+        }
     }
 
     override fun onStop() {
         refreshJob?.cancel()
         refreshJob = null
-
-        getSharedPreferences(
-            WearDisplayPreferences.PREFS,
-            Context.MODE_PRIVATE,
-        ).unregisterOnSharedPreferenceChangeListener(
-            displayPreferencesListener,
-        )
-
+        getSharedPreferences(WearDisplayPreferences.PREFS, Context.MODE_PRIVATE)
+            .unregisterOnSharedPreferenceChangeListener(displayPreferencesListener)
         super.onStop()
     }
 
@@ -148,6 +126,7 @@ class WearActivity : Activity() {
         trendArrow2 = findViewById(R.id.wear_trend_arrow_2)
         delta = findViewById(R.id.wear_delta)
         age = findViewById(R.id.wear_age)
+        glucoseStatus = findViewById(R.id.wear_glucose_status)
         source = findViewById(R.id.wear_source)
         connection = findViewById(R.id.wear_connection)
         syncHint = findViewById(R.id.wear_sync_hint)
@@ -164,28 +143,17 @@ class WearActivity : Activity() {
 
     private fun requestPhoneRefresh(initial: Boolean = false) {
         if (!::connection.isInitialized) return
-
-        if (!initial) {
-            syncHint.text = "Werte werden synchronisiert"
-        }
+        if (!initial) syncHint.text = "Werte werden synchronisiert"
 
         scope.launch {
-            connectedNodes =
-                withContext(Dispatchers.IO) {
-                    runCatching {
-                        requestLatestState(
-                            applicationContext,
-                        )
-                    }.getOrDefault(0)
-                }
-
-            syncHint.text =
-                if (connectedNodes > 0) {
-                    "Tippen zum Aktualisieren"
-                } else {
-                    "Telefon derzeit nicht erreichbar"
-                }
-
+            connectedNodes = withContext(Dispatchers.IO) {
+                runCatching { requestLatestState(applicationContext) }.getOrDefault(0)
+            }
+            syncHint.text = if (connectedNodes > 0) {
+                "Tippen zum Aktualisieren"
+            } else {
+                "Telefon derzeit nicht erreichbar"
+            }
             render()
         }
     }
@@ -205,72 +173,55 @@ class WearActivity : Activity() {
             applyUiColors(preferences)
         }
 
-        val freshness =
-            FreshnessPolicy.classify(
-                glucoseState?.measuredAtEpochMs
-                    ?: state?.receivedAtEpochMs,
-                now,
-            )
-
-        val canShowValue =
-            glucoseState != null &&
-                freshness in
-                setOf(
-                    Freshness.CURRENT,
-                    Freshness.DELAYED,
-                )
-
+        val freshness = FreshnessPolicy.classify(
+            glucoseState?.measuredAtEpochMs ?: state?.receivedAtEpochMs,
+            now,
+        )
+        val canShowValue = glucoseState != null && freshness in setOf(Freshness.CURRENT, Freshness.DELAYED)
         val targetLow = state?.target?.lowMgDl ?: 80.0
         val targetHigh = state?.target?.highMgDl ?: 160.0
-        val resolvedUnit =
-            resolveUnit(
-                glucoseState?.displayUnit,
-                preferences.glucoseUnit,
-            )
+        val resolvedUnit = resolveUnit(glucoseState?.displayUnit, preferences.glucoseUnit)
 
         val glucoseSectionChanged =
-            firstRender ||
-                refreshClock ||
-                previousState?.glucose != glucoseState ||
+            firstRender || refreshClock || previousState?.glucose != glucoseState ||
                 previousState?.target != state?.target ||
                 previousPreferences?.glucoseUnit != preferences.glucoseUnit ||
-                previousPreferences.uiColors != preferences.uiColors
+                previousPreferences?.uiColors != preferences.uiColors
 
         if (glucoseSectionChanged) {
-            glucose.text =
-                if (canShowValue) {
-                    formatGlucose(
-                        glucoseState.valueMgDl,
-                        resolvedUnit,
-                    )
-                } else {
-                    "—"
-                }
+            glucose.text = if (canShowValue) formatGlucose(glucoseState.valueMgDl, resolvedUnit) else "—"
 
-            glucose.setTextColor(
-                when {
-                    !canShowValue -> preferences.uiColors.textPrimary
-                    glucoseState.valueMgDl < targetLow -> preferences.uiColors.glucoseLow
-                    glucoseState.valueMgDl > targetHigh -> preferences.uiColors.glucoseHigh
-                    else -> preferences.uiColors.glucoseInRange
-                },
-            )
-
-            renderTrend(
-                if (canShowValue) glucoseState.trend else null,
-                preferences.uiColors.textPrimary,
-            )
-
-            delta.text =
-                if (canShowValue) {
-                    formatDelta(
-                        glucoseState.deltaMgDl,
-                        resolvedUnit,
-                    )
-                } else {
-                    "—"
-                }
+            val rangeColor = when {
+                !canShowValue -> preferences.uiColors.tileBorder
+                glucoseState.valueMgDl < targetLow -> preferences.uiColors.glucoseLow
+                glucoseState.valueMgDl > targetHigh -> preferences.uiColors.glucoseHigh
+                else -> IN_RANGE_SURFACE_ACCENT
+            }
+            val valueColor = when {
+                !canShowValue -> preferences.uiColors.textPrimary
+                glucoseState.valueMgDl < targetLow -> preferences.uiColors.glucoseLow
+                glucoseState.valueMgDl > targetHigh -> preferences.uiColors.glucoseHigh
+                else -> preferences.uiColors.glucoseInRange
+            }
+            glucose.setTextColor(valueColor)
+            renderTrend(if (canShowValue) glucoseState.trend else null, preferences.uiColors.textPrimary)
+            delta.text = if (canShowValue) formatDelta(glucoseState.deltaMgDl, resolvedUnit) else "—"
             age.text = ageMinutes(glucoseState?.measuredAtEpochMs, now)
+            glucoseStatus.text = freshnessLabel(freshness)
+            glucoseStatus.setTextColor(freshnessColor(freshness, preferences))
+
+            val glucoseFill = if (canShowValue) {
+                blendArgb(preferences.uiColors.tileBackground, rangeColor, 0.24f)
+            } else {
+                preferences.uiColors.tileBackground
+            }
+            val glucoseBorder = when (freshness) {
+                Freshness.CURRENT -> rangeColor
+                Freshness.DELAYED -> DELAYED_ACCENT
+                Freshness.STALE, Freshness.NO_DATA -> preferences.uiColors.glucoseLow
+            }
+            findViewById<View>(R.id.wear_glucose_card).background =
+                roundedBackground(glucoseFill, glucoseBorder, 26f)
         }
 
         chart.bind(
@@ -283,64 +234,42 @@ class WearActivity : Activity() {
         if (refreshClock) chart.invalidate()
 
         if (
-            firstRender ||
+            firstRender || refreshClock ||
             previousPreferences?.showTherapyStats != preferences.showTherapyStats ||
             previousState?.insulin != state?.insulin ||
             previousState?.carbs != state?.carbs ||
             previousState?.basal != state?.basal
         ) {
-            therapyRow.visibility =
-                if (preferences.showTherapyStats) View.VISIBLE else View.GONE
+            therapyRow.visibility = if (preferences.showTherapyStats) View.VISIBLE else View.GONE
             findViewById<View>(R.id.wear_basal_card).visibility =
                 if (preferences.showTherapyStats) View.VISIBLE else View.GONE
 
-            iob.text = formatNumber(state?.insulin?.totalIob, 2, " U")
-            cob.text = formatNumber(state?.carbs?.cobGrams, 0, " g")
-            basal.text =
-                formatNumber(
-                    basalDisplayUnitsPerHour(state?.basal),
-                    2,
-                    " U/h",
-                )
+            iob.text = if (canShowValue) formatNumber(state?.insulin?.totalIob, 2, " U") else "—"
+            cob.text = if (canShowValue) formatNumber(state?.carbs?.cobGrams, 0, " g") else "—"
+            basal.text = if (canShowValue) {
+                formatNumber(basalDisplayUnitsPerHour(state?.basal), 2, " U/h")
+            } else "—"
             basalIcon.setImageResource(basalIconResource(state?.basal))
         }
 
-        if (
-            firstRender ||
-            previousState?.source != state?.source ||
-            previousState?.sourceVersion != state?.sourceVersion
-        ) {
-            source.text =
-                when (state?.source) {
-                    DataSourceId.DEXCOM_G7_WATCH -> "Dexcom G7 Watch"
-                    DataSourceId.ANDROID_APS -> "AndroidAPS"
-                    DataSourceId.NIGHTSCOUT -> "Nightscout"
-                    DataSourceId.XDRIP_PLUS ->
-                        state.sourceVersion
-                            ?.let { "xDrip+ $it" }
-                            ?: "xDrip+"
-                    DataSourceId.OTHER -> "Other"
-                    null -> "Datenquelle nicht verfügbar"
-                }
+        if (firstRender || previousState?.source != state?.source || previousState?.sourceVersion != state?.sourceVersion) {
+            source.text = when (state?.source) {
+                DataSourceId.DEXCOM_G7_WATCH -> "Dexcom G7 Watch"
+                DataSourceId.ANDROID_APS -> "AndroidAPS"
+                DataSourceId.NIGHTSCOUT -> "Nightscout"
+                DataSourceId.XDRIP_PLUS -> state.sourceVersion?.let { "xDrip+ $it" } ?: "xDrip+"
+                DataSourceId.OTHER -> "Other"
+                null -> "Datenquelle nicht verfügbar"
+            }
         }
 
         if (
-            firstRender ||
-            lastRenderedConnectedNodes != connectedNodes ||
+            firstRender || lastRenderedConnectedNodes != connectedNodes ||
             previousPreferences?.uiColors != preferences.uiColors
         ) {
-            connection.text =
-                if (connectedNodes > 0) {
-                    "● Telefon verbunden"
-                } else {
-                    "○ Telefon nicht erreichbar"
-                }
+            connection.text = if (connectedNodes > 0) "● Telefon verbunden" else "○ Telefon nicht erreichbar"
             connection.setTextColor(
-                if (connectedNodes > 0) {
-                    preferences.uiColors.accent
-                } else {
-                    preferences.uiColors.textSecondary
-                },
+                if (connectedNodes > 0) preferences.uiColors.accent else preferences.uiColors.textSecondary,
             )
         }
 
@@ -351,16 +280,12 @@ class WearActivity : Activity() {
         hasRendered = true
     }
 
-    private fun renderTrend(
-        trend: app.aapswear.model.Trend?,
-        color: Int,
-    ) {
+    private fun renderTrend(trend: app.aapswear.model.Trend?, color: Int) {
         val spec = trend?.let(TrendVisuals::spec)
         if (spec == null) {
             trendContainer.visibility = View.GONE
             return
         }
-
         trendContainer.visibility = View.VISIBLE
         val tint = ColorStateList.valueOf(color)
         trendArrow1.imageTintList = tint
@@ -368,30 +293,19 @@ class WearActivity : Activity() {
         trendArrow1.rotation = spec.rotationDegrees
         trendArrow2.rotation = spec.rotationDegrees
         trendArrow1.visibility = View.VISIBLE
-        trendArrow2.visibility =
-            if (spec.arrowCount == 2) View.VISIBLE else View.GONE
+        trendArrow2.visibility = if (spec.arrowCount == 2) View.VISIBLE else View.GONE
     }
 
     private fun applyUiColors(preferences: WearDisplayPreferences) {
         val ui = preferences.uiColors
         findViewById<View>(R.id.wear_root).setBackgroundColor(ui.background)
 
-        listOf(
-            R.id.wear_glucose_card,
-            R.id.wear_basal_card,
-            R.id.wear_iob_card,
-            R.id.wear_cob_card,
-            R.id.wear_connection_card,
-            R.id.wear_settings_action,
-        ).forEach { id ->
-            findViewById<View>(id).background =
-                roundedBackground(
-                    ui.tileBackground,
-                    ui.tileBorder,
-                )
+        listOf(R.id.wear_basal_card, R.id.wear_iob_card, R.id.wear_cob_card).forEach { id ->
+            findViewById<View>(id).background = roundedBackground(ui.tileBackground, ui.tileBorder, 20f)
         }
-
-        // The chart paints its own background, target range, grid and outer contour.
+        listOf(R.id.wear_connection_card, R.id.wear_settings_action).forEach { id ->
+            findViewById<View>(id).background = roundedBackground(ui.tileBackground, ui.tileBorder, 22f)
+        }
         findViewById<View>(R.id.wear_graph_card).background = null
 
         listOf(
@@ -401,81 +315,72 @@ class WearActivity : Activity() {
             R.id.wear_cob,
             R.id.wear_source,
             R.id.wear_settings_label,
-        ).forEach { id ->
-            findViewById<TextView>(id).setTextColor(ui.textPrimary)
-        }
+        ).forEach { id -> findViewById<TextView>(id).setTextColor(ui.textPrimary) }
+
         listOf(
             R.id.wear_delta,
             R.id.wear_age,
             R.id.wear_sync_hint,
             R.id.wear_watchface_push_status,
             R.id.wear_footer_text,
-        ).forEach { id ->
-            findViewById<TextView>(id).setTextColor(ui.textSecondary)
-        }
+        ).forEach { id -> findViewById<TextView>(id).setTextColor(ui.textSecondary) }
 
         iobIcon.imageTintList = ColorStateList.valueOf(ui.iob)
         cobIcon.imageTintList = ColorStateList.valueOf(ui.cob)
         basalIcon.imageTintList = ColorStateList.valueOf(ui.basal)
-
-        val primaryTint = ColorStateList.valueOf(ui.textPrimary)
-        findViewById<ImageView>(R.id.wear_settings_icon).imageTintList = primaryTint
-        findViewById<ImageView>(R.id.wear_footer_icon).imageTintList =
-            ColorStateList.valueOf(ui.accent)
+        findViewById<ImageView>(R.id.wear_settings_icon).imageTintList = ColorStateList.valueOf(ui.textPrimary)
+        findViewById<ImageView>(R.id.wear_footer_icon).imageTintList = ColorStateList.valueOf(ui.accent)
     }
 
-    private fun roundedBackground(
-        fill: Int,
-        border: Int,
-    ): GradientDrawable =
+    private fun freshnessLabel(freshness: Freshness): String = when (freshness) {
+        Freshness.CURRENT -> "AKTUELL"
+        Freshness.DELAYED -> "VERZÖGERT"
+        Freshness.STALE -> "VERALTET · KEINE AKTUELLEN DATEN"
+        Freshness.NO_DATA -> "KEINE DATEN"
+    }
+
+    private fun freshnessColor(freshness: Freshness, preferences: WearDisplayPreferences): Int = when (freshness) {
+        Freshness.CURRENT -> preferences.uiColors.accent
+        Freshness.DELAYED -> DELAYED_ACCENT
+        Freshness.STALE, Freshness.NO_DATA -> preferences.uiColors.glucoseLow
+    }
+
+    private fun blendArgb(base: Int, overlay: Int, fraction: Float): Int {
+        val amount = fraction.coerceIn(0f, 1f)
+        fun channel(a: Int, b: Int) = (a + (b - a) * amount).roundToInt().coerceIn(0, 255)
+        return Color.argb(
+            channel(Color.alpha(base), Color.alpha(overlay)),
+            channel(Color.red(base), Color.red(overlay)),
+            channel(Color.green(base), Color.green(overlay)),
+            channel(Color.blue(base), Color.blue(overlay)),
+        )
+    }
+
+    private fun roundedBackground(fill: Int, border: Int, radiusDp: Float): GradientDrawable =
         GradientDrawable().apply {
             shape = GradientDrawable.RECTANGLE
-            cornerRadius = 18f * resources.displayMetrics.density
+            cornerRadius = radiusDp * resources.displayMetrics.density
             setColor(fill)
-            setStroke(
-                (1f * resources.displayMetrics.density).roundToInt().coerceAtLeast(1),
-                border,
-            )
+            setStroke((1f * resources.displayMetrics.density).roundToInt().coerceAtLeast(1), border)
         }
 
     private fun requestWatchFacePermissionOnFirstLaunch() {
-        val onboarding =
-            getSharedPreferences(
-                ONBOARDING_PREFS,
-                Context.MODE_PRIVATE,
-            )
+        val onboarding = getSharedPreferences(ONBOARDING_PREFS, Context.MODE_PRIVATE)
         if (onboarding.getBoolean(KEY_WFP_PERMISSION_REQUESTED, false)) return
 
-        onboarding
-            .edit()
-            .putBoolean(KEY_WFP_PERMISSION_REQUESTED, true)
-            .apply()
-
-        if (
-            SugarliciousWatchFacePush.isSupported() &&
-            !SugarliciousWatchFacePush.hasActivationPermission(this)
-        ) {
-            requestPermissions(
-                arrayOf(
-                    SugarliciousWatchFacePush.ACTIVE_PERMISSION,
-                ),
-                WATCH_FACE_PERMISSION_REQUEST,
-            )
+        onboarding.edit().putBoolean(KEY_WFP_PERMISSION_REQUESTED, true).apply()
+        if (SugarliciousWatchFacePush.isSupported() && !SugarliciousWatchFacePush.hasActivationPermission(this)) {
+            requestPermissions(arrayOf(SugarliciousWatchFacePush.ACTIVE_PERMISSION), WATCH_FACE_PERMISSION_REQUEST)
         }
     }
 
     private fun renderWatchFacePushStatus() {
         if (!::watchFacePushStatus.isInitialized) return
-
-        watchFacePushStatus.text =
-            when {
-                !SugarliciousWatchFacePush.isSupported() ->
-                    "Watchface-Direktwechsel: Wear OS 6+ erforderlich"
-                SugarliciousWatchFacePush.hasActivationPermission(this) ->
-                    "Watchface-Direktwechsel freigegeben"
-                else ->
-                    "Watchface-Direktwechsel nicht freigegeben"
-            }
+        watchFacePushStatus.text = when {
+            !SugarliciousWatchFacePush.isSupported() -> "Watchface-Direktwechsel: Wear OS 6+ erforderlich"
+            SugarliciousWatchFacePush.hasActivationPermission(this) -> "Watchface-Direktwechsel freigegeben"
+            else -> "Watchface-Direktwechsel nicht freigegeben"
+        }
     }
 
     override fun onRequestPermissionsResult(
@@ -483,91 +388,46 @@ class WearActivity : Activity() {
         permissions: Array<out String>,
         grantResults: IntArray,
     ) {
-        super.onRequestPermissionsResult(
-            requestCode,
-            permissions,
-            grantResults,
-        )
-        if (requestCode == WATCH_FACE_PERMISSION_REQUEST) {
-            renderWatchFacePushStatus()
-        }
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == WATCH_FACE_PERMISSION_REQUEST) renderWatchFacePushStatus()
     }
 
-    private fun resolveUnit(
-        stateUnit: GlucoseUnit?,
-        preference: WatchGlucoseUnit,
-    ): GlucoseUnit =
-        when (preference) {
-            WatchGlucoseUnit.AAPS -> stateUnit ?: GlucoseUnit.MG_DL
-            WatchGlucoseUnit.MG_DL -> GlucoseUnit.MG_DL
-            WatchGlucoseUnit.MMOL_L -> GlucoseUnit.MMOL_L
-        }
+    private fun resolveUnit(stateUnit: GlucoseUnit?, preference: WatchGlucoseUnit): GlucoseUnit = when (preference) {
+        WatchGlucoseUnit.AAPS -> stateUnit ?: GlucoseUnit.MG_DL
+        WatchGlucoseUnit.MG_DL -> GlucoseUnit.MG_DL
+        WatchGlucoseUnit.MMOL_L -> GlucoseUnit.MMOL_L
+    }
 
-    private fun formatGlucose(
-        valueMgDl: Double,
-        unit: GlucoseUnit,
-    ): String =
+    private fun formatGlucose(valueMgDl: Double, unit: GlucoseUnit): String =
         if (unit == GlucoseUnit.MMOL_L) {
-            String.format(
-                Locale.getDefault(),
-                "%.1f",
-                valueMgDl / 18.0,
-            )
-        } else {
-            valueMgDl.roundToInt().toString()
-        }
+            String.format(Locale.getDefault(), "%.1f", valueMgDl / 18.0)
+        } else valueMgDl.roundToInt().toString()
 
-    private fun formatDelta(
-        valueMgDl: Double?,
-        unit: GlucoseUnit,
-    ): String {
+    private fun formatDelta(valueMgDl: Double?, unit: GlucoseUnit): String {
         valueMgDl ?: return "—"
-        val value =
-            if (unit == GlucoseUnit.MMOL_L) valueMgDl / 18.0 else valueMgDl
+        val value = if (unit == GlucoseUnit.MMOL_L) valueMgDl / 18.0 else valueMgDl
         val prefix = if (value >= 0.0) "+" else ""
-        return prefix +
-            if (unit == GlucoseUnit.MMOL_L) {
-                String.format(Locale.getDefault(), "%.1f", value)
-            } else {
-                value.roundToInt().toString()
-            }
+        return prefix + if (unit == GlucoseUnit.MMOL_L) {
+            String.format(Locale.getDefault(), "%.1f", value)
+        } else value.roundToInt().toString()
     }
 
-    private fun ageMinutes(
-        timestamp: Long?,
-        now: Long,
-    ): String =
-        timestamp
-            ?.let {
-                "${((now - it).coerceAtLeast(0L) / 60_000L)} min"
-            }
-            ?: "—"
+    private fun ageMinutes(timestamp: Long?, now: Long): String =
+        timestamp?.let { "${((now - it).coerceAtLeast(0L) / 60_000L)} min" } ?: "—"
 
-    private fun formatNumber(
-        value: Double?,
-        digits: Int,
-        suffix: String,
-    ): String =
-        value
-            ?.let {
-                String.format(
-                    Locale.US,
-                    "%.${digits}f%s",
-                    it,
-                    suffix,
-                )
-            }
-            ?: "—"
+    private fun formatNumber(value: Double?, digits: Int, suffix: String): String =
+        value?.let { String.format(Locale.US, "%.${digits}f%s", it, suffix) } ?: "—"
 
     companion object {
         private const val WATCH_FACE_PERMISSION_REQUEST = 701
         private const val ONBOARDING_PREFS = "wear_onboarding"
         private const val KEY_WFP_PERMISSION_REQUESTED = "watchface_permission_requested"
+        private const val IN_RANGE_SURFACE_ACCENT = 0xFF54DF30.toInt()
+        private const val DELAYED_ACCENT = 0xFFFFD040.toInt()
     }
 }
 
-internal fun basalDisplayUnitsPerHour(basal: BasalState?): Double? =
-    basal?.currentUnitsPerHour
+internal fun basalDisplayUnitsPerHour(basal: BasalState?): Double? = basal?.currentUnitsPerHour
 
 internal fun basalIconResource(basal: BasalState?): Int {
     val absolute = basal?.tempAbsoluteUnitsPerHour
@@ -578,10 +438,8 @@ internal fun basalIconResource(basal: BasalState?): Int {
             ComplicationR.drawable.ic_complication_basal_more
         absolute != null && base != null && absolute < base - BASAL_COMPARE_EPSILON ->
             ComplicationR.drawable.ic_complication_basal_less
-        percent != null && percent > 100 ->
-            ComplicationR.drawable.ic_complication_basal_more
-        percent != null && percent < 100 ->
-            ComplicationR.drawable.ic_complication_basal_less
+        percent != null && percent > 100 -> ComplicationR.drawable.ic_complication_basal_more
+        percent != null && percent < 100 -> ComplicationR.drawable.ic_complication_basal_less
         else -> ComplicationR.drawable.ic_complication_basal
     }
 }
