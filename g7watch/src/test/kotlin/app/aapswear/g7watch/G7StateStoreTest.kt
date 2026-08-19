@@ -15,7 +15,9 @@ class G7StateStoreTest {
     @Test fun `collector state survives process recreation`() {
         val context = ApplicationProvider.getApplicationContext<android.content.Context>()
         G7SensorStateStore(context).save(G7PersistedState(collectorEnabled = true, collectorOwner = CollectorOwner.WATCH))
-        assertEquals(CollectorOwner.WATCH, G7SensorStateStore(context).read().collectorOwner)
+        val restored = G7SensorStateStore(context).read()
+        assertTrue(restored.collectorEnabled)
+        assertEquals(CollectorOwner.WATCH, restored.collectorOwner)
     }
 
     @Test fun `scanner accepts only current G7 advertising families`() {
