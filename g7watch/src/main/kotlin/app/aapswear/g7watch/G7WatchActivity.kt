@@ -12,7 +12,6 @@ import android.graphics.drawable.GradientDrawable
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
-import android.os.PowerManager
 import android.provider.Settings
 import android.text.InputFilter
 import android.text.InputType
@@ -25,6 +24,7 @@ import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
+import android.widget.Toast
 import app.aapswear.g7.G7Sensor
 import app.aapswear.g7.G7SessionManager
 import app.aapswear.g7.G7SetupPayload
@@ -353,8 +353,7 @@ class G7WatchActivity : Activity() {
         if (requestCode == PERMISSION_REQUEST) render()
     }
 
-    private fun isBatteryUnrestricted(): Boolean =
-        getSystemService(PowerManager::class.java).isIgnoringBatteryOptimizations(packageName)
+    private fun isBatteryUnrestricted(): Boolean = G7BackgroundAccess.isBatteryUnrestricted(this)
 
     private fun canScheduleExactReconnects(): Boolean {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return true
@@ -362,13 +361,17 @@ class G7WatchActivity : Activity() {
     }
 
     private fun requestBatteryExemption() {
-        runCatching {
-            startActivity(
-                Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS)
-                    .setData(Uri.parse("package:$packageName")),
-            )
-        }.onFailure {
-            runCatching { startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)) }
+        if (G7BackgroundAccess.isBatteryUnrestricted(this)) {
+            Toast.makeText(this, "Dauerbetrieb ist bereits uneingeschränkt", Toast.LENGTH_SHORT).show()
+            render()
+            return
+        }
+        if (!G7BackgroundAccess.openBatterySettings(this)) {
+            Toast.makeText(
+                this,
+                "Akku-Einstellungen konnten auf dieser Watch nicht geöffnet werden",
+                Toast.LENGTH_LONG,
+            ).show()
         }
     }
 
