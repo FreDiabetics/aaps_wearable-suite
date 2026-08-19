@@ -185,7 +185,8 @@ internal fun OverviewWatchFaceTile(
         runCatching { requestWatchRuntimeStatus(appContext) }
     }
 
-    val effectiveFaceIndex = runtime.activeSugarliciousFaceIndex ?: selectedFaceIndex
+    val savedFaceIndex = SugarliciousWatchFaceSelectionStore.read(appContext, selectedFaceIndex)
+    val effectiveFaceIndex = runtime.activeSugarliciousFaceIndex ?: savedFaceIndex
     val selected = effectiveFaceIndex.coerceIn(0, sugarliciousWatchFaceNames.lastIndex)
     val activeComplicationIds =
         runtime.activeComplicationIds.ifEmpty {
@@ -212,7 +213,10 @@ internal fun OverviewWatchFaceTile(
     LaunchedEffect(pager.settledPage, runtime.activeSugarliciousFaceIndex) {
         if (runtime.activeSugarliciousFaceIndex == null) {
             val index = pager.settledPage % sugarliciousWatchFaceNames.size
-            if (index != selected) onSelectedFace(index)
+            if (index != selected) {
+                SugarliciousWatchFaceSelectionStore.write(appContext, index)
+                if (index != SUGARLICIOUS_G6_STYLE_FACE_INDEX) onSelectedFace(index)
+            }
         }
     }
 
@@ -267,17 +271,18 @@ internal fun OverviewWatchFaceTile(
             ) { page ->
                 val index = page % sugarliciousWatchFaceNames.size
                 Box(
-                    modifier = Modifier
-                        .offset(y = carouselFaceVerticalOffset)
-                        .graphicsLayer {
-                            val rawDistance = abs((pager.currentPage - page) + pager.currentPageOffsetFraction)
-                            val distance = rawDistance.coerceIn(0f, 1f)
-                            val scale = lerp(1f, 0.73f, distance)
-                            scaleX = scale
-                            scaleY = scale
-                            alpha = carouselPageVisibility(rawDistance)
-                        }
-                        .clickable(onClick = onEdit),
+                    modifier =
+                        Modifier
+                            .offset(y = carouselFaceVerticalOffset)
+                            .graphicsLayer {
+                                val rawDistance = abs((pager.currentPage - page) + pager.currentPageOffsetFraction)
+                                val distance = rawDistance.coerceIn(0f, 1f)
+                                val scale = lerp(1f, 0.73f, distance)
+                                scaleX = scale
+                                scaleY = scale
+                                alpha = carouselPageVisibility(rawDistance)
+                            }
+                            .clickable(onClick = onEdit),
                     contentAlignment = Alignment.Center,
                 ) {
                     val pageComplications =
@@ -294,10 +299,11 @@ internal fun OverviewWatchFaceTile(
 
             if (interactive) {
                 Box(
-                    modifier = Modifier
-                        .matchParentSize()
-                        .then(oneStepSwipe)
-                        .clickable(onClick = onEdit),
+                    modifier =
+                        Modifier
+                            .matchParentSize()
+                            .then(oneStepSwipe)
+                            .clickable(onClick = onEdit),
                 )
             }
         }
@@ -336,10 +342,11 @@ internal fun OverviewWatchFaceTile(
             Surface(
                 shape = RoundedCornerShape(999.dp),
                 color = statusColor.copy(alpha = 0.14f),
-                border = androidx.compose.foundation.BorderStroke(
-                    width = 1.dp,
-                    color = statusColor.copy(alpha = 0.72f),
-                ),
+                border =
+                    androidx.compose.foundation.BorderStroke(
+                        width = 1.dp,
+                        color = statusColor.copy(alpha = 0.72f),
+                    ),
             ) {
                 Row(
                     modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
@@ -390,14 +397,15 @@ internal fun FaceDial(
     activeComplicationIds: List<Int> = emptyList(),
     modifier: Modifier = Modifier,
 ) {
-    if (index == SUGARLICIOUS_G6_STYLE_FACE_INDEX) {
-        G6StyleFacePreview(state = state, modifier = modifier)
-    } else {
-        SugarliciousFacePreview(
-            index = index,
-            state = state,
-            complicationIds = activeComplicationIds,
-            modifier = modifier,
-        )
+    when (index) {
+        0 -> SugarliciousAnalogFacePreview(state = state, modifier = modifier)
+        SUGARLICIOUS_G6_STYLE_FACE_INDEX -> G6StyleFacePreview(state = state, modifier = modifier)
+        else ->
+            SugarliciousFacePreview(
+                index = index,
+                state = state,
+                complicationIds = activeComplicationIds,
+                modifier = modifier,
+            )
     }
 }
