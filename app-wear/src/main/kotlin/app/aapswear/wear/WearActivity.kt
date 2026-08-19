@@ -1,21 +1,26 @@
 package app.aapswear.wear
 
+import android.Manifest
 import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
+import android.content.pm.PackageManager
 import android.content.res.ColorStateList
 import android.graphics.Color
 import android.graphics.drawable.GradientDrawable
+import android.os.Build
 import android.os.Bundle
 import android.view.View
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
+import android.widget.Toast
 import app.aapswear.complications.G7LocalReadingResolver
 import app.aapswear.complications.R as ComplicationR
 import app.aapswear.model.BasalState
 import app.aapswear.model.DataSourceId
+import app.aapswear.model.DiagnosticSeverity
 import app.aapswear.model.Freshness
 import app.aapswear.model.FreshnessPolicy
 import app.aapswear.model.GlucoseUnit
@@ -45,6 +50,7 @@ class WearActivity : Activity() {
     private var lastRenderedPreferences: WearDisplayPreferences? = null
     private var lastRenderedConnectedNodes: Int? = null
     private var hasRendered = false
+    private var batteryRequestPending = false
 
     private lateinit var glucose: TextView
     private lateinit var trendContainer: LinearLayout
@@ -73,6 +79,16 @@ class WearActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        runCatching { StateDataLayerService.start(this) }
+            .onFailure { error ->
+                recordRuntimeDiagnostic(
+                    "WATCH-FGS-500",
+                    "Wear runtime foreground service could not be started from the app",
+                    DiagnosticSeverity.ERROR,
+                    error,
+                )
+            }
+
         setContentView(R.layout.activity_wear)
         bindViews()
 
@@ -88,9 +104,42 @@ class WearActivity : Activity() {
             }
         }
 
-        requestWatchFacePermissionOnFirstLaunch()
+        val notificationRequestStarted = requestRuntimeNotificationPermission()
+        if (!notificationRequestStarted) {
+            val batteryRequestStarted = requestBatteryExemptionIfNeeded()
+            if (!batteryRequestStarted) requestWatchFacePermissionOnFirstLaunch()
+        }
         requestPhoneRefresh(initial = true)
         render()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        if (!batteryRequestPending) return
+
+        batteryRequestPending = false
+        val unrestricted = WearBackgroundAccess.isBatteryUnrestricted(this)
+        if (unrestricted) {
+            Toast.makeText(this, "Dauerbetrieb ist uneingeschränkt", Toast.LENGTH_SHORT).show()
+            recordRuntimeDiagnostic(
+                "WATCH-BG-200",
+                "Battery optimization exemption granted for Sugarlicious Wear",
+                DiagnosticSeverity.INFO,
+            )
+        } else {
+            Toast.makeText(
+                this,
+                "Dauerbetrieb nicht freigegeben – Akkuoptimierung ist weiterhin aktiv",
+                Toast.LENGTH_LONG,
+            ).show()
+            recordRuntimeDiagnostic(
+                "WATCH-BG-403",
+                "Battery optimization exemption was not granted for Sugarlicious Wear",
+                DiagnosticSeverity.WARNING,
+            )
+        }
+        runCatching { StateDataLayerService.start(this) }
+        requestWatchFacePermissionOnFirstLaunch()
     }
 
     override fun onStart() {
@@ -364,6 +413,36 @@ class WearActivity : Activity() {
             setStroke((1f * resources.displayMetrics.density).roundToInt().coerceAtLeast(1), border)
         }
 
+    private fun requestRuntimeNotificationPermission(): Boolean {
+        if (Build.VERSION.SDK_INT < 33 ||
+            checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+        ) {
+            return false
+        }
+        requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), NOTIFICATION_PERMISSION_REQUEST)
+        return true
+    }
+
+    private fun requestBatteryExemptionIfNeeded(): Boolean {
+        if (WearBackgroundAccess.isBatteryUnrestricted(this)) return false
+
+        batteryRequestPending = true
+        if (WearBackgroundAccess.openBatterySettings(this)) return true
+
+        batteryRequestPending = false
+        Toast.makeText(
+            this,
+            "Akku-Einstellungen konnten auf dieser Watch nicht geöffnet werden",
+            Toast.LENGTH_LONG,
+        ).show()
+        recordRuntimeDiagnostic(
+            "WATCH-BG-404",
+            "Battery optimization settings could not be opened for Sugarlicious Wear",
+            DiagnosticSeverity.ERROR,
+        )
+        return false
+    }
+
     private fun requestWatchFacePermissionOnFirstLaunch() {
         val onboarding = getSharedPreferences(ONBOARDING_PREFS, Context.MODE_PRIVATE)
         if (onboarding.getBoolean(KEY_WFP_PERMISSION_REQUESTED, false)) return
@@ -383,13 +462,49 @@ class WearActivity : Activity() {
         }
     }
 
+    private fun recordRuntimeDiagnostic(
+        code: String,
+        message: String,
+        severity: DiagnosticSeverity,
+        error: Throwable? = null,
+    ) {
+        scope.launch(Dispatchers.IO) {
+            applicationContext.recordWatchDiagnostic(
+                "RUNTIME",
+                code,
+                message,
+                severity,
+                error?.let { mapOf("error" to it.javaClass.simpleName) }.orEmpty(),
+            )
+        }
+    }
+
     override fun onRequestPermissionsResult(
         requestCode: Int,
         permissions: Array<out String>,
         grantResults: IntArray,
     ) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        if (requestCode == WATCH_FACE_PERMISSION_REQUEST) renderWatchFacePushStatus()
+        when (requestCode) {
+            NOTIFICATION_PERMISSION_REQUEST -> {
+                val granted = grantResults.firstOrNull() == PackageManager.PERMISSION_GRANTED
+                if (!granted) {
+                    Toast.makeText(
+                        this,
+                        "Benachrichtigungen nicht freigegeben – die Dauerbetrieb-Anzeige kann verborgen bleiben",
+                        Toast.LENGTH_LONG,
+                    ).show()
+                    recordRuntimeDiagnostic(
+                        "WATCH-NOTIFY-403",
+                        "Notification permission was not granted for Sugarlicious Wear",
+                        DiagnosticSeverity.WARNING,
+                    )
+                }
+                val batteryRequestStarted = requestBatteryExemptionIfNeeded()
+                if (!batteryRequestStarted) requestWatchFacePermissionOnFirstLaunch()
+            }
+            WATCH_FACE_PERMISSION_REQUEST -> renderWatchFacePushStatus()
+        }
     }
 
     private fun resolveUnit(stateUnit: GlucoseUnit?, preference: WatchGlucoseUnit): GlucoseUnit = when (preference) {
@@ -419,6 +534,7 @@ class WearActivity : Activity() {
         value?.let { String.format(Locale.US, "%.${digits}f%s", it, suffix) } ?: "—"
 
     companion object {
+        private const val NOTIFICATION_PERMISSION_REQUEST = 700
         private const val WATCH_FACE_PERMISSION_REQUEST = 701
         private const val ONBOARDING_PREFS = "wear_onboarding"
         private const val KEY_WFP_PERMISSION_REQUESTED = "watchface_permission_requested"
