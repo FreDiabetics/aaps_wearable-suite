@@ -6,10 +6,7 @@ import android.content.Intent
 
 internal fun shouldRestoreG7Collector(action: String?, collectorEnabled: Boolean): Boolean =
     collectorEnabled &&
-        action in setOf(
-            Intent.ACTION_BOOT_COMPLETED,
-            Intent.ACTION_MY_PACKAGE_REPLACED,
-        )
+        (action == Intent.ACTION_BOOT_COMPLETED || action == Intent.ACTION_MY_PACKAGE_REPLACED)
 
 class G7BootReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
