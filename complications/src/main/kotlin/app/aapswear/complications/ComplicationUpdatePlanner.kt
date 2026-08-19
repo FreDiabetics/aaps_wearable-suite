@@ -12,14 +12,18 @@ object ComplicationUpdatePlanner {
         old: TherapyDisplayState?,
         new: TherapyDisplayState,
     ): List<Class<*>> {
-        if (old == null) return AllProviders.classes.map { it }
+        if (old == null) return (AllProviders.classes + g6StyleProviders).distinct()
         if (old == new) return emptyList()
 
         val affected = linkedSetOf<Class<*>>()
         val glucoseChanged = old.glucose != new.glucose
         val glucoseHistoryChanged = old.glucoseHistory != new.glucoseHistory
 
-        if (glucoseChanged) affected += glucoseProviders
+        if (glucoseChanged) {
+            affected += glucoseProviders
+            affected += g6StyleStatusProviders
+        }
+        if (old.source != new.source) affected += g6StyleStatusProviders
 
         if (
             glucoseChanged ||
@@ -50,6 +54,14 @@ object ComplicationUpdatePlanner {
         return affected.toList()
     }
 
+    private val g6StyleProviders =
+        listOf(
+            G6StyleHeaderComplication::class.java,
+            G6StyleGraphComplication::class.java,
+            G6StyleStatusComplication::class.java,
+        )
+    private val g6StyleStatusProviders = listOf(G6StyleStatusComplication::class.java)
+
     private val glucoseProviders =
         listOf(
             GlucoseComplication::class.java,
@@ -69,12 +81,14 @@ object ComplicationUpdatePlanner {
             DeltaOnlyComplication::class.java,
             GlucoseAgeComplication::class.java,
             GlucoseDeltaComplication::class.java,
+            G6StyleHeaderComplication::class.java,
         )
 
     private val graphProviders =
         listOf(
             GlucoseGraphComplication::class.java,
             GlucoseGraphLargeComplication::class.java,
+            G6StyleGraphComplication::class.java,
         )
 
     private val tirProviders =
