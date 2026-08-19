@@ -29,6 +29,8 @@ import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 
+internal fun shouldKeepG7RuntimeForeground(collectorEnabled: Boolean): Boolean = collectorEnabled
+
 class G7CollectorService : Service() {
     private lateinit var store: G7SensorStateStore
     private lateinit var credentials: G7CredentialStore
@@ -41,7 +43,12 @@ class G7CollectorService : Service() {
         store = G7SensorStateStore(this)
         credentials = G7CredentialStore(this)
         getSystemService(NotificationManager::class.java).createNotificationChannel(
-            NotificationChannel(CHANNEL, "G7 Direct to Watch", NotificationManager.IMPORTANCE_LOW),
+            NotificationChannel(CHANNEL, "G7 Direct to Watch", NotificationManager.IMPORTANCE_LOW).apply {
+                description = "Permanenter Dexcom G7 Watch Collector"
+                setSound(null, null)
+                enableVibration(false)
+                setShowBadge(false)
+            },
         )
         G7ErrorNotifier.ensureChannel(this)
     }
@@ -51,27 +58,40 @@ class G7CollectorService : Service() {
             collectionJob?.cancel()
             store.save(G7SessionManager(store.read()).stop())
             cancelScheduledReconnect(this)
-            finishService(startId)
+            stopRuntimeForeground()
             return START_NOT_STICKY
         }
 
-        acquireCycleWakeLock()
-        startForegroundCollector("Collector startet")
-        scope.launch { applicationContext.recordG7Diagnostic("G7-COLLECT-100", "Collector cycle started") }
+        val persisted = store.read()
+        if (!persisted.collectorEnabled) {
+            stopRuntimeForeground()
+            return START_NOT_STICKY
+        }
+
+        startForegroundCollector(
+            if (collectionJob?.isActive == true) "Collector aktiv" else "Dauerbetrieb aktiv",
+        )
         if (collectionJob?.isActive == true) return START_STICKY
-        collectionJob = scope.launch { collectOnce(startId) }
+
+        acquireCycleWakeLock()
+        scope.launch { applicationContext.recordG7Diagnostic("G7-COLLECT-100", "Collector cycle started") }
+        collectionJob = scope.launch { collectOnce() }
         return START_STICKY
     }
 
-    private suspend fun collectOnce(startId: Int) {
+    private suspend fun collectOnce() {
         val persisted = store.read()
         val configuredSensor = persisted.sensor
-        if (!persisted.collectorEnabled || configuredSensor == null) {
+        if (!persisted.collectorEnabled) {
+            finishCycle()
+            return
+        }
+        if (configuredSensor == null) {
             fail(
                 persisted,
                 G7CollectorError("G7-SETUP-001", false, System.currentTimeMillis(), "Sensor muss zuerst eingerichtet und der Collector gestartet werden"),
             )
-            finishService(startId)
+            finishCycle()
             return
         }
         val storedCredentials = credentials.read()
@@ -80,7 +100,7 @@ class G7CollectorService : Service() {
                 persisted,
                 G7CollectorError("G7-SETUP-002", false, System.currentTimeMillis(), "Sensorcode fehlt oder ist nicht mehr lesbar"),
             )
-            finishService(startId)
+            finishCycle()
             return
         }
 
@@ -139,19 +159,19 @@ class G7CollectorService : Service() {
             )
             G7ErrorNotifier.markRecovered(this)
             scheduleReconnect(next)
-            updateForeground("${reading.glucoseMgDl.toInt()} mg/dL empfangen")
+            updateForeground("${reading.glucoseMgDl.toInt()} mg/dL · nächster Wert geplant")
         } catch (error: G7BleException) {
             fail(store.read(), G7CollectorError(error.errorCode, error.recoverable, System.currentTimeMillis(), error.message))
         } catch (_: TimeoutCancellationException) {
             fail(store.read(), G7CollectorError("G7-BLE-111", true, System.currentTimeMillis(), "Zeitüberschreitung bei der Sensorverbindung"))
         } catch (_: CancellationException) {
-            // Explicit stop/source switch: teardown is not a collector failure.
+            // Explicit stop or service teardown is not a collector failure.
         } catch (_: SecurityException) {
             fail(store.read(), G7CollectorError("G7-PERM-401", false, System.currentTimeMillis(), "Bluetooth-Berechtigung fehlt"))
         } catch (_: Throwable) {
             fail(store.read(), G7CollectorError("G7-INT-500", true, System.currentTimeMillis(), "Unerwarteter Collector-Fehler"))
         } finally {
-            finishService(startId)
+            finishCycle()
         }
     }
 
@@ -197,7 +217,7 @@ class G7CollectorService : Service() {
         getSystemService(NotificationManager::class.java).notify(NOTIFICATION_ID, notification(message))
     }
 
-    private fun notification(message: String): Notification {
+    internal fun notification(message: String): Notification {
         val openApp = PendingIntent.getActivity(
             this,
             0,
@@ -210,7 +230,11 @@ class G7CollectorService : Service() {
             .setContentTitle("G7 Direct to Watch")
             .setContentText(message)
             .setContentIntent(openApp)
+            .setCategory(Notification.CATEGORY_SERVICE)
+            .setOnlyAlertOnce(true)
+            .setSilent(true)
             .setOngoing(true)
+            .setAutoCancel(false)
             .build()
     }
 
@@ -265,10 +289,27 @@ class G7CollectorService : Service() {
         cycleWakeLock = null
     }
 
-    private fun finishService(startId: Int) {
+    private fun finishCycle() {
+        releaseCycleWakeLock()
+        collectionJob = null
+        val current = store.read()
+        if (shouldKeepG7RuntimeForeground(current.collectorEnabled)) {
+            val message = when (current.protocolState) {
+                G7ProtocolState.WAITING_FOR_NEXT_READING -> "Dauerbetrieb aktiv · nächster Sensorwert geplant"
+                G7ProtocolState.RECOVERING -> "Dauerbetrieb aktiv · nächstes Sensorfenster wird abgewartet"
+                G7ProtocolState.ERROR -> current.lastError?.let { "${it.code}: ${it.safeMessage}" } ?: "Collector prüfen"
+                else -> "Dauerbetrieb aktiv"
+            }
+            updateForeground(message)
+        } else {
+            stopRuntimeForeground()
+        }
+    }
+
+    private fun stopRuntimeForeground() {
         releaseCycleWakeLock()
         stopForeground(STOP_FOREGROUND_REMOVE)
-        stopSelfResult(startId)
+        stopSelf()
     }
 
     override fun onDestroy() {
@@ -282,15 +323,11 @@ class G7CollectorService : Service() {
     companion object {
         const val ACTION_START = "app.aapswear.g7watch.START"
         const val ACTION_STOP = "app.aapswear.g7watch.STOP"
-        private const val CHANNEL = "g7_collector"
-        private const val NOTIFICATION_ID = 7001
+        internal const val CHANNEL = "g7_collector"
+        internal const val NOTIFICATION_ID = 7001
         private const val COLLECTION_WAKE_LOCK_TIMEOUT_MS = 35L * 60L * 1000L
         private const val MIN_RECONNECT_LEAD_MS = 1_000L
 
-        /**
-         * Explicit collector activation. Merely having credentials or a prepared sensor never starts
-         * BLE scanning; this method is called only from a user start or a G7 data-source transition.
-         */
         fun start(context: Context) {
             val app = context.applicationContext
             val stateStore = G7SensorStateStore(app)
@@ -304,7 +341,6 @@ class G7CollectorService : Service() {
             )
         }
 
-        /** Stops collection immediately while preserving the configured sensor and credentials. */
         fun stop(context: Context) {
             val app = context.applicationContext
             val stateStore = G7SensorStateStore(app)
