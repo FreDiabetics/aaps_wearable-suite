@@ -32,7 +32,7 @@ class WearRuntimeLifecycleTest {
     }
 
     @Test fun `runtime service is sticky and notification is permanent silent service state`() {
-        val service = Robolectric.buildService(StateDataLayerService::class.java).get()
+        val service = Robolectric.buildService(StateDataLayerService::class.java).create().get()
         val notification = service.runtimeNotification()
 
         assertEquals(Service.START_STICKY, service.onStartCommand(null, 0, 1))
