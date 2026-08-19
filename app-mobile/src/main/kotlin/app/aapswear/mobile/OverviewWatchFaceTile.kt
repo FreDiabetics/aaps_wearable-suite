@@ -67,6 +67,7 @@ internal val sugarliciousWatchFaceNames =
         "Sugarlicious Rings",
         "Sugarlicious Graph",
         "Sugarlicious Digital",
+        "Sugarlicious G6 Style",
     )
 
 private const val carouselPages = 400
@@ -186,8 +187,6 @@ internal fun OverviewWatchFaceTile(
 
     val effectiveFaceIndex = runtime.activeSugarliciousFaceIndex ?: selectedFaceIndex
     val selected = effectiveFaceIndex.coerceIn(0, sugarliciousWatchFaceNames.lastIndex)
-    // The large watch represents the connected watch. Wear's runtime provider IDs are the source
-    // of truth; the phone's saved face preset is only a fallback before runtime status arrives.
     val activeComplicationIds =
         runtime.activeComplicationIds.ifEmpty {
             WatchFacePresetStore.read(appContext, selected).ifEmpty {
@@ -391,10 +390,14 @@ internal fun FaceDial(
     activeComplicationIds: List<Int> = emptyList(),
     modifier: Modifier = Modifier,
 ) {
-    SugarliciousFacePreview(
-        index = index,
-        state = state,
-        complicationIds = activeComplicationIds,
-        modifier = modifier,
-    )
+    if (index == SUGARLICIOUS_G6_STYLE_FACE_INDEX) {
+        G6StyleFacePreview(state = state, modifier = modifier)
+    } else {
+        SugarliciousFacePreview(
+            index = index,
+            state = state,
+            complicationIds = activeComplicationIds,
+            modifier = modifier,
+        )
+    }
 }
