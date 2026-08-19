@@ -12,15 +12,25 @@ Sugarlicious Mobile remains the phone-side bridge. It does not contain a direct 
 Dexcom G7 app -> AndroidAPS -> Sugarlicious Mobile -> Wear Data Layer -> Sugarlicious Wear
 ```
 
-`PersistentBridgeService` is the existing foreground service for the user-visible background bridge/notification. It returns `START_STICKY` and is restored after `BOOT_COMPLETED` and `MY_PACKAGE_REPLACED`. The bridge has no user-facing disable switch; while Sugarlicious is installed its desired product state is therefore always enabled. A real Android Force Stop remains authoritative.
+`PersistentBridgeService` is the existing foreground service for the user-visible background bridge/notification. It returns `START_STICKY` and is restored after `BOOT_COMPLETED` and `MY_PACKAGE_REPLACED`. A real Android Force Stop remains authoritative.
 
 AAPS broadcasts are processed by the manifest `AapsStatusReceiver`. Valid state is persisted before Wear Data Layer I/O so a temporarily disconnected watch cannot invalidate phone-side data. The service notification keeps stale/no-data states explicit rather than making an old glucose value appear current.
 
 ### Wear
 
-Phone-to-watch delivery remains event-driven through `StateDataLayerService`, a `WearableListenerService`. Sugarlicious does not add a second always-running Wear keep-alive service. Google Play services can deliver registered Data Layer events without the Wear Activity being visible.
+Phone-to-watch delivery remains event-driven through the existing `StateDataLayerService : WearableListenerService`. This same service is the permanent Sugarlicious Wear runtime foreground service; no parallel Data Layer or keep-alive service exists.
 
-The Wear Activity's 30-second refresh job is UI-only and is cancelled in `onStop()`; it is not part of background data transport.
+`StateDataLayerService`:
+
+- calls `startForeground()` when created/started,
+- returns `START_STICKY`,
+- runs as `connectedDevice`,
+- uses a silent low-importance ongoing non-auto-cancel notification,
+- starts when the Wear app is opened,
+- restores after `BOOT_COMPLETED` and `MY_PACKAGE_REPLACED`,
+- continues to process Data Layer callbacks only when events arrive.
+
+The permanent foreground lifetime does not add a polling loop. The Wear Activity's 30-second refresh job remains UI-only and is cancelled in `onStop()`.
 
 ### G7 Watch Collector
 
@@ -29,26 +39,38 @@ The direct G7 collector remains a separate Wear OS application/service and is in
 ```text
 explicit user start
     -> persisted collectorEnabled=true
-    -> G7CollectorService collection cycle
-    -> BLE/auth/read
+    -> persistent G7CollectorService foreground runtime
+    -> one BLE/auth/read cycle
     -> persisted reading/state
+    -> BLE cycle ends + WakeLock released
     -> exact/inexact allow-while-idle reconnect alarm
-    -> next collection cycle
+    -> next alarm starts another cycle in the same service runtime
 ```
 
-The service is intentionally event-driven rather than permanently resident between five-minute sensor windows. While a collection cycle is active it is a connected-device foreground service with an ongoing low-importance notification. Between cycles the persisted enable state plus scheduled reconnect represents the desired active collector state.
+While `collectorEnabled=true`, `G7CollectorService` remains a foreground service between five-minute sensor windows. The foreground notification remains visible, but BLE scanning/connection work and the bounded collection WakeLock exist only during an actual collection cycle. There is no permanent BLE scan and no collector loop.
 
-`collectorEnabled=false` is written only by explicit collector stop or deliberate sensor reconfiguration. Technical disconnects, process recreation, phone loss, source changes, boot and app replacement do not convert a user-enabled collector into a user-disabled collector.
+A successful or failed cycle no longer calls `stopForeground()` or `stopSelf()` while the collector remains enabled. Only an explicit user stop changes `collectorEnabled=false`, cancels the reconnect alarm and terminates the foreground service/notification.
+
+`collectorEnabled=false` is not written by technical disconnects, process recreation, phone loss, source changes, boot or app replacement.
 
 ## Lifecycle restore
 
+### Sugarlicious Wear runtime
+
+- Activity closed: `StateDataLayerService` remains foreground and sticky.
+- Process recreation: `START_STICKY` restores the foreground runtime.
+- Boot: `WearRuntimeBootReceiver` starts the existing listener service.
+- App update: `MY_PACKAGE_REPLACED` starts the same service.
+- Data Layer handling remains callback/event driven.
+
 ### G7 enabled
 
-- Activity closed: state remains enabled.
-- Process recreated during a running service: `START_STICKY` re-enters the persisted enabled state.
+- Activity closed: state and foreground service remain enabled.
+- Between sensor windows: notification remains; BLE work and WakeLock are released.
+- Process recreation: `START_STICKY` re-enters the persisted enabled state.
 - Boot: `G7BootReceiver` restores only when `collectorEnabled=true`.
 - App update: `MY_PACKAGE_REPLACED` follows the same restore policy.
-- Reconnect alarm: starts a cycle only while the persisted state remains enabled.
+- Reconnect alarm: triggers another bounded sensor cycle while the persisted state remains enabled.
 - Phone unavailable: no collector disable side effect.
 - Canonical source changes to phone: no collector disable side effect.
 
@@ -58,6 +80,7 @@ The service is intentionally event-driven rather than permanently resident betwe
 - App update does not start the collector.
 - A reconnect receiver ignores the event.
 - Source selection cannot enable the collector.
+- No persistent G7 foreground notification remains.
 
 ## Source selection separation
 
@@ -72,50 +95,63 @@ Canonical display/source resolution remains separate and unchanged.
 
 ## Battery optimization access
 
-The G7 Watch UI reads the actual system state through `PowerManager.isIgnoringBatteryOptimizations()`.
+Battery optimization is handled separately for both Wear packages:
 
-`Dauerbetrieb freigeben` attempts real Wear/Android system surfaces in this order:
+```text
+app.aapswear
+app.aapswear.g7watch
+```
 
-1. app-specific request for battery-optimization exemption,
-2. battery-optimization settings list,
-3. application details,
-4. general system settings.
+Both use the package-specific `ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` request first. The only source of truth after returning from Android/Wear OS settings is:
 
-No local preference is used to fake a grant. Returning to the Activity triggers a fresh system-state read. If no system settings activity can be opened, the user receives visible feedback instead of a silent no-op.
+```text
+PowerManager.isIgnoringBatteryOptimizations(packageName)
+```
+
+No local preference or optimistic UI state represents a grant.
+
+For Sugarlicious Wear, failure to open the settings surface or failure to grant the exemption creates visible feedback and a Watch diagnostic event. For the G7 Watch Collector, `Dauerbetrieb freigeben` follows the same truth model and records visible/diagnostic failure when the exemption is not granted.
+
+The G7 action button uses `WRAP_CONTENT` with a minimum touch height and vertical padding; it is not constrained to a fixed 46 dp height on round displays.
 
 ## Battery policy
 
-No permanent polling loop, keep-alive loop or phone-driven collector loop is added.
+A persistent foreground service lifetime is not implemented as a busy runtime.
 
 - Mobile background state is event/flow driven.
-- Wear Data Layer state is event driven.
+- Wear Data Layer callbacks remain event driven.
+- No new Wear polling loop is added.
 - G7 reconnect remains scheduled around sensor windows.
-- The existing bounded collection-cycle wake lock remains limited to active collector work.
-- Source changes no longer create stop/start churn.
-- Existing BLE reconnect/backoff behavior is unchanged by this lifecycle work.
+- BLE scan/connection work ends after each G7 collection cycle.
+- The bounded G7 collection WakeLock is released after each cycle.
+- The G7 foreground notification remains resident without keeping BLE or CPU awake between cycles.
+- Source changes no longer create collector stop/start churn.
+- Existing BLE reconnect/backoff semantics remain unchanged.
 
 ## Force Stop
 
 An explicit Android/Wear OS **Force Stop** is not bypassed. Android may suppress receivers, alarms and service restarts until the user launches the application again. Sugarlicious does not attempt to defeat this system behavior.
 
-## Manual lifecycle test matrix
+## Required hardware lifecycle test matrix
 
-| Scenario | Expected result |
+Automated tests and CI are necessary but are not sufficient for merge readiness. The following scenarios must be validated on the actual phone/watch combination before PR #47 may be declared merge-ready:
+
+| Scenario | Required result |
 | --- | --- |
-| Open Mobile, then close UI | AAPS -> Mobile -> Wear flow continues without reopening Mobile |
-| Open Wear, then close UI | Data Layer updates continue without Wear Activity being visible |
-| Enable G7 collector, leave Activity | `collectorEnabled` remains true; scheduled collection continues |
-| Turn display off / AOD / Doze | Collector remains enabled; scheduled reconnect remains platform-managed |
+| Phone app closed | Mobile foreground notification remains; AndroidAPS -> Mobile -> Wear updates continue |
+| Watch app closed | Sugarlicious Wear foreground notification remains; Data Layer updates continue |
+| Display off / Doze for 30+ minutes | Current values continue without manually opening either app |
 | Phone out of range | Direct Watch collector remains enabled and continues independently |
-| Phone returns | Collector remains enabled; canonical source selection is independent |
-| Reboot watch with collector enabled | Collector restores from persisted state |
-| Reboot watch with collector disabled | Collector remains disabled |
-| Update G7 Watch app with collector enabled | `MY_PACKAGE_REPLACED` restores collector lifecycle |
-| Brief Bluetooth off/on | Technical unavailability does not write `collectorEnabled=false`; normal recovery path applies |
-| Change display source away from direct G7 | Collector enable state is unchanged |
-| Change display source to direct G7 while collector disabled | Collector remains disabled until explicit user start |
-| Use `Dauerbetrieb freigeben` | A real system settings/request surface opens where supported; UI reflects actual grant on resume |
-| Force Stop from Android settings | System Force Stop is respected; no unsupported bypass is attempted |
+| Phone returns | Normal transport/source recovery occurs without opening an app |
+| Multiple G7 five-minute cycles | Distinct new Watch-direct readings arrive automatically while G7 FGS remains resident |
+| Watch reboot | Wear runtime restores; enabled G7 collector restores; disabled collector stays disabled |
+| App update | `MY_PACKAGE_REPLACED` restores Wear runtime and enabled G7 collector |
+| Bluetooth off/on | Technical failure does not write `collectorEnabled=false`; automatic recovery continues |
+| Battery exemption denied | Visible error and diagnostic; UI continues to report actual optimized state |
+| Battery exemption granted | `PowerManager` reports unrestricted for the respective package |
+| Explicit Collector stop | `collectorEnabled=false`, reconnect cancelled, G7 FGS/notification terminated |
+
+Success criterion: **No app must be manually opened in order for current values to continue. Phone and Watch foreground notifications remain visible for their active runtimes.**
 
 ## Data-integrity invariants
 
