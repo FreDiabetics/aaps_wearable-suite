@@ -28,12 +28,21 @@ import android.widget.Toast
 import app.aapswear.g7.G7Sensor
 import app.aapswear.g7.G7SessionManager
 import app.aapswear.g7.G7SetupPayload
+import app.aapswear.model.DiagnosticSeverity
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
 import java.text.DateFormat
 import java.util.Date
 import java.util.Locale
 import java.util.UUID
 
 class G7WatchActivity : Activity() {
+    private val diagnosticScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private var batteryRequestPending = false
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         window.statusBarColor = BACKGROUND
@@ -44,6 +53,29 @@ class G7WatchActivity : Activity() {
 
     override fun onResume() {
         super.onResume()
+        if (batteryRequestPending) {
+            batteryRequestPending = false
+            val unrestricted = G7BackgroundAccess.isBatteryUnrestricted(this)
+            if (unrestricted) {
+                Toast.makeText(this, "Dauerbetrieb ist uneingeschränkt", Toast.LENGTH_SHORT).show()
+                recordBackgroundDiagnostic(
+                    "G7-BG-200",
+                    "Battery optimization exemption granted for G7 Watch Collector",
+                    DiagnosticSeverity.INFO,
+                )
+            } else {
+                Toast.makeText(
+                    this,
+                    "Dauerbetrieb nicht freigegeben – Akkuoptimierung ist weiterhin aktiv",
+                    Toast.LENGTH_LONG,
+                ).show()
+                recordBackgroundDiagnostic(
+                    "G7-BG-403",
+                    "Battery optimization exemption was not granted for G7 Watch Collector",
+                    DiagnosticSeverity.WARNING,
+                )
+            }
+        }
         render()
     }
 
@@ -305,6 +337,9 @@ class G7WatchActivity : Activity() {
         text = textValue
         isAllCaps = false
         textSize = 13f
+        minHeight = 46.dp
+        minimumHeight = 46.dp
+        setPadding(12.dp, 10.dp, 12.dp, 10.dp)
         setTypeface(typeface, Typeface.BOLD)
         setTextColor(if (primary) Color.rgb(9, 25, 15) else TEXT_PRIMARY)
         backgroundTintList = ColorStateList.valueOf(if (primary) ACCENT else SURFACE_HIGH)
@@ -331,7 +366,10 @@ class G7WatchActivity : Activity() {
         setMargins(0, 8.dp, 0, 0)
     }
 
-    private fun buttonParams(top: Int = 8) = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 46.dp).apply {
+    private fun buttonParams(top: Int = 8) = LinearLayout.LayoutParams(
+        ViewGroup.LayoutParams.MATCH_PARENT,
+        ViewGroup.LayoutParams.WRAP_CONTENT,
+    ).apply {
         setMargins(0, top.dp, 0, 0)
     }
 
@@ -366,12 +404,34 @@ class G7WatchActivity : Activity() {
             render()
             return
         }
-        if (!G7BackgroundAccess.openBatterySettings(this)) {
-            Toast.makeText(
-                this,
-                "Akku-Einstellungen konnten auf dieser Watch nicht geöffnet werden",
-                Toast.LENGTH_LONG,
-            ).show()
+
+        batteryRequestPending = true
+        if (G7BackgroundAccess.openBatterySettings(this)) return
+
+        batteryRequestPending = false
+        Toast.makeText(
+            this,
+            "Akku-Einstellungen konnten auf dieser Watch nicht geöffnet werden",
+            Toast.LENGTH_LONG,
+        ).show()
+        recordBackgroundDiagnostic(
+            "G7-BG-404",
+            "Battery optimization settings could not be opened for G7 Watch Collector",
+            DiagnosticSeverity.ERROR,
+        )
+    }
+
+    private fun recordBackgroundDiagnostic(
+        code: String,
+        message: String,
+        severity: DiagnosticSeverity,
+    ) {
+        diagnosticScope.launch {
+            applicationContext.recordG7Diagnostic(
+                code,
+                message,
+                severity,
+            )
         }
     }
 
@@ -385,6 +445,11 @@ class G7WatchActivity : Activity() {
         }.onFailure {
             runCatching { startActivity(Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM)) }
         }
+    }
+
+    override fun onDestroy() {
+        diagnosticScope.cancel()
+        super.onDestroy()
     }
 
     private fun app.aapswear.g7.G7ProtocolState.displayName(): String = when (this) {
