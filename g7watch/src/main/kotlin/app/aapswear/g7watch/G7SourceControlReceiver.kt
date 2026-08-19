@@ -5,20 +5,21 @@ import android.content.Context
 import android.content.Intent
 
 /**
- * Receives explicit data-source transitions from the Sugarlicious Wear app.
- * Selecting the direct G7 source is an explicit request to run the collector; selecting any
- * other source stops it. Repeated configuration syncs with the same source are filtered on the
- * Wear side and therefore do not restart scanning.
+ * Legacy source-selection signal from Sugarlicious Wear.
+ *
+ * Source selection and collector lifecycle are deliberately separate. Changing the canonical
+ * display source must never persist collectorEnabled=false. Entering the direct-G7 source may
+ * only resume a collector that the user has already enabled explicitly.
  */
 class G7SourceControlReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action != ACTION_SET_SOURCE) return
-        val selected = intent.getBooleanExtra(EXTRA_G7_SELECTED, false)
-        if (selected) {
-            G7CollectorService.start(context)
-        } else {
-            G7CollectorService.stop(context)
-        }
+
+        val g7Selected = intent.getBooleanExtra(EXTRA_G7_SELECTED, false)
+        val collectorEnabled = G7SensorStateStore(context).read().collectorEnabled
+        if (!shouldResumeEnabledCollectorForSourceSignal(g7Selected, collectorEnabled)) return
+
+        runCatching { G7CollectorService.start(context) }
     }
 
     companion object {
@@ -26,3 +27,8 @@ class G7SourceControlReceiver : BroadcastReceiver() {
         const val EXTRA_G7_SELECTED = "g7_selected"
     }
 }
+
+internal fun shouldResumeEnabledCollectorForSourceSignal(
+    g7Selected: Boolean,
+    collectorEnabled: Boolean,
+): Boolean = g7Selected && collectorEnabled
