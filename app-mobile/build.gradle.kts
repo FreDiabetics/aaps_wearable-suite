@@ -19,7 +19,9 @@ val syncSugarliciousAnalogPreviewAssets =
         ) {
             rename { "sugarlicious_analog_second_hand.png" }
         }
-        into(generatedAnalogPreviewRes.map { it.dir("drawable-nodpi") })
+        into(generatedAnalogPreviewRes)
+        eachFile { path = "drawable-nodpi/$name" }
+        includeEmptyDirs = false
     }
 
 android {
@@ -35,7 +37,7 @@ android {
         versionName = "0.6.2"
     }
     testOptions { unitTests.isIncludeAndroidResources = true }
-    sourceSets["main"].res.srcDir(generatedAnalogPreviewRes)
+    sourceSets["main"].res.directories.add(generatedAnalogPreviewRes.get().asFile.path)
 }
 
 tasks.matching { task -> task.name == "preBuild" }.configureEach {
