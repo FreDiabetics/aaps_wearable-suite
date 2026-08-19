@@ -1,7 +1,9 @@
 package app.aapswear.g7watch
 
+import android.content.ComponentName
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.content.pm.ServiceInfo
 import androidx.test.core.app.ApplicationProvider
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -25,7 +27,7 @@ class G7ManifestLifecycleTest {
         )
     }
 
-    @Test fun `connected device foreground service permissions are declared`() {
+    @Test fun `connected device foreground service permissions and type are declared`() {
         val context = ApplicationProvider.getApplicationContext<android.content.Context>()
         val info = context.packageManager.getPackageInfo(
             context.packageName,
@@ -33,9 +35,18 @@ class G7ManifestLifecycleTest {
         )
         val permissions = info.requestedPermissions.orEmpty().toSet()
 
+        assertTrue("android.permission.POST_NOTIFICATIONS" in permissions)
         assertTrue("android.permission.FOREGROUND_SERVICE" in permissions)
         assertTrue("android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" in permissions)
         assertTrue("android.permission.RECEIVE_BOOT_COMPLETED" in permissions)
         assertTrue("android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" in permissions)
+
+        val service = context.packageManager.getServiceInfo(
+            ComponentName(context, G7CollectorService::class.java),
+            0,
+        )
+        assertTrue(
+            service.foregroundServiceType and ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE != 0,
+        )
     }
 }
