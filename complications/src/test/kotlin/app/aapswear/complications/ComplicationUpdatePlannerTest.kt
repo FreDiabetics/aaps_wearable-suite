@@ -19,13 +19,16 @@ class ComplicationUpdatePlannerTest {
     }
 
     @Test
-    fun `glucose changes do not rebuild therapy providers`() {
+    fun `glucose changes update regular and G6 glucose graph providers`() {
         val old = state()
         val new = old.copy(glucose = old.glucose!!.copy(valueMgDl = 124.0))
         val affected = ComplicationUpdatePlanner.affectedProviders(old, new)
 
         assertTrue(GlucoseComplication::class.java in affected)
         assertTrue(GlucoseGraphComplication::class.java in affected)
+        assertTrue(G6StyleHeaderComplication::class.java in affected)
+        assertTrue(G6StyleGraphComplication::class.java in affected)
+        assertTrue(G6StyleStatusComplication::class.java in affected)
         assertFalse(IobComplication::class.java in affected)
         assertFalse(CobComplication::class.java in affected)
         assertFalse(BasalComplication::class.java in affected)
@@ -49,7 +52,7 @@ class ComplicationUpdatePlannerTest {
     }
 
     @Test
-    fun `history changes update graph and TIR without glucose text`() {
+    fun `history changes update regular and G6 graph without glucose header`() {
         val old = state()
         val new =
             old.copy(
@@ -63,8 +66,10 @@ class ComplicationUpdatePlannerTest {
         val affected = ComplicationUpdatePlanner.affectedProviders(old, new)
 
         assertTrue(GlucoseGraphComplication::class.java in affected)
+        assertTrue(G6StyleGraphComplication::class.java in affected)
         assertTrue(TirComplication::class.java in affected)
         assertFalse(GlucoseComplication::class.java in affected)
+        assertFalse(G6StyleHeaderComplication::class.java in affected)
     }
 
     private fun state() =
