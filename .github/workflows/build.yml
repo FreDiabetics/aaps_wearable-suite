@@ -57,6 +57,8 @@ jobs:
           :watchfaces:robby:assembleRelease
           :watchfaces:simple-digital:assembleRelease
           :watchfaces:steam-punk:assembleRelease
+      - name: Lint Mobile and Wear frontend
+        run: ./gradlew :app-mobile:lintDebug :app-wear:lintDebug
       - name: Validate Watch Face Format XML
         shell: pwsh
         run: ./tools/wff-validator/validate.ps1

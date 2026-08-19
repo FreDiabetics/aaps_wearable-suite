@@ -47,6 +47,13 @@ object TherapyDisplayFormatter {
     fun freshness(state: TherapyDisplayState?, nowEpochMs: Long): Freshness =
         FreshnessPolicy.classify(state?.glucose?.measuredAtEpochMs, nowEpochMs)
 
+    fun freshnessLabel(freshness: Freshness): String = when (freshness) {
+        Freshness.CURRENT -> "AKTUELL"
+        Freshness.DELAYED -> "VERZÖGERT"
+        Freshness.STALE -> "VERALTET"
+        Freshness.NO_DATA -> "KEINE DATEN"
+    }
+
     fun isGlucoseDisplayable(state: TherapyDisplayState?, nowEpochMs: Long): Boolean =
         when (freshness(state, nowEpochMs)) {
             Freshness.CURRENT, Freshness.DELAYED -> true
@@ -59,7 +66,7 @@ object TherapyDisplayFormatter {
         DataSourceId.NIGHTSCOUT -> "Nightscout"
         DataSourceId.XDRIP_PLUS -> "xDrip+"
         DataSourceId.OTHER -> "Andere Quelle"
-        null -> ""
+        null -> "Keine Quelle"
     }
 
     fun target(target: TargetState?, unit: GlucoseUnit): String {

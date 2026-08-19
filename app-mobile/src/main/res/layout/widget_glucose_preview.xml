@@ -1,1 +1,28 @@
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="vertical" android:gravity="center_vertical" android:padding="18dp" android:background="#15191D"><TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Sugarlicious" android:textColor="#F5F5F5" android:textStyle="bold" android:textSize="15sp"/><TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="123  ↗  +5" android:textColor="#19D7E8" android:textStyle="bold" android:textSize="34sp"/><TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="mg/dL" android:textColor="#B8C0C4" android:textSize="13sp"/></LinearLayout>
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/bg_widget_preview_glucose"
+    android:gravity="center_vertical"
+    android:orientation="vertical"
+    android:padding="16dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+        <ImageView android:layout_width="20dp" android:layout_height="20dp" android:src="@drawable/ic_sugarlicious_monochrome" android:tint="#6DE892" android:contentDescription="Sugarlicious" />
+        <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_marginStart="7dp" android:layout_weight="1" android:text="Sugarlicious" android:textColor="#F5F5F5" android:textStyle="bold" android:textSize="14sp" />
+        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="AKTUELL" android:textColor="#6DE892" android:textStyle="bold" android:textSize="10sp" />
+    </LinearLayout>
+
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:gravity="center_vertical" android:orientation="horizontal">
+        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="123" android:textColor="#F5F5F5" android:textStyle="bold" android:textSize="46sp" />
+        <LinearLayout android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginStart="12dp" android:orientation="vertical">
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="↗  +5" android:textColor="#F5F5F5" android:textStyle="bold" android:textSize="20sp" />
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="mg/dL" android:textColor="#B5B5B5" android:textSize="12sp" />
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="AndroidAPS · 3 min" android:textColor="#B5B5B5" android:textSize="10sp" />
+        </LinearLayout>
+    </LinearLayout>
+</LinearLayout>
