@@ -4,6 +4,24 @@ plugins {
     id("com.android.application")
 }
 
+val generatedAnalogPreviewRes = layout.buildDirectory.dir("generated/sugarliciousAnalogPreviewRes")
+val syncSugarliciousAnalogPreviewAssets =
+    tasks.register<Copy>("syncSugarliciousAnalogPreviewAssets") {
+        from(
+            rootProject.file(
+                "watchfaces/sugarlicious-analog/src/main/res/drawable-nodpi/sugarlicious_analog_template.png",
+            ),
+        )
+        from(
+            rootProject.file(
+                "watchfaces/sugarlicious-analog/src/main/res/drawable-nodpi/second_hand.png",
+            ),
+        ) {
+            rename { "sugarlicious_analog_second_hand.png" }
+        }
+        into(generatedAnalogPreviewRes.map { it.dir("drawable-nodpi") })
+    }
+
 android {
     buildFeatures { compose = true }
 
@@ -17,6 +35,11 @@ android {
         versionName = "0.6.2"
     }
     testOptions { unitTests.isIncludeAndroidResources = true }
+    sourceSets["main"].res.srcDir(generatedAnalogPreviewRes)
+}
+
+tasks.matching { task -> task.name == "preBuild" }.configureEach {
+    dependsOn(syncSugarliciousAnalogPreviewAssets)
 }
 
 dependencies {
