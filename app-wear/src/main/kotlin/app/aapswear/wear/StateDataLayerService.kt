@@ -1,8 +1,14 @@
 package app.aapswear.wear
 
+import android.app.Notification
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.app.PendingIntent
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.content.pm.ServiceInfo
+import android.os.Build
 import androidx.wear.watchface.complications.datasource.ComplicationDataSourceUpdateRequester
 import app.aapswear.complications.ActiveComplicationRegistry
 import app.aapswear.complications.AllProviders
@@ -49,7 +55,17 @@ class StateDataLayerService : WearableListenerService() {
 
     override fun onCreate() {
         super.onCreate()
+        ensureRuntimeChannel()
+        startForegroundRuntime()
         scope.launch {
+            if (!WearBackgroundAccess.isBatteryUnrestricted(applicationContext)) {
+                applicationContext.recordWatchDiagnostic(
+                    "RUNTIME",
+                    "WATCH-BG-201",
+                    "Wear runtime is active while battery optimization is still enabled",
+                    DiagnosticSeverity.WARNING,
+                )
+            }
             runCatching {
                 requestLatestState(this@StateDataLayerService)
             }
@@ -64,6 +80,11 @@ class StateDataLayerService : WearableListenerService() {
                     )
                 }
         }
+    }
+
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        startForegroundRuntime()
+        return START_STICKY
     }
 
     override fun onDataChanged(events: DataEventBuffer) {
@@ -435,12 +456,78 @@ class StateDataLayerService : WearableListenerService() {
         }
     }
 
+    private fun ensureRuntimeChannel() {
+        val channel = NotificationChannel(
+            RUNTIME_CHANNEL,
+            "Sugarlicious Wear Dauerbetrieb",
+            NotificationManager.IMPORTANCE_LOW,
+        ).apply {
+            description = "Permanenter Sugarlicious Wear Datenempfang"
+            setSound(null, null)
+            enableVibration(false)
+            setShowBadge(false)
+        }
+        getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
+    }
+
+    private fun startForegroundRuntime() {
+        val notification = runtimeNotification()
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            startForeground(
+                RUNTIME_NOTIFICATION_ID,
+                notification,
+                ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE,
+            )
+        } else {
+            startForeground(RUNTIME_NOTIFICATION_ID, notification)
+        }
+    }
+
+    internal fun runtimeNotification(): Notification {
+        val openApp = PendingIntent.getActivity(
+            this,
+            0,
+            Intent(this, WearActivity::class.java),
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+        )
+        val batteryUnrestricted = WearBackgroundAccess.isBatteryUnrestricted(this)
+        return Notification.Builder(this, RUNTIME_CHANNEL)
+            .setSmallIcon(R.mipmap.ic_launcher)
+            .setContentTitle("Sugarlicious Wear")
+            .setContentText(
+                if (batteryUnrestricted) {
+                    "Dauerbetrieb aktiv"
+                } else {
+                    "Akkuoptimierung aktiv – Dauerbetrieb freigeben"
+                },
+            )
+            .setContentIntent(openApp)
+            .setCategory(Notification.CATEGORY_SERVICE)
+            .setOnlyAlertOnce(true)
+            .setSilent(true)
+            .setOngoing(true)
+            .setAutoCancel(false)
+            .build()
+    }
+
     override fun onDestroy() {
         scope.cancel()
         super.onDestroy()
     }
 
     companion object {
+        const val ACTION_START_RUNTIME = "app.aapswear.wear.START_RUNTIME"
+        internal const val RUNTIME_CHANNEL = "sugarlicious_wear_runtime"
+        internal const val RUNTIME_NOTIFICATION_ID = 6101
+
+        fun start(context: Context) {
+            val app = context.applicationContext
+            app.startForegroundService(
+                Intent(app, StateDataLayerService::class.java)
+                    .setAction(ACTION_START_RUNTIME),
+            )
+        }
+
         private val watchFacePushScope =
             CoroutineScope(
                 SupervisorJob() + Dispatchers.IO,
