@@ -34,7 +34,10 @@
             android:exported="false"
             android:foregroundServiceType="connectedDevice" />
         <receiver android:name=".G7BootReceiver" android:enabled="true" android:exported="true">
-            <intent-filter><action android:name="android.intent.action.BOOT_COMPLETED" /></intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
         </receiver>
         <receiver android:name=".G7ReconnectReceiver" android:exported="false" />
         <receiver android:name=".G7ErrorAcknowledgeReceiver" android:exported="false" />
