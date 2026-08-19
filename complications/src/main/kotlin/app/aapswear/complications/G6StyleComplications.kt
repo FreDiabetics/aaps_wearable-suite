@@ -180,14 +180,15 @@ class G6StyleGraphComplication : G6StyleComplicationService() {
     }
 
     private fun renderGraph(state: TherapyDisplayState?, nowEpochMs: Long): Bitmap {
-        val width = 800
-        val height = 310
+        // Match the WFF slot one-to-one instead of allocating a ~1 MB oversize bitmap every update.
+        val width = 402
+        val height = 157
         val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(bitmap)
-        val plotLeft = 6f
-        val plotRight = width - 6f
-        val plotTop = 6f
-        val plotBottom = height - 6f
+        val plotLeft = 4f
+        val plotRight = width - 4f
+        val plotTop = 4f
+        val plotBottom = height - 4f
         val targetLow = (state?.target?.lowMgDl ?: 70.0).coerceIn(40.0, 180.0)
         val targetHigh = (state?.target?.highMgDl ?: 180.0).coerceIn(targetLow + 1.0, 300.0)
 
@@ -206,11 +207,11 @@ class G6StyleGraphComplication : G6StyleComplicationService() {
 
         val divider = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = COLOR_DIVIDER
-            strokeWidth = 2f
+            strokeWidth = 1f
         }
         canvas.drawLine(plotLeft, yFor(targetHigh), plotRight, yFor(targetHigh), divider)
         divider.color = COLOR_LOW_LINE
-        divider.strokeWidth = 5f
+        divider.strokeWidth = 3f
         canvas.drawLine(plotLeft, yFor(targetLow), plotRight, yFor(targetLow), divider)
 
         val samples = G6StylePresentationFormatter.samples(state, nowEpochMs)
@@ -222,18 +223,18 @@ class G6StyleGraphComplication : G6StyleComplicationService() {
 
         val dotPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.WHITE }
         samples.forEach { sample ->
-            canvas.drawCircle(xFor(sample.measuredAtEpochMs), yFor(sample.valueMgDl), 6.5f, dotPaint)
+            canvas.drawCircle(xFor(sample.measuredAtEpochMs), yFor(sample.valueMgDl), 3.2f, dotPaint)
         }
 
         val labelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = Color.WHITE
             typeface = Typeface.DEFAULT_BOLD
-            textSize = 38f
+            textSize = 19f
         }
-        canvas.drawText("3HR", 18f, 45f, labelPaint)
+        canvas.drawText("3HR", 10f, 24f, labelPaint)
         labelPaint.textAlign = Paint.Align.RIGHT
-        canvas.drawText(GRAPH_MAX.roundToInt().toString(), width - 16f, 45f, labelPaint)
-        canvas.drawText(targetLow.roundToInt().toString(), width - 16f, yFor(targetLow) - 10f, labelPaint)
+        canvas.drawText(GRAPH_MAX.roundToInt().toString(), width - 8f, 24f, labelPaint)
+        canvas.drawText(targetLow.roundToInt().toString(), width - 8f, yFor(targetLow) - 5f, labelPaint)
 
         if (samples.isEmpty()) {
             val freshness = TherapyDisplayFormatter.freshness(state, nowEpochMs)
@@ -241,7 +242,7 @@ class G6StyleGraphComplication : G6StyleComplicationService() {
                 color = Color.WHITE
                 typeface = Typeface.DEFAULT_BOLD
                 textAlign = Paint.Align.CENTER
-                textSize = 44f
+                textSize = 22f
             }
             canvas.drawText(
                 TherapyDisplayFormatter.freshnessLabel(freshness),
