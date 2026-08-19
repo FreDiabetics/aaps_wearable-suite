@@ -24,6 +24,11 @@ class G7LifecyclePolicyTest {
         assertFalse(shouldRestoreG7Collector(null, collectorEnabled = true))
     }
 
+    @Test fun `enabled collector keeps foreground runtime between sensor cycles`() {
+        assertTrue(shouldKeepG7RuntimeForeground(collectorEnabled = true))
+        assertFalse(shouldKeepG7RuntimeForeground(collectorEnabled = false))
+    }
+
     @Test fun `source selection cannot enable a user-disabled collector`() {
         assertFalse(
             shouldResumeEnabledCollectorForSourceSignal(
