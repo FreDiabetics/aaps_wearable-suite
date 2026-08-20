@@ -356,14 +356,14 @@ internal class GlucoseDashboardChart @JvmOverloads constructor(
             val end = viewport.endEpochMs(liveEdge)
             val start = end - (viewport.hours * HOUR_MS).toLong()
 
-            val history =
+            val allHistory =
                 buildList {
                     addAll(state?.glucoseHistory.orEmpty())
                     state?.glucose?.let { add(GlucoseSample(it.valueMgDl, it.measuredAtEpochMs, state!!.source)) }
                 }
                     .sortedBy { it.measuredAtEpochMs }
                     .distinctBy { it.measuredAtEpochMs to it.source }
-                    .filter { it.measuredAtEpochMs in start..min(end, now) }
+            val history = allHistory.filter { it.measuredAtEpochMs in start..min(end, now) }
 
             val visiblePredictions =
                 PredictionDisplayTimeline.anchor(predictions, now)
@@ -372,7 +372,9 @@ internal class GlucoseDashboardChart @JvmOverloads constructor(
 
             val targetTop = mapGlucoseY(targetHigh, plot)
             val targetBottom = mapGlucoseY(targetLow, plot)
-            val excursion = sustainedRangeExcursion(history, targetLow, targetHigh)
+            val excursion =
+                if (signalLost) null
+                else sustainedRangeExcursion(allHistory, targetLow, targetHigh)
 
             if (showTargetRange) {
                 if (excursion == RangeExcursion.HIGH) {
