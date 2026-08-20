@@ -23,6 +23,16 @@ class G7ReconnectSchedulerTest {
         assertEquals(0, plan.retryCount)
     }
 
+    @Test fun `missed advertisement window aligns to next five minute connection window`() {
+        val reading = 1_000_000L
+        val missAt = 1_360_000L
+        val plan = G7ReconnectScheduler.afterExpectedWindowMiss(missAt, reading)
+
+        assertEquals(1_570_000L, plan.nextReconnectEpochMs)
+        assertEquals(210_000L, plan.delayMs)
+        assertEquals(0, plan.retryCount)
+    }
+
     @Test fun `GATT 133 never inherits generic retry count`() {
         val plan = G7ReconnectScheduler.afterGatt133(10_000_000L, 9_000_000L)
 

@@ -23,13 +23,7 @@ internal data class G7AcknowledgedError(
 internal fun g7ErrorSignature(error: G7CollectorError): String =
     "${error.code}|${error.safeMessage}"
 
-/**
- * Urgent collector error surface for Wear OS.
- *
- * Android 14+ reserves true full-screen intents for calling/alarm apps. Collector failures use a
- * high-importance heads-up notification instead, remain posted until explicit acknowledgement,
- * and update in place when automatic recovery succeeds.
- */
+/** High-priority surface reserved for an actually actionable G7 Watch-only problem. */
 internal object G7ErrorNotifier {
     private const val CHANNEL_ID = "g7_collector_errors_v1"
     private const val CHANNEL_NAME = "G7 Collector-Fehler"
@@ -40,7 +34,6 @@ internal object G7ErrorNotifier {
     private const val KEY_ACTIVE_MESSAGE = "active_message"
     private const val KEY_FIRST_OCCURRED_AT = "first_occurred_at"
     private const val KEY_LAST_POSTED_AT = "last_posted_at"
-    private const val KEY_RECOVERED_AT = "recovered_at"
     private const val KEY_LAST_ACK_SIGNATURE = "last_ack_signature"
     private const val KEY_LAST_ACK_AT = "last_ack_at"
 
@@ -73,45 +66,36 @@ internal object G7ErrorNotifier {
             .putString(KEY_ACTIVE_MESSAGE, error.safeMessage)
             .putLong(KEY_FIRST_OCCURRED_AT, firstOccurredAt)
             .putLong(KEY_LAST_POSTED_AT, System.currentTimeMillis())
-            .remove(KEY_RECOVERED_AT)
             .apply()
 
         app.getSystemService(NotificationManager::class.java).notify(
             NOTIFICATION_ID,
             buildNotification(
                 context = app,
-                title = "G7-Fehler ${error.code}",
+                title = if (error.code == "G7-SIGNAL-LOSS") "G7 Signalverlust" else "G7-Fehler ${error.code}",
                 body = error.safeMessage,
                 occurredAtEpochMs = firstOccurredAt,
-                recoveredAtEpochMs = null,
                 onlyAlertOnce = sameActiveError,
             ),
         )
     }
 
+    /** A valid new reading means the active connection problem is over; do not require cleanup acknowledgement. */
     fun markRecovered(context: Context) {
+        clearActive(context)
+    }
+
+    fun clearActive(context: Context) {
         val app = context.applicationContext
-        val prefs = app.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-        val signature = prefs.getString(KEY_ACTIVE_SIGNATURE, null) ?: return
-        val code = prefs.getString(KEY_ACTIVE_CODE, null) ?: return
-        val message = prefs.getString(KEY_ACTIVE_MESSAGE, null) ?: return
-        val firstOccurredAt = prefs.getLong(KEY_FIRST_OCCURRED_AT, 0L).takeIf { it > 0L } ?: return
-        val recoveredAt = System.currentTimeMillis()
-        prefs.edit().putLong(KEY_RECOVERED_AT, recoveredAt).apply()
-        ensureChannel(app)
-        app.getSystemService(NotificationManager::class.java).notify(
-            NOTIFICATION_ID,
-            buildNotification(
-                context = app,
-                title = "G7-Verbindung wiederhergestellt",
-                body = "$code: $message",
-                occurredAtEpochMs = firstOccurredAt,
-                recoveredAtEpochMs = recoveredAt,
-                onlyAlertOnce = true,
-            ),
-        )
-        // Keep the active signature until the user acknowledges the incident.
-        prefs.edit().putString(KEY_ACTIVE_SIGNATURE, signature).apply()
+        app.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .edit()
+            .remove(KEY_ACTIVE_SIGNATURE)
+            .remove(KEY_ACTIVE_CODE)
+            .remove(KEY_ACTIVE_MESSAGE)
+            .remove(KEY_FIRST_OCCURRED_AT)
+            .remove(KEY_LAST_POSTED_AT)
+            .apply()
+        app.getSystemService(NotificationManager::class.java).cancel(NOTIFICATION_ID)
     }
 
     fun acknowledge(context: Context): G7AcknowledgedError? {
@@ -127,7 +111,6 @@ internal object G7ErrorNotifier {
             .remove(KEY_ACTIVE_MESSAGE)
             .remove(KEY_FIRST_OCCURRED_AT)
             .remove(KEY_LAST_POSTED_AT)
-            .remove(KEY_RECOVERED_AT)
             .apply()
         app.getSystemService(NotificationManager::class.java).cancel(NOTIFICATION_ID)
         return G7AcknowledgedError(signature, acknowledgedAt)
@@ -138,13 +121,15 @@ internal object G7ErrorNotifier {
         title: String,
         body: String,
         occurredAtEpochMs: Long,
-        recoveredAtEpochMs: Long?,
         onlyAlertOnce: Boolean,
     ): Notification {
+        val openIntent = Intent(context, G7WatchActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+        }
         val openApp = PendingIntent.getActivity(
             context,
             7002,
-            Intent(context, G7WatchActivity::class.java),
+            openIntent,
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
         )
         val acknowledge = PendingIntent.getBroadcast(
@@ -154,12 +139,7 @@ internal object G7ErrorNotifier {
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
         )
         val errorTime = DateFormat.getTimeInstance(DateFormat.SHORT).format(Date(occurredAtEpochMs))
-        val detail = if (recoveredAtEpochMs == null) {
-            "$body\nAufgetreten: $errorTime"
-        } else {
-            val recoveredTime = DateFormat.getTimeInstance(DateFormat.SHORT).format(Date(recoveredAtEpochMs))
-            "$body\nAufgetreten: $errorTime\nAutomatisch wiederhergestellt: $recoveredTime\nBitte quittieren."
-        }
+        val detail = "$body\nAufgetreten: $errorTime"
         val actionIcon = Icon.createWithResource(context, R.drawable.ic_g7_notification)
         return Notification.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_g7_notification)

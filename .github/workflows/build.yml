@@ -12,6 +12,8 @@ jobs:
           distribution: temurin
           java-version: '21'
       - uses: android-actions/setup-android@v3
+        with:
+          cmdline-tools-version: '15859902'
       - run: sdkmanager "platforms;android-36" "build-tools;36.0.0"
       - name: Validate branch protection helper with PowerShell 7
         shell: pwsh

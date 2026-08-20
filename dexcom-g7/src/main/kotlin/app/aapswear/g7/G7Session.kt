@@ -21,11 +21,12 @@ object G7ReconnectScheduler {
     }
 
     /**
-     * GATT 133 is a transient Android BLE connection failure, not an authentication/session
-     * failure. After bounded in-window retries have been exhausted, wait for the next expected
-     * Dexcom advertising/connection window instead of entering the generic exponential backoff.
+     * GATT 133 and a missed advertisement window are transient BLE/cadence failures, not an
+     * authentication/session failure. After bounded in-window work is exhausted, wait for the next
+     * expected Dexcom advertising window instead of spinning generic exponential retries between
+     * the sensor's five-minute transmit opportunities.
      */
-    fun afterGatt133(nowEpochMs: Long, lastReadingEpochMs: Long?): G7ReconnectPlan {
+    fun afterExpectedWindowMiss(nowEpochMs: Long, lastReadingEpochMs: Long?): G7ReconnectPlan {
         if (lastReadingEpochMs == null) {
             return G7ReconnectPlan(nowEpochMs + GATT_133_INITIAL_RETRY_MS, 0, GATT_133_INITIAL_RETRY_MS)
         }
@@ -40,6 +41,9 @@ object G7ReconnectScheduler {
         }
         return G7ReconnectPlan(trigger, 0, trigger - nowEpochMs)
     }
+
+    fun afterGatt133(nowEpochMs: Long, lastReadingEpochMs: Long?): G7ReconnectPlan =
+        afterExpectedWindowMiss(nowEpochMs, lastReadingEpochMs)
 }
 
 object G7RecoveryChain {
@@ -115,8 +119,8 @@ class G7SessionManager(initial: G7PersistedState = G7PersistedState()) {
                 ),
             )
         }
-        if (error.code == GATT_133_ERROR_CODE) {
-            val plan = G7ReconnectScheduler.afterGatt133(error.occurredAtEpochMs, state.lastReading?.timestampEpochMs)
+        if (error.code == GATT_133_ERROR_CODE || error.code == NO_ADVERTISEMENT_ERROR_CODE) {
+            val plan = G7ReconnectScheduler.afterExpectedWindowMiss(error.occurredAtEpochMs, state.lastReading?.timestampEpochMs)
             return transition(
                 state.copy(
                     sessionState = G7SessionState.RECOVERING,
@@ -168,6 +172,7 @@ class G7SessionManager(initial: G7PersistedState = G7PersistedState()) {
 
     private companion object {
         const val GATT_133_ERROR_CODE = "G7-GATT-133"
+        const val NO_ADVERTISEMENT_ERROR_CODE = "G7-BLE-107"
     }
 }
 

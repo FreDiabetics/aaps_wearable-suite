@@ -23,7 +23,10 @@
         android:theme="@style/G7WatchTheme"
         android:usesCleartextTraffic="false">
         <meta-data android:name="com.google.android.wearable.standalone" android:value="true" />
-        <activity android:name=".G7WatchActivity" android:exported="true">
+        <activity
+            android:name=".G7WatchActivity"
+            android:exported="true"
+            android:launchMode="singleTask">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
@@ -40,6 +43,7 @@
             </intent-filter>
         </receiver>
         <receiver android:name=".G7ReconnectReceiver" android:exported="false" />
+        <receiver android:name=".G7SignalLossReceiver" android:exported="false" />
         <receiver android:name=".G7ErrorAcknowledgeReceiver" android:exported="false" />
         <receiver
             android:name=".G7SetupReceiver"

@@ -58,16 +58,21 @@ class G7CollectorService : Service() {
             collectionJob?.cancel()
             store.save(G7SessionManager(store.read()).stop())
             cancelScheduledReconnect(this)
+            G7SignalLossMonitor.cancel(this)
+            G7ErrorNotifier.clearActive(this)
             stopRuntimeForeground()
             return START_NOT_STICKY
         }
 
         val persisted = store.read()
         if (!persisted.collectorEnabled) {
+            G7SignalLossMonitor.cancel(this)
+            G7ErrorNotifier.clearActive(this)
             stopRuntimeForeground()
             return START_NOT_STICKY
         }
 
+        G7SignalLossMonitor.scheduleFromState(this, persisted)
         startForegroundCollector(
             if (collectionJob?.isActive == true) "Collector aktiv" else "Dauerbetrieb aktiv",
         )
@@ -158,8 +163,9 @@ class G7CollectorService : Service() {
                 ),
             )
             G7ErrorNotifier.markRecovered(this)
+            G7SignalLossMonitor.scheduleFromState(this, next)
             scheduleReconnect(next)
-            updateForeground("${reading.glucoseMgDl.toInt()} mg/dL · nächster Wert geplant")
+            updateForeground("${reading.glucoseMgDl.toInt()} mg/dL · Normalbetrieb")
         } catch (error: G7BleException) {
             fail(store.read(), G7CollectorError(error.errorCode, error.recoverable, System.currentTimeMillis(), error.message))
         } catch (_: TimeoutCancellationException) {
@@ -177,18 +183,26 @@ class G7CollectorService : Service() {
 
     private fun fail(state: G7PersistedState, error: G7CollectorError) {
         val managed = G7SessionManager(state).failure(error)
+        val softWindowFailure = error.recoverable && error.code in SOFT_WINDOW_ERRORS
         val next = managed.copy(
             connectionState = G7ConnectionState.DISCONNECTED,
-            protocolState = if (error.recoverable && error.code == G7_GATT_133_ERROR_CODE) {
-                G7ProtocolState.RECOVERING
-            } else {
-                G7ProtocolState.ERROR
-            },
+            protocolState = if (softWindowFailure) G7ProtocolState.RECOVERING else G7ProtocolState.ERROR,
         )
         store.save(next)
         scheduleReconnect(next)
-        updateForeground("${error.code}: ${error.safeMessage}")
-        G7ErrorNotifier.show(this, error)
+        G7SignalLossMonitor.scheduleFromState(this, next)
+        updateForeground(
+            if (softWindowFailure) {
+                "Dauerbetrieb aktiv · nächstes Sensorfenster wird abgewartet"
+            } else {
+                "${error.code}: ${error.safeMessage}"
+            },
+        )
+
+        val watchOnly = G7AlertPolicyStore.isWatchOnly(this)
+        if (shouldPostImmediateCollectorAlert(watchOnly, error, next.sessionState)) {
+            G7ErrorNotifier.show(this, error)
+        }
         scope.launch {
             applicationContext.recordG7Diagnostic(
                 error.code,
@@ -196,6 +210,8 @@ class G7CollectorService : Service() {
                 if (error.recoverable) DiagnosticSeverity.WARNING else DiagnosticSeverity.ERROR,
                 mapOf(
                     "recoverable" to error.recoverable,
+                    "watchOnlyAlerts" to watchOnly,
+                    "userAlertPosted" to shouldPostImmediateCollectorAlert(watchOnly, error, next.sessionState),
                     "retryCount" to next.retryCount,
                     "nextReconnectEpochMs" to next.nextReconnectEpochMs,
                     "sessionState" to next.sessionState.name,
@@ -218,10 +234,13 @@ class G7CollectorService : Service() {
     }
 
     internal fun notification(message: String): Notification {
+        val openIntent = Intent(this, G7WatchActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+        }
         val openApp = PendingIntent.getActivity(
             this,
             0,
-            Intent(this, G7WatchActivity::class.java),
+            openIntent,
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
         )
         return Notification.Builder(this, CHANNEL)
@@ -295,8 +314,8 @@ class G7CollectorService : Service() {
         val current = store.read()
         if (shouldKeepG7RuntimeForeground(current.collectorEnabled)) {
             val message = when (current.protocolState) {
-                G7ProtocolState.WAITING_FOR_NEXT_READING -> "Dauerbetrieb aktiv · nächster Sensorwert geplant"
-                G7ProtocolState.RECOVERING -> "Dauerbetrieb aktiv · nächstes Sensorfenster wird abgewartet"
+                G7ProtocolState.WAITING_FOR_NEXT_READING -> "Dauerbetrieb aktiv · Normalbetrieb"
+                G7ProtocolState.RECOVERING -> "Dauerbetrieb aktiv · automatische Wiederverbindung"
                 G7ProtocolState.ERROR -> current.lastError?.let { "${it.code}: ${it.safeMessage}" } ?: "Collector prüfen"
                 else -> "Dauerbetrieb aktiv"
             }
@@ -327,6 +346,7 @@ class G7CollectorService : Service() {
         internal const val NOTIFICATION_ID = 7001
         private const val COLLECTION_WAKE_LOCK_TIMEOUT_MS = 35L * 60L * 1000L
         private const val MIN_RECONNECT_LEAD_MS = 1_000L
+        private val SOFT_WINDOW_ERRORS = setOf(G7_GATT_133_ERROR_CODE, "G7-BLE-107", "G7-BLE-111")
 
         fun start(context: Context) {
             val app = context.applicationContext
@@ -336,6 +356,7 @@ class G7CollectorService : Service() {
             if (!current.collectorEnabled) {
                 stateStore.save(G7SessionManager(current).startCollector())
             }
+            G7SignalLossMonitor.scheduleFromState(app, stateStore.read())
             app.startForegroundService(
                 Intent(app, G7CollectorService::class.java).setAction(ACTION_START),
             )
@@ -346,6 +367,8 @@ class G7CollectorService : Service() {
             val stateStore = G7SensorStateStore(app)
             stateStore.save(G7SessionManager(stateStore.read()).stop())
             cancelScheduledReconnect(app)
+            G7SignalLossMonitor.cancel(app)
+            G7ErrorNotifier.clearActive(app)
             app.stopService(Intent(app, G7CollectorService::class.java))
             app.getSystemService(NotificationManager::class.java).cancel(NOTIFICATION_ID)
         }
