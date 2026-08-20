@@ -2,9 +2,11 @@ package app.aapswear.g7watch
 
 import android.content.ComponentName
 import android.content.Intent
+import android.content.pm.ActivityInfo
 import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
 import androidx.test.core.app.ApplicationProvider
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -48,5 +50,21 @@ class G7ManifestLifecycleTest {
         assertTrue(
             service.foregroundServiceType and ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE != 0,
         )
+    }
+
+    @Test fun `collector UI uses a single task and signal loss receiver is registered`() {
+        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+        val activity = context.packageManager.getActivityInfo(
+            ComponentName(context, G7WatchActivity::class.java),
+            0,
+        )
+        assertEquals(ActivityInfo.LAUNCH_SINGLE_TASK, activity.launchMode)
+
+        val receiver = context.packageManager.getReceiverInfo(
+            ComponentName(context, G7SignalLossReceiver::class.java),
+            0,
+        )
+        assertTrue(receiver.enabled)
+        assertTrue(!receiver.exported)
     }
 }
