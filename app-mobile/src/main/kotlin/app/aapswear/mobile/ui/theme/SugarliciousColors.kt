@@ -83,8 +83,7 @@ enum class SugarliciousColorRole(
     GRAPH_MUTED("graph_muted", "Graph-Hinweise / Trennlinie", SugarliciousColorGroup.GRAPH, 0xFF969696.toInt(), 0xFF777777.toInt()),
     GRAPH_DIVIDER("graph_divider", "Trennlinie", SugarliciousColorGroup.GRAPH, 0xFF969696.toInt(), 0xFF747474.toInt(), true),
     GRAPH_SIGNAL_LOSS("graph_signal_loss", "Signalverlust", SugarliciousColorGroup.GRAPH, 0x46FF5C69, 0x38D11A2A, true),
-    GRAPH_CURRENT_OUTLINE("graph_current_outline", "Aktueller Punkt · Kontur", SugarliciousColorGroup.GRAPH, 0xFF000000.toInt()),
-    ;
+    GRAPH_CURRENT_OUTLINE("graph_current_outline", "Aktueller Punkt · Kontur", SugarliciousColorGroup.GRAPH, 0xFF000000.toInt());
 
     companion object {
         /** Semantic alias used by the graph while keeping the persisted target_band key compatible. */
