@@ -19,6 +19,7 @@ import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.nativeCanvas
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.res.painterResource
 import app.aapswear.model.Freshness
 import app.aapswear.model.TherapyDisplayFormatter
@@ -91,9 +92,10 @@ internal fun SugarliciousAnalogFacePreview(
     val now = System.currentTimeMillis()
     val freshness = TherapyDisplayFormatter.freshness(state, now)
     val displayable = TherapyDisplayFormatter.isGlucoseDisplayable(state, now)
-    val glucose = if (displayable && state?.glucose != null) TherapyDisplayFormatter.glucose(state.glucose) else "—"
-    val trend = if (displayable && state?.glucose != null) TherapyDisplayFormatter.trendArrow(state.glucose.trend) else ""
-    val age = TherapyDisplayFormatter.ageMinutes(state?.glucose?.measuredAtEpochMs, now)
+    val glucoseState = state?.glucose
+    val glucose = if (displayable && glucoseState != null) TherapyDisplayFormatter.glucose(glucoseState) else "—"
+    val trend = if (displayable && glucoseState != null) TherapyDisplayFormatter.trendArrow(glucoseState.trend) else ""
+    val age = TherapyDisplayFormatter.ageMinutes(glucoseState?.measuredAtEpochMs, now)
     val source = TherapyDisplayFormatter.sourceName(state?.source)
     val iob = state?.insulin?.totalIob?.let { TherapyDisplayFormatter.units(it, "U", 1) } ?: "1.2U"
     val cob = state?.carbs?.cobGrams?.let { TherapyDisplayFormatter.units(it, "g", 0) } ?: "15g"
