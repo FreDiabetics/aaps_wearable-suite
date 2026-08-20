@@ -51,12 +51,12 @@ enum class SugarliciousColorRole(
     CGM_DOT_IN_RANGE("cgm_dot_in_range", "CGM-Punkte · im Ziel", SugarliciousColorGroup.GLUCOSE, 0xFF54DF30.toInt(), 0xFF2E9C45.toInt(), true),
     CGM_DOT_HIGH("cgm_dot_high", "CGM-Punkte · hoch", SugarliciousColorGroup.GLUCOSE, 0xFFFFD040.toInt(), 0xFFD47D00.toInt(), true),
     /**
-     * Compatibility role: the target range itself is rendered via RANGE_IN_RANGE since #51.
-     * The retained target_band preference now controls the effective target value line/text,
-     * so existing saved graph color data remains readable without introducing a parallel key.
+     * Compatibility enum slot: the target range itself is rendered via RANGE_IN_RANGE since #51.
+     * This role now owns the independent target_value preference for effective target line/text.
+     * Old target_band preferences stay untouched and are not reinterpreted.
      */
     TARGET_BAND(
-        "target_band",
+        "target_value",
         "Zielwert im Graph",
         SugarliciousColorGroup.GLUCOSE,
         0xFFF5F5F5.toInt(),
@@ -86,7 +86,7 @@ enum class SugarliciousColorRole(
     GRAPH_CURRENT_OUTLINE("graph_current_outline", "Aktueller Punkt · Kontur", SugarliciousColorGroup.GRAPH, 0xFF000000.toInt());
 
     companion object {
-        /** Semantic alias used by the graph while keeping the persisted target_band key compatible. */
+        /** Semantic alias used by graph/settings without adding another enum entry. */
         val TARGET_VALUE: SugarliciousColorRole
             get() = TARGET_BAND
     }
