@@ -152,7 +152,10 @@ internal fun G6StyleFacePreview(
             fontWeight = FontWeight.Medium,
             textAlign = TextAlign.Center,
             maxLines = 1,
-            modifier = Modifier.align(Alignment.BottomCenter).padding(horizontal = w * 0.09f, bottom = h * 0.045f),
+            modifier =
+                Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(start = w * 0.09f, end = w * 0.09f, bottom = h * 0.045f),
         )
     }
 }
