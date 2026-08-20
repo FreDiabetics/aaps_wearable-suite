@@ -1026,7 +1026,6 @@ internal fun NotificationGraphSettingsPanel() {
         SugarliciousColorRole.CGM_DOT_IN_RANGE,
         SugarliciousColorRole.CGM_DOT_HIGH,
         SugarliciousColorRole.GRAPH_CURRENT_OUTLINE,
-        SugarliciousColorRole.RANGE_IN_RANGE,
         SugarliciousColorRole.GRAPH_BACKGROUND,
         SugarliciousColorRole.GRAPH_DIVIDER,
     )
@@ -1051,6 +1050,11 @@ internal fun NotificationGraphSettingsPanel() {
                 revision++
             }) { Text("RESET", color = SugarliciousColors.Primary, fontSize = 9.sp, fontWeight = FontWeight.Bold) }
         }
+        Text(
+            "Bereich · im Ziel übernimmt immer die Farbe des App-Graphs.",
+            color = SugarliciousColors.TextSecondary,
+            fontSize = 10.sp,
+        )
         GraphSettingSlider(
             "Punktgröße", "Nur die CGM-Dots in der Notification", dotRadius, 1.5f..6f,
             "${String.format(locale, "%.1f", dotRadius)} dp",
