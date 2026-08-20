@@ -35,6 +35,16 @@ class SugarliciousWatchFaceSelectionStoreTest {
     }
 
     @Test
+    fun `g6 style availability reads explicit collector source from dashboard preferences`() {
+        context.getSharedPreferences("dashboard_ui", Context.MODE_PRIVATE)
+            .edit()
+            .putString("dataSource", DataSourcePreference.DEXCOM_G7_WATCH.name)
+            .commit()
+
+        assertTrue(SugarliciousWatchFaceSelectionStore.isG6StyleRelevant(context, null))
+    }
+
+    @Test
     fun `g6 style becomes relevant for canonical watch direct state`() {
         val state = TherapyDisplayState(source = DataSourceId.DEXCOM_G7_WATCH, receivedAtEpochMs = 1L)
         assertTrue(
@@ -53,6 +63,42 @@ class SugarliciousWatchFaceSelectionStoreTest {
                 context,
                 null,
                 DashboardUiPreferences(),
+            ),
+        )
+    }
+
+    @Test
+    fun `g6 style cannot be selected before collector is relevant`() {
+        assertFalse(
+            SugarliciousWatchFaceSelectionStore.isSelectable(
+                SUGARLICIOUS_G6_STYLE_FACE_INDEX,
+                g6StyleRelevant = false,
+            ),
+        )
+        assertTrue(
+            SugarliciousWatchFaceSelectionStore.isSelectable(
+                SUGARLICIOUS_G6_STYLE_FACE_INDEX,
+                g6StyleRelevant = true,
+            ),
+        )
+    }
+
+    @Test
+    fun `unavailable saved g6 style falls back to legacy selectable face`() {
+        assertEquals(
+            2,
+            SugarliciousWatchFaceSelectionStore.resolveSelectableFallback(
+                savedFaceIndex = SUGARLICIOUS_G6_STYLE_FACE_INDEX,
+                legacyFallback = 2,
+                g6StyleRelevant = false,
+            ),
+        )
+        assertEquals(
+            SUGARLICIOUS_G6_STYLE_FACE_INDEX,
+            SugarliciousWatchFaceSelectionStore.resolveSelectableFallback(
+                savedFaceIndex = SUGARLICIOUS_G6_STYLE_FACE_INDEX,
+                legacyFallback = 2,
+                g6StyleRelevant = true,
             ),
         )
     }
