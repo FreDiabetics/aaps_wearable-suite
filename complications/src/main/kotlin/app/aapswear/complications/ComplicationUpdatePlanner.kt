@@ -8,11 +8,14 @@ import app.aapswear.model.TherapyDisplayState
  * and keeps an IOB/COB update from invalidating every graph and glucose field.
  */
 object ComplicationUpdatePlanner {
+    val allManagedProviders: List<Class<*>>
+        get() = (AllProviders.classes + g6StyleProviders).distinct()
+
     fun affectedProviders(
         old: TherapyDisplayState?,
         new: TherapyDisplayState,
     ): List<Class<*>> {
-        if (old == null) return (AllProviders.classes + g6StyleProviders).distinct()
+        if (old == null) return allManagedProviders
         if (old == new) return emptyList()
 
         val affected = linkedSetOf<Class<*>>()
