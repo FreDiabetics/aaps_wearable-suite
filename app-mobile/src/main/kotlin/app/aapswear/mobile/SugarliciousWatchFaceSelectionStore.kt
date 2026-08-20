@@ -28,11 +28,41 @@ internal object SugarliciousWatchFaceSelectionStore {
     fun isG6StyleRelevant(
         context: Context,
         state: TherapyDisplayState?,
+    ): Boolean =
+        isG6StyleRelevant(
+            context = context,
+            state = state,
+            preferences =
+                DashboardUiPreferences.read(
+                    context.getSharedPreferences(PREFS, Context.MODE_PRIVATE),
+                ),
+        )
+
+    fun isG6StyleRelevant(
+        context: Context,
+        state: TherapyDisplayState?,
         preferences: DashboardUiPreferences,
     ): Boolean {
         val dashboard = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         return preferences.dataSource == DataSourcePreference.DEXCOM_G7_WATCH ||
             state?.source == DataSourceId.DEXCOM_G7_WATCH ||
             dashboard.getBoolean(G7_SOURCE_FALLBACK_MIGRATION_KEY, false)
+    }
+
+    fun isSelectable(
+        faceIndex: Int,
+        g6StyleRelevant: Boolean,
+    ): Boolean =
+        faceIndex in sugarliciousWatchFaceCards.indices &&
+            (faceIndex != SUGARLICIOUS_G6_STYLE_FACE_INDEX || g6StyleRelevant)
+
+    fun resolveSelectableFallback(
+        savedFaceIndex: Int,
+        legacyFallback: Int,
+        g6StyleRelevant: Boolean,
+    ): Int {
+        val saved = savedFaceIndex.coerceIn(sugarliciousWatchFaceCards.indices)
+        if (isSelectable(saved, g6StyleRelevant)) return saved
+        return legacyFallback.coerceIn(0, SUGARLICIOUS_G6_STYLE_FACE_INDEX - 1)
     }
 }
