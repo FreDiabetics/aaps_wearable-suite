@@ -260,6 +260,7 @@ private val cgmGraphColorRoles =
         SugarliciousColorRole.CGM_DOT_IN_RANGE,
         SugarliciousColorRole.CGM_DOT_HIGH,
         SugarliciousColorRole.GRAPH_DIVIDER,
+        SugarliciousColorRole.GRAPH_SIGNAL_LOSS,
     )
 
 internal fun colorRoleVisible(
@@ -693,7 +694,8 @@ private fun ColorRoleExample(
             }
 
             SugarliciousColorRole.GRAPH_MUTED,
-            SugarliciousColorRole.GRAPH_DIVIDER -> {
+            SugarliciousColorRole.GRAPH_DIVIDER,
+            SugarliciousColorRole.GRAPH_SIGNAL_LOSS -> {
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(4.dp),
                     verticalAlignment = Alignment.CenterVertically,
