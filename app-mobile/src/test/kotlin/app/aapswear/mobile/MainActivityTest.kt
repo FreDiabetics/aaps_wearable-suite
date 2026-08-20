@@ -133,15 +133,15 @@ class MainActivityTest {
         assertEquals(96, Color.alpha(SugarliciousColorStore.load(preferences).argb(SugarliciousColorRole.RANGE_IN_RANGE)))
     }
 
-    @Test fun `light target band defaults to the opaque picker color`() {
+    @Test fun `light target value defaults to the opaque graph line color`() {
         val context = ApplicationProvider.getApplicationContext<android.content.Context>()
         val preferences = context.getSharedPreferences("dashboard_ui", android.content.Context.MODE_PRIVATE)
         preferences.edit().clear().putString("themeMode", "LIGHT").commit()
 
-        val target = SugarliciousColorStore.load(preferences).argb(SugarliciousColorRole.TARGET_BAND)
+        val target = SugarliciousColorStore.load(preferences).argb(SugarliciousColorRole.TARGET_VALUE)
 
         assertEquals(255, Color.alpha(target))
-        assertEquals(0xFFB9EFC7.toInt(), target)
+        assertEquals(0xFF252525.toInt(), target)
     }
 
     @Test fun `cgm dot appearance settings are read from preferences`() {
