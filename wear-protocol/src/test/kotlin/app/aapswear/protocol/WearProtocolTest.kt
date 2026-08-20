@@ -46,4 +46,10 @@ class WearProtocolTest {
   assertEquals(WatchDataSource.DEXCOM_G7_WATCH,WearProtocol.decodeConfig(WearProtocol.encodeConfig(config)).dataSource)
   assertFailsWith<IllegalArgumentException>{G7SetupCommand("12")}
  }
+ @Test fun runtimeStatusAllowsSixthSugarliciousFace() {
+  val sixth=WatchRuntimeStatus(activeSugarliciousFaceIndex=5,activeComplicationIds=listOf(1,1,2))
+  val decoded=WearProtocol.decodeRuntimeStatus(WearProtocol.encodeRuntimeStatus(sixth))
+  assertEquals(5,decoded.activeSugarliciousFaceIndex)
+  assertEquals(listOf(1,2),decoded.activeComplicationIds)
+ }
 }

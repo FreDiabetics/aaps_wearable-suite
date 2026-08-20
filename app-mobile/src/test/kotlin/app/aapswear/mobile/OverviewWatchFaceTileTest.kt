@@ -53,7 +53,7 @@ class OverviewWatchFaceTileTest {
     @Test
     fun `watch menu lists every installable Sugarlicious face as a card`() {
         assertEquals(sugarliciousWatchFaceNames, sugarliciousWatchFaceCards.map { it.name })
-        assertEquals(5, sugarliciousWatchFaceCards.size)
+        assertEquals(sugarliciousWatchFaceNames.size, sugarliciousWatchFaceCards.size)
         assertTrue(sugarliciousWatchFaceCards.all { it.slots > 0 && "AOD" in it.features })
     }
 

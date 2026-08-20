@@ -27,6 +27,7 @@ if (-not $?) {
     :watchfaces:sugarlicious-rings:assembleRelease `
     :watchfaces:sugarlicious-graph:assembleRelease `
     :watchfaces:sugarlicious-digital:assembleRelease `
+    :watchfaces:sugarlicious-g6-style:assembleRelease `
     :watchfaces:aaps-big-chart:assembleRelease :watchfaces:aaps-circle:assembleRelease `
     :watchfaces:aaps-cockpit:assembleRelease :watchfaces:aaps-community:assembleRelease `
     :watchfaces:aaps-digital-style:assembleRelease :watchfaces:aaps-large:assembleRelease `
@@ -65,6 +66,7 @@ $faces = @(
     @{ Module='sugarlicious-rings';  Out='sugarlicious_rings'  },
     @{ Module='sugarlicious-graph';  Out='sugarlicious_graph'  },
     @{ Module='sugarlicious-digital'; Out='sugarlicious_digital' },
+    @{ Module='sugarlicious-g6-style'; Out='sugarlicious_g6_style' },
     @{ Module='aaps-big-chart'; Out='aaps_big_chart' },
     @{ Module='aaps-circle'; Out='aaps_circle' },
     @{ Module='aaps-cockpit'; Out='aaps_cockpit' },

@@ -57,7 +57,6 @@ data class WatchGraphColors(
     val predictionZeroTemp: Int = 0xFF30DBDE.toInt(),
 )
 
-
 @Serializable
 data class WatchUiColors(
     val background: Int = 0xFF181818.toInt(),
@@ -80,7 +79,6 @@ data class WatchGraphStyle(
     val cgmDotOutlineEnabled: Boolean = true,
     val cgmDotOutlineWidthDp: Float = 0.95f,
 )
-
 
 @Serializable
 data class WatchRuntimeStatus(
@@ -121,6 +119,8 @@ object WearProtocol {
     const val G7_READING_PATH = "/aaps-display/v1/g7-reading"
     const val DIAGNOSTICS_REQUEST_PATH = "/aaps-display/v1/diagnostics-request"
     const val DIAGNOSTICS_BATCH_PATH = "/aaps-display/v1/diagnostics-batch"
+    const val SUGARLICIOUS_WATCH_FACE_MAX_INDEX = 5
+
     private val json = Json {
         ignoreUnknownKeys = true
         explicitNulls = false
@@ -158,7 +158,8 @@ object WearProtocol {
     fun decodeRuntimeStatus(bytes: ByteArray): WatchRuntimeStatus {
         val decoded = json.decodeFromString<WatchRuntimeStatus>(bytes.decodeToString())
         return decoded.copy(
-            activeSugarliciousFaceIndex = decoded.activeSugarliciousFaceIndex?.coerceIn(0, 4),
+            activeSugarliciousFaceIndex =
+                decoded.activeSugarliciousFaceIndex?.coerceIn(0, SUGARLICIOUS_WATCH_FACE_MAX_INDEX),
             activeComplicationIds = decoded.activeComplicationIds.distinct().take(12),
         )
     }

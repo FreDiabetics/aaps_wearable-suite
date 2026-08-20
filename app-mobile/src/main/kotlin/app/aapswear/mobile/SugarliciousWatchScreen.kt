@@ -2,8 +2,8 @@ package app.aapswear.mobile
 
 import android.content.SharedPreferences
 import android.widget.Toast
-import androidx.compose.foundation.border
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -16,9 +16,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -41,6 +41,8 @@ import androidx.compose.ui.unit.sp
 import app.aapswear.mobile.ui.theme.SugarliciousColors
 import app.aapswear.model.TherapyDisplayState
 import kotlinx.coroutines.launch
+
+internal const val SUGARLICIOUS_G6_STYLE_FACE_INDEX = 5
 
 internal data class SugarliciousWatchFaceCard(
     val name: String,
@@ -80,6 +82,12 @@ internal val sugarliciousWatchFaceCards =
             style = "Digital",
             slots = 8,
             features = listOf("Glukose", "Graph", "AOD"),
+        ),
+        SugarliciousWatchFaceCard(
+            name = "Sugarlicious G6 Style",
+            style = "G7 Collector",
+            slots = 3,
+            features = listOf("G7 Collector", "3h Graph", "AOD", "Fixed Layout"),
         ),
     )
 
@@ -121,31 +129,41 @@ internal fun SugarliciousWatchScreen(
     val context = LocalContext.current
     val appContext = context.applicationContext
     val scope = rememberCoroutineScope()
+    val savedFaceIndex = SugarliciousWatchFaceSelectionStore.read(appContext, preferences.watchFaceIndex)
+    val g6StyleRelevant =
+        SugarliciousWatchFaceSelectionStore.isG6StyleRelevant(appContext, state, preferences)
     var runtimeStatus by remember { mutableStateOf(WatchRuntimeStatusStore.read(appContext)) }
     var activeFaceIndex by remember {
-        mutableStateOf<Int?>(runtimeStatus.activeSugarliciousFaceIndex ?: preferences.watchFaceIndex)
+        mutableStateOf<Int?>(runtimeStatus.activeSugarliciousFaceIndex ?: savedFaceIndex)
     }
     var editingFaceIndex by remember {
-        mutableStateOf(runtimeStatus.activeSugarliciousFaceIndex ?: preferences.watchFaceIndex)
+        mutableStateOf(runtimeStatus.activeSugarliciousFaceIndex ?: savedFaceIndex)
     }
     var facePresets by remember { mutableStateOf(WatchFacePresetStore.readAll(appContext)) }
     var showLegacyFaces by remember { mutableStateOf(false) }
 
     DisposableEffect(appContext) {
-        val listener =
-            SharedPreferences.OnSharedPreferenceChangeListener { _, _ ->
-                val updated = WatchRuntimeStatusStore.read(appContext)
-                runtimeStatus = updated
-                activeFaceIndex = updated.activeSugarliciousFaceIndex
-            }
-        WatchRuntimeStatusStore.registerListener(appContext, listener)
-        onDispose {
-            WatchRuntimeStatusStore.unregisterListener(appContext, listener)
+        val listener = SharedPreferences.OnSharedPreferenceChangeListener { _, _ ->
+            val updated = WatchRuntimeStatusStore.read(appContext)
+            runtimeStatus = updated
+            activeFaceIndex =
+                updated.activeSugarliciousFaceIndex
+                    ?: SugarliciousWatchFaceSelectionStore.read(appContext, savedFaceIndex)
         }
+        WatchRuntimeStatusStore.registerListener(appContext, listener)
+        onDispose { WatchRuntimeStatusStore.unregisterListener(appContext, listener) }
     }
 
     LaunchedEffect(appContext) {
         runCatching { requestWatchRuntimeStatus(appContext) }
+    }
+
+    LaunchedEffect(preferences.watchFaceIndex, runtimeStatus.activeSugarliciousFaceIndex) {
+        if (runtimeStatus.activeSugarliciousFaceIndex == null) {
+            val stored = SugarliciousWatchFaceSelectionStore.read(appContext, preferences.watchFaceIndex)
+            activeFaceIndex = stored
+            editingFaceIndex = stored
+        }
     }
 
     Column(
@@ -171,6 +189,7 @@ internal fun SugarliciousWatchScreen(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 indices.forEach { index ->
+                    val enabled = index != SUGARLICIOUS_G6_STYLE_FACE_INDEX || g6StyleRelevant
                     WatchFaceTile(
                         modifier = Modifier.weight(1f),
                         face = sugarliciousWatchFaceCards[index],
@@ -178,21 +197,23 @@ internal fun SugarliciousWatchScreen(
                         state = state,
                         activeComplicationIds = facePresets.getOrElse(index) { emptyList() },
                         selected = activeFaceIndex == index,
+                        enabled = enabled,
                         onSelected = {
                             editingFaceIndex = index
+                            activeFaceIndex = index
+                            SugarliciousWatchFaceSelectionStore.write(appContext, index)
                             val activated = WatchFacePresetStore.activate(appContext, index)
                             facePresets =
                                 WatchFacePresetStore.readAll(appContext).toMutableList().also {
                                     it[index] = activated
                                 }
-                            onSelectedFace(index)
+                            if (index != SUGARLICIOUS_G6_STYLE_FACE_INDEX) {
+                                onSelectedFace(index)
+                            }
                         },
                     )
                 }
-
-                if (indices.size == 1) {
-                    Spacer(Modifier.weight(1f))
-                }
+                if (indices.size == 1) Spacer(Modifier.weight(1f))
             }
         }
 
@@ -211,17 +232,36 @@ internal fun SugarliciousWatchScreen(
         )
 
         key(editingFaceIndex) {
-            CompositionLocalProvider(LocalSugarliciousTrendArrowMaxSize provides 8.dp) {
-                ComplicationStudio(
-                    state = state,
-                    onPresetChanged = { updated ->
-                        WatchFacePresetStore.save(appContext, editingFaceIndex, updated)
-                        facePresets =
-                            facePresets.toMutableList().also { presets ->
+            if (editingFaceIndex == SUGARLICIOUS_G6_STYLE_FACE_INDEX) {
+                Surface(
+                    color = SugarliciousColors.SurfaceHigh,
+                    shape = RoundedCornerShape(18.dp),
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text(
+                        text =
+                            if (g6StyleRelevant) {
+                                "G6 Style nutzt drei feste, nicht austauschbare Slots für Glukose/Trend, den 3-Stunden-Graphen und Quelle/Freshness. Alle Werte kommen aus dem zentralen Sugarlicious-Resolver."
+                            } else {
+                                "G6 Style wird verfügbar, sobald der G7 Watch Collector eingerichtet oder als Datenquelle aktiv ist."
+                            },
+                        color = SugarliciousColors.TextSecondary,
+                        fontSize = 12.sp,
+                        modifier = Modifier.padding(14.dp),
+                    )
+                }
+            } else {
+                CompositionLocalProvider(LocalSugarliciousTrendArrowMaxSize provides 8.dp) {
+                    ComplicationStudio(
+                        state = state,
+                        onPresetChanged = { updated ->
+                            WatchFacePresetStore.save(appContext, editingFaceIndex, updated)
+                            facePresets = facePresets.toMutableList().also { presets ->
                                 presets[editingFaceIndex] = updated
                             }
-                    },
-                )
+                        },
+                    )
+                }
             }
         }
     }
@@ -236,7 +276,9 @@ internal fun SugarliciousWatchScreen(
                         Surface(
                             modifier = Modifier.fillMaxWidth().clickable {
                                 scope.launch {
-                                    val nodes = runCatching { requestWatchFaceApply(appContext, 5 + index) }.getOrDefault(0)
+                                    val nodes = runCatching {
+                                        requestWatchFaceApply(appContext, sugarliciousWatchFaceCards.size + index)
+                                    }.getOrDefault(0)
                                     Toast.makeText(
                                         context,
                                         if (nodes > 0) "${face.name} wird an die Watch gesendet" else "Watch nicht erreichbar",
@@ -276,6 +318,7 @@ private fun WatchFaceTile(
     state: TherapyDisplayState?,
     activeComplicationIds: List<Int>,
     selected: Boolean,
+    enabled: Boolean,
     onSelected: () -> Unit,
 ) {
     val context = LocalContext.current
@@ -292,49 +335,32 @@ private fun WatchFaceTile(
                         if (selected) {
                             SugarliciousColors.Primary
                         } else {
-                            SugarliciousColors.Border.copy(alpha = 0.58f)
+                            SugarliciousColors.Border.copy(alpha = if (enabled) 0.58f else 0.32f)
                         },
                     shape = shape,
                 )
-                .clickable {
+                .clickable(enabled = enabled) {
                     onSelected()
                     scope.launch {
                         val appContext = context.applicationContext
                         val preset = WatchFacePresetStore.activate(appContext, index)
-                        runCatching {
-                            syncComplicationPreset(appContext, preset)
-                        }
-
-                        val nodes =
-                            runCatching {
-                                requestWatchFaceApply(
-                                    appContext,
-                                    index,
-                                )
-                            }.getOrDefault(0)
-
+                        runCatching { syncComplicationPreset(appContext, preset) }
+                        val nodes = runCatching { requestWatchFaceApply(appContext, index) }.getOrDefault(0)
                         if (nodes == 0) {
-                            Toast.makeText(
-                                context,
-                                "Watch nicht erreichbar",
-                                Toast.LENGTH_SHORT,
-                            ).show()
+                            Toast.makeText(context, "Watch nicht erreichbar", Toast.LENGTH_SHORT).show()
                         }
                     }
                 },
         shape = shape,
         color =
-            if (selected) {
-                SugarliciousColors.SurfaceSelected
-            } else {
-                SugarliciousColors.Surface
+            when {
+                selected -> SugarliciousColors.SurfaceSelected
+                enabled -> SugarliciousColors.Surface
+                else -> SugarliciousColors.Surface.copy(alpha = 0.55f)
             },
     ) {
         Column(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 10.dp, vertical = 10.dp),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 10.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center,
         ) {
@@ -348,12 +374,21 @@ private fun WatchFaceTile(
             Text(
                 text = face.name,
                 modifier = Modifier.fillMaxWidth().padding(top = 7.dp),
-                color = SugarliciousColors.TextPrimary,
+                color = if (enabled) SugarliciousColors.TextPrimary else SugarliciousColors.TextSecondary,
                 fontSize = 13.sp,
                 fontWeight = FontWeight.Bold,
                 textAlign = TextAlign.Center,
                 maxLines = 2,
             )
+            if (index == SUGARLICIOUS_G6_STYLE_FACE_INDEX) {
+                Text(
+                    text = if (enabled) "G7 Collector Style" else "G7 Collector erforderlich",
+                    color = if (enabled) SugarliciousColors.Primary else SugarliciousColors.TextSecondary,
+                    fontSize = 9.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    textAlign = TextAlign.Center,
+                )
+            }
         }
     }
 }
