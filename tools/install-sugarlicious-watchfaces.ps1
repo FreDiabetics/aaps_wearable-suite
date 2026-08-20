@@ -13,6 +13,7 @@ $faces = @(
     @{ Name = "Orbit"; Asset = "sugarlicious_orbit.apk" }
     @{ Name = "Rings"; Asset = "sugarlicious_rings.apk" }
     @{ Name = "Graph"; Asset = "sugarlicious_graph.apk" }
+    @{ Name = "G6 Style"; Asset = "sugarlicious_g6_style.apk" }
 )
 
 if (-not (Test-Path -LiteralPath $Adb -PathType Leaf)) {
@@ -39,4 +40,4 @@ foreach ($face in $faces) {
     }
 }
 
-Write-Host "Alle fünf Sugarlicious-Watchfaces wurden auf der Watch installiert."
+Write-Host "Alle sechs Sugarlicious-Watchfaces wurden auf der Watch installiert."
