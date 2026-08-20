@@ -5,20 +5,28 @@ import android.content.Context
 import android.content.Intent
 
 /**
- * Legacy source-selection signal from Sugarlicious Wear.
+ * Source-selection signal from Sugarlicious Wear.
  *
- * Source selection and collector lifecycle are deliberately separate. Changing the canonical
- * display source must never persist collectorEnabled=false. Entering the direct-G7 source may
- * only resume a collector that the user has already enabled explicitly.
+ * Source selection and collector lifecycle remain separate. Changing the canonical display source
+ * must never persist collectorEnabled=false. The signal additionally controls whether the standalone
+ * collector is allowed to raise user-facing connection alarms: only explicit Watch Collector Only
+ * mode enables those alarms. Automatic/Phone modes keep recoverable collector problems diagnostic.
  */
 class G7SourceControlReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action != ACTION_SET_SOURCE) return
 
         val g7Selected = intent.getBooleanExtra(EXTRA_G7_SELECTED, false)
-        val collectorEnabled = G7SensorStateStore(context).read().collectorEnabled
-        if (!shouldResumeEnabledCollectorForSourceSignal(g7Selected, collectorEnabled)) return
+        G7AlertPolicyStore.setWatchOnly(context, g7Selected)
+        val state = G7SensorStateStore(context).read()
 
+        if (!g7Selected) {
+            G7ErrorNotifier.clearActive(context)
+            return
+        }
+
+        G7SignalLossMonitor.scheduleFromState(context, state)
+        if (!shouldResumeEnabledCollectorForSourceSignal(g7Selected, state.collectorEnabled)) return
         runCatching { G7CollectorService.start(context) }
     }
 
