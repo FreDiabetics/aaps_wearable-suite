@@ -120,7 +120,7 @@ class DashboardChartsTest {
     @Test fun `glucose chart marks stale signal period with configured signal loss color`() {
         val preferences = context.getSharedPreferences("chart_signal_loss_color", android.content.Context.MODE_PRIVATE)
         preferences.edit().clear().putString("themeMode", "DARK").commit()
-        val signalLoss = Color.argb(120, 210, 30, 60)
+        val signalLoss = Color.rgb(210, 30, 60)
         SugarliciousColorStore.save(preferences, SugarliciousColorRole.GRAPH_SIGNAL_LOSS, signalLoss)
         SugarliciousColors.apply(SugarliciousColorStore.load(preferences))
 
