@@ -60,3 +60,9 @@ Prognosen werden nicht lokal berechnet. Der Adapter liest optional das
 akzeptiert nur endliche Werte zwischen 20 und 1000 mg/dl, begrenzt jede Serie
 auf 96 Punkte und verwendet den AAPS-Zeitabstand von fünf Minuten. Fehlt das
 Objekt oder ist es ungültig, bleibt `PREDICTIONS` aus der Capability-Menge weg.
+
+Der letzte gültige Prognosesatz bleibt für kurze Quell- oder Verbindungsunterbrechungen
+lokal erhalten und läuft nach spätestens drei Stunden ohne gültigen Punkt aus. Für die
+reine Darstellung werden die unveränderten Zeitabstände so an die aktuelle Zeit
+verschoben, dass der erste Prognosepunkt direkt rechts der Jetzt-Trennlinie liegt. Die
+gespeicherten AAPS-Quelldaten selbst werden dabei nicht umgeschrieben.

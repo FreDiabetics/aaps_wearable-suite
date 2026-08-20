@@ -4,7 +4,7 @@
 
 Sie zeigt lokal von AndroidAPS gesendete Glukose-, Trend-, Delta-, IOB-, COB-,
 Basal-, Profil-, Pumpen- und Batteriedaten auf Wear OS an. Sie kann keine
-Therapie auslösen oder ändern. Die 27 Provider lassen sich auch in fremden
+Therapie auslösen oder ändern. Die 35 Provider lassen sich auch in fremden
 Watchfaces verwenden; deren Layout wird dann vom jeweiligen Watchface bestimmt.
 xDrip+ kann alternativ lokale Glukose-, Trend- und Zeitdaten liefern;
 Therapieinformationen bleiben ausschließlich AndroidAPS-Daten.
@@ -30,20 +30,27 @@ Therapieinformationen bleiben ausschließlich AndroidAPS-Daten.
    das betreffende Watchface-Paket entfernen und nach der Wear-App erneut
    installieren oder die AAPS-Complications einmal manuell zuweisen.
 
-Wichtig: Die vier Sugarlicious-Watchfaces sind eigenständige WFF-Apps. Die
+Wichtig: Die sechs Sugarlicious-Watchfaces sind eigenständige WFF-Apps. Die
 Installation von `app-wear-debug.apk` installiert sie nicht automatisch. Für
-einen lokalen Debug-Build werden zuerst alle vier Pakete gebaut und danach auf
-der Watch installiert:
+einen vollständigen lokalen Build mit Tests und Installation aller Apps und
+Watchfaces genügt bei verbundenem Telefon und verbundener Watch:
 
 ```powershell
-.\gradlew.bat :watchfaces:sugarlicious-analog:assembleRelease :watchfaces:sugarlicious-orbit:assembleRelease :watchfaces:sugarlicious-rings:assembleRelease :watchfaces:sugarlicious-graph:assembleRelease
-.\tools\install-sugarlicious-watchfaces.ps1 -WatchSerial "ADB-SERIENNUMMER-DER-WATCH"
+.\dev.ps1 all -Test
 ```
 
-Anschließend erscheinen `Sugarlicious Analog`, `Sugarlicious Orbit`,
-`Sugarlicious Rings` und `Sugarlicious Graph` in der Watchface-Auswahl. Falls
-Galaxy Wearable die Liste noch zwischengespeichert hat, die Auswahl auf der Uhr
-durch langes Drücken des Zifferblatts öffnen oder Galaxy Wearable neu starten.
+Das Skript erkennt Telefon und Watch anhand ihrer Android-Geräteart; USB- und
+Wireless-Debugging-Seriennummern funktionieren gleichermaßen. Bei mehreren
+Telefonen oder Watches kann die Auswahl mit `-PhoneSerial` beziehungsweise
+`-WatchSerial` eindeutig vorgegeben werden.
+
+Anschließend erscheinen `Sugarlicious Digital`, `Sugarlicious Analog`,
+`Sugarlicious Orbit`, `Sugarlicious Rings`, `Sugarlicious Graph` und
+`Sugarlicious G6 Style` in der Watchface-Auswahl. Das G6-Style-Watchface wird in
+der Sugarlicious-Auswahl freigegeben, sobald die Dexcom-G7-Watch-Datenquelle
+aktiviert oder als aktive Quelle erkannt ist. Falls Galaxy Wearable die Liste
+noch zwischengespeichert hat, die Auswahl auf der Uhr durch langes Drücken des
+Zifferblatts öffnen oder Galaxy Wearable neu starten.
 
 Alternativ oder als Glukose-Fallback in xDrip+ die Ausgabe von Daten über lokale
 Intents aktivieren und in Sugarlicious unter **Einstellungen → Anzeige →
@@ -82,10 +89,10 @@ sind semantisch; Farbe, Schrift und Anordnung bestimmt das fremde Watchface.
 Für kontrollierte Optik stehen die Bild-/Graph-Provider und die mitgelieferten
 WFF-Pakete bereit.
 
-Die Originalpakete heißen Sugarlicious Digital, Analog, Orbit, Rings und Graph.
-Die vier analogen Varianten besitzen kräftige eigene Baton-Zeiger, AOD sowie
-Graph- und kreisförmig nutzbare `RANGED_VALUE`-Slots. Die Zeiger sind eine
-Eigenentwicklung und keine kopierten Apple-Assets.
+Die Originalpakete heißen Sugarlicious Digital, Analog, Orbit, Rings, Graph und
+G6 Style. Die vier analogen Varianten besitzen kräftige eigene Baton-Zeiger,
+AOD sowie Graph- und kreisförmig nutzbare `RANGED_VALUE`-Slots. Die Zeiger sind
+eine Eigenentwicklung und keine kopierten Apple-Assets.
 
 ## DIY-Hinweis
 

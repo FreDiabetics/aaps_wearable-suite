@@ -4,7 +4,7 @@ android {
     namespace="app.aapswear.watchface.steampunk"
     compileSdk=36
     defaultConfig {
-        applicationId="app.aapswear.watchface.steampunk"
+        applicationId="app.aapswear.watchfacepush.steampunk"
         minSdk=33
         targetSdk=35
         versionCode=3

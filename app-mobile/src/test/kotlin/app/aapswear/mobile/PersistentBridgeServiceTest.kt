@@ -5,7 +5,15 @@ import android.app.NotificationManager
 import android.app.Service
 import android.content.Intent
 import android.graphics.Color
+import android.graphics.Rect
+import android.util.TypedValue
+import android.view.LayoutInflater
+import android.view.View
+import android.view.ViewGroup
+import android.widget.ImageView
+import android.widget.TextView
 import androidx.test.core.app.ApplicationProvider
+import app.aapswear.mobile.ui.theme.SugarliciousColorRole
 import app.aapswear.model.GlucoseState
 import app.aapswear.model.GlucoseUnit
 import app.aapswear.model.TherapyDisplayState
@@ -24,10 +32,66 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
+import kotlin.math.abs
 
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class PersistentBridgeServiceTest {
+
+    @Test
+    fun `notification value block keeps metadata below the value and flat arrow`() {
+        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+        val layouts =
+            listOf(
+                Triple(R.layout.notification_sugarlicious_collapsed, 29f, 11f),
+                Triple(R.layout.notification_sugarlicious_expanded, 36f, 13f),
+            )
+
+        layouts.forEach { (layoutId, valueSp, metaSp) ->
+            val root = LayoutInflater.from(context).inflate(layoutId, null)
+            val info = root.findViewById<ViewGroup>(R.id.notification_info_block)
+            val primary = root.findViewById<ViewGroup>(R.id.notification_primary_row)
+            val value = root.findViewById<TextView>(R.id.notification_value)
+            val trend = root.findViewById<ImageView>(R.id.notification_trend)
+            val meta = root.findViewById<TextView>(R.id.notification_meta)
+            val density = context.resources.displayMetrics.density
+            val valuePx =
+                TypedValue.applyDimension(
+                    TypedValue.COMPLEX_UNIT_SP,
+                    valueSp,
+                    context.resources.displayMetrics,
+                )
+            val metaPx =
+                TypedValue.applyDimension(
+                    TypedValue.COMPLEX_UNIT_SP,
+                    metaSp,
+                    context.resources.displayMetrics,
+                )
+            val digitBounds = Rect()
+            value.text = "123"
+            meta.text = "+5 · 2 min alt"
+            trend.visibility = View.VISIBLE
+            root.measure(
+                View.MeasureSpec.makeMeasureSpec(
+                    (400f * density).toInt(),
+                    View.MeasureSpec.EXACTLY,
+                ),
+                View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED),
+            )
+            value.paint.getTextBounds("123", 0, 3, digitBounds)
+
+            assertEquals(ViewGroup.LayoutParams.WRAP_CONTENT, info.layoutParams.width)
+            assertEquals(ViewGroup.LayoutParams.WRAP_CONTENT, primary.layoutParams.width)
+            assertEquals(ViewGroup.LayoutParams.MATCH_PARENT, meta.layoutParams.width)
+            assertEquals(valuePx, value.textSize, 0.5f)
+            assertEquals(metaPx, meta.textSize, 0.5f)
+            assertEquals(primary.measuredWidth, info.measuredWidth)
+            assertEquals(info.measuredWidth, meta.measuredWidth)
+            assertTrue(
+                abs(digitBounds.height() - trend.layoutParams.height) <= 3f * density,
+            )
+        }
+    }
 
     @Test
     @Config(sdk = [35])
@@ -50,7 +114,7 @@ class PersistentBridgeServiceTest {
 
     @Test
     @Config(sdk = [36])
-    fun `live preference requests promoted status with current glucose and graph`() {
+    fun `live preference requests promoted status with current glucose delta and graph`() {
         val context = ApplicationProvider.getApplicationContext<android.content.Context>()
         context.getSharedPreferences("dashboard_ui", android.content.Context.MODE_PRIVATE).edit()
             .clear()
@@ -63,7 +127,13 @@ class PersistentBridgeServiceTest {
         val now = System.currentTimeMillis()
         val therapyState = TherapyDisplayState(
             receivedAtEpochMs = now,
-            glucose = GlucoseState(123.0, GlucoseUnit.MG_DL, Trend.FLAT, now),
+            glucose = GlucoseState(
+                valueMgDl = 123.0,
+                displayUnit = GlucoseUnit.MG_DL,
+                trend = Trend.FLAT,
+                measuredAtEpochMs = now,
+                deltaMgDl = 5.0,
+            ),
             glucoseHistory = listOf(
                 app.aapswear.model.GlucoseSample(115.0, now - 10 * 60_000L),
                 app.aapswear.model.GlucoseSample(120.0, now - 5 * 60_000L),
@@ -77,69 +147,85 @@ class PersistentBridgeServiceTest {
         val notification = shadowOf(manager).getNotification(PersistentBridgeService.NOTIFICATION_ID)
         val content = notification.extras.getCharSequence(Notification.EXTRA_TEXT).toString()
 
-        assertEquals("123 →", notification.extras.getCharSequence(Notification.EXTRA_TITLE).toString())
+        assertEquals("123", notification.extras.getCharSequence(Notification.EXTRA_TITLE).toString())
         assertTrue(notification.extras.getBoolean(PersistentBridgeService.EXTRA_REQUEST_PROMOTED_ONGOING))
-        assertTrue(content.contains("mg/dL"))
+        assertTrue(content.contains("+5"))
+        assertFalse(content.contains("mg/dL"))
         assertNull(notification.getLargeIcon())
         assertNotNull(notification.contentView)
         assertNotNull(notification.bigContentView)
         assertNull(notification.extras.getParcelable(Notification.EXTRA_PICTURE))
 
-        val collapsedGraph =
-            NotificationGraphRenderer.renderCollapsed(
-                context,
-                therapyState,
-                context.getSharedPreferences(
-                    "dashboard_ui",
-                    android.content.Context.MODE_PRIVATE,
-                ),
+        val graphPreferences =
+            context.getSharedPreferences("dashboard_ui", android.content.Context.MODE_PRIVATE)
+        val highEdgeColor = Color.rgb(198, 36, 91)
+        val targetBandColor = Color.rgb(0, 184, 126)
+        val lowEdgeColor = Color.rgb(24, 156, 214)
+        val graphColors = graphPreferences.edit()
+        listOf("dark", "light").forEach { mode ->
+            graphColors.putInt(
+                "notification.color.$mode.${SugarliciousColorRole.RANGE_HIGH.preferenceKey}",
+                highEdgeColor,
             )
-        val expandedGraph =
-            NotificationGraphRenderer.renderExpanded(
-                context,
-                therapyState,
-                context.getSharedPreferences(
-                    "dashboard_ui",
-                    android.content.Context.MODE_PRIVATE,
-                ),
+            graphColors.putInt(
+                "notification.color.$mode.${SugarliciousColorRole.TARGET_BAND.preferenceKey}",
+                targetBandColor,
             )
+            graphColors.putInt(
+                "notification.color.$mode.${SugarliciousColorRole.RANGE_LOW.preferenceKey}",
+                lowEdgeColor,
+            )
+        }
+        graphColors.commit()
 
-        assertEquals(
-            NotificationGraphRenderer.COLLAPSED_WIDTH,
-            collapsedGraph.width,
+        val collapsedGraph = NotificationGraphRenderer.renderCollapsed(
+            context,
+            therapyState,
+            graphPreferences,
         )
-        assertEquals(
-            NotificationGraphRenderer.COLLAPSED_HEIGHT,
-            collapsedGraph.height,
+        val expandedGraph = NotificationGraphRenderer.renderExpanded(
+            context,
+            therapyState,
+            graphPreferences,
         )
-        assertEquals(
-            NotificationGraphRenderer.EXPANDED_WIDTH,
-            expandedGraph.width,
-        )
-        assertEquals(
-            NotificationGraphRenderer.EXPANDED_HEIGHT,
-            expandedGraph.height,
-        )
-        assertEquals(
-            0,
-            Color.alpha(
-                collapsedGraph.getPixel(
-                    0,
-                    0,
-                ),
-            ),
-        )
-        assertTrue(
-            Color.alpha(
-                expandedGraph.getPixel(
-                    expandedGraph.width / 2,
-                    expandedGraph.height / 2,
-                ),
-            ) > 0,
-        )
+
+        assertEquals(NotificationGraphRenderer.COLLAPSED_WIDTH, collapsedGraph.width)
+        assertEquals(NotificationGraphRenderer.COLLAPSED_HEIGHT, collapsedGraph.height)
+        assertEquals(NotificationGraphRenderer.EXPANDED_WIDTH, expandedGraph.width)
+        assertEquals(NotificationGraphRenderer.EXPANDED_HEIGHT, expandedGraph.height)
+        listOf(collapsedGraph, expandedGraph).forEach { graph ->
+            assertEquals(0, Color.alpha(graph.getPixel(0, 0)))
+            assertEquals(0, Color.alpha(graph.getPixel(graph.width - 1, 0)))
+            assertEquals(0, Color.alpha(graph.getPixel(0, graph.height - 1)))
+            assertEquals(0, Color.alpha(graph.getPixel(graph.width - 1, graph.height - 1)))
+            assertEquals(highEdgeColor, graph.getPixel(graph.width / 2, 0))
+            assertEquals(lowEdgeColor, graph.getPixel(graph.width / 2, graph.height - 1))
+        }
+        val targetTop = (expandedGraph.height * 0.1875f).toInt() + 2
+        assertEquals(targetBandColor, expandedGraph.getPixel(0, targetTop))
+        assertEquals(targetBandColor, expandedGraph.getPixel(expandedGraph.width - 1, targetTop))
         assertEquals(null, notification.extras.getCharSequence(Notification.EXTRA_SUB_TEXT))
         assertEquals(1, notification.actions.size)
         controller.destroy()
+    }
+
+    @Test
+    @Config(sdk = [35])
+    fun `notification graph accepts only one two or three hours`() {
+        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+        val preferences = context.getSharedPreferences("dashboard_ui", android.content.Context.MODE_PRIVATE)
+
+        preferences.edit().clear().putInt(PersistentBridgeService.PREFERENCE_NOTIFICATION_GRAPH_HOURS, 1).commit()
+        assertEquals(1, NotificationGraphRenderer.notificationGraphHours(preferences))
+
+        preferences.edit().putInt(PersistentBridgeService.PREFERENCE_NOTIFICATION_GRAPH_HOURS, 2).commit()
+        assertEquals(2, NotificationGraphRenderer.notificationGraphHours(preferences))
+
+        preferences.edit().putInt(PersistentBridgeService.PREFERENCE_NOTIFICATION_GRAPH_HOURS, 3).commit()
+        assertEquals(3, NotificationGraphRenderer.notificationGraphHours(preferences))
+
+        preferences.edit().putInt(PersistentBridgeService.PREFERENCE_NOTIFICATION_GRAPH_HOURS, 6).commit()
+        assertEquals(3, NotificationGraphRenderer.notificationGraphHours(preferences))
     }
 
     @Test

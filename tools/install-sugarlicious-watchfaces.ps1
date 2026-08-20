@@ -7,7 +7,14 @@ param(
 
 $ErrorActionPreference = "Stop"
 $projectRoot = Split-Path -Parent $PSScriptRoot
-$faces = @("analog", "orbit", "rings", "graph")
+$faces = @(
+    @{ Name = "Digital"; Asset = "sugarlicious_digital.apk" }
+    @{ Name = "Analog"; Asset = "sugarlicious_analog.apk" }
+    @{ Name = "Orbit"; Asset = "sugarlicious_orbit.apk" }
+    @{ Name = "Rings"; Asset = "sugarlicious_rings.apk" }
+    @{ Name = "Graph"; Asset = "sugarlicious_graph.apk" }
+    @{ Name = "G6 Style"; Asset = "sugarlicious_g6_style.apk" }
+)
 
 if (-not (Test-Path -LiteralPath $Adb -PathType Leaf)) {
     throw "ADB wurde nicht gefunden: $Adb"
@@ -19,16 +26,18 @@ if ($LASTEXITCODE -ne 0 -or -not ($connected -match "(?m)^$([regex]::Escape($Wat
 }
 
 foreach ($face in $faces) {
-    $apk = Join-Path $projectRoot "watchfaces\sugarlicious-$face\build\outputs\apk\release\sugarlicious-$face-release.apk"
+    $apk =
+        Join-Path $projectRoot `
+            "app-wear\build\generated\watchfacePushAssets\watchfaces\$($face.Asset)"
     if (-not (Test-Path -LiteralPath $apk -PathType Leaf)) {
-        throw "Watchface-APK fehlt: $apk. Zuerst die vier assembleRelease-Tasks ausführen."
+        throw "Watchface-APK fehlt: $apk. Zuerst Prepare-WatchFacePushAssets.ps1 ausführen."
     }
 
-    Write-Host "Installiere Sugarlicious $face ..."
+    Write-Host "Installiere Sugarlicious $($face.Name) ..."
     & $Adb -s $WatchSerial install -r $apk
     if ($LASTEXITCODE -ne 0) {
-        throw "Installation von Sugarlicious $face fehlgeschlagen."
+        throw "Installation von Sugarlicious $($face.Name) fehlgeschlagen."
     }
 }
 
-Write-Host "Alle vier Sugarlicious-Watchfaces wurden auf der Watch installiert."
+Write-Host "Alle sechs Sugarlicious-Watchfaces wurden auf der Watch installiert."

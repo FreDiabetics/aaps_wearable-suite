@@ -4,7 +4,7 @@ android {
     namespace="app.aapswear.watchface.sugarlicious.digital"
     compileSdk=36
     defaultConfig {
-        applicationId="app.aapswear.watchface.sugarlicious.digital"
+        applicationId="app.aapswear.watchfacepush.digital"
         minSdk=33
         targetSdk=35
         versionCode=6

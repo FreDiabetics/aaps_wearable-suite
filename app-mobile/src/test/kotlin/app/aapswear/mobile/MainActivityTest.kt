@@ -25,6 +25,31 @@ import org.robolectric.annotation.Config
 @Config(sdk = [35])
 class MainActivityTest {
 
+    @Test fun `watch config uses mobile therapy icon colors`() {
+        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+        val preferences = context.getSharedPreferences("dashboard_ui", android.content.Context.MODE_PRIVATE)
+        preferences.edit().clear().putString("themeMode", "DARK").commit()
+        val iob = Color.rgb(10, 20, 30)
+        val cob = Color.rgb(40, 50, 60)
+        val basal = Color.rgb(70, 80, 90)
+        SugarliciousColorStore.save(preferences, SugarliciousColorRole.BLUE, iob)
+        SugarliciousColorStore.save(preferences, SugarliciousColorRole.ORANGE, cob)
+        SugarliciousColorStore.save(preferences, SugarliciousColorRole.SECONDARY, basal)
+
+        val colors = readWatchConfig(context).uiColors
+
+        assertEquals(iob, colors.iob)
+        assertEquals(cob, colors.cob)
+        assertEquals(basal, colors.basal)
+    }
+
+    @Test fun `watch config carries direct G7 source selection`() {
+        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+        context.getSharedPreferences("dashboard_ui", android.content.Context.MODE_PRIVATE)
+            .edit().clear().putString("dataSource", DataSourcePreference.DEXCOM_G7_WATCH.name).commit()
+        assertEquals(app.aapswear.protocol.WatchDataSource.DEXCOM_G7_WATCH, readWatchConfig(context).dataSource)
+    }
+
     @Test fun `app surfaces are neutral gray and system accent follows the icon`() {
         val context = ApplicationProvider.getApplicationContext<android.content.Context>()
         listOf(R.color.app_background, R.color.app_surface, R.color.app_surface_high, R.color.app_surface_raised, R.color.app_surface_selected).forEach { colorId ->
@@ -61,11 +86,15 @@ class MainActivityTest {
         assertTrue(dashboard.childCount > 0)
         assertSame(originalComposeView, dashboard.getChildAt(0))
 
-        activity.findViewById<View>(R.id.nav_settings).performClick()
+        activity.findViewById<View>(R.id.top_settings).performClick()
         shadowOf(android.os.Looper.getMainLooper()).idle()
         val settingsText = textOf(activity.findViewById(R.id.dashboard_content))
         assertTrue(settingsText.contains("Datenquelle"))
-        assertTrue(settingsText.contains("Loop-App"))
+        assertTrue(settingsText.contains("AndroidAPS"))
+        assertTrue(settingsText.contains("APP-BETRIEB & SICHERUNG"))
+        assertTrue(settingsText.contains("Dauerbetrieb"))
+        assertTrue(settingsText.contains("Einstellungen sichern"))
+        assertTrue(settingsText.contains("Einstellungen wiederherstellen"))
         controller.pause().stop().destroy()
     }
 
@@ -76,7 +105,7 @@ class MainActivityTest {
         val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
         val activity = controller.get()
 
-        activity.findViewById<View>(R.id.nav_settings).performClick()
+        activity.findViewById<View>(R.id.top_settings).performClick()
         shadowOf(android.os.Looper.getMainLooper()).idle()
         val details = activity.findViewById<android.widget.Switch>(R.id.dashboard_details_switch)
         assertTrue(details.isChecked)
@@ -104,6 +133,17 @@ class MainActivityTest {
         assertEquals(96, Color.alpha(SugarliciousColorStore.load(preferences).argb(SugarliciousColorRole.RANGE_IN_RANGE)))
     }
 
+    @Test fun `light target band defaults to the opaque picker color`() {
+        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+        val preferences = context.getSharedPreferences("dashboard_ui", android.content.Context.MODE_PRIVATE)
+        preferences.edit().clear().putString("themeMode", "LIGHT").commit()
+
+        val target = SugarliciousColorStore.load(preferences).argb(SugarliciousColorRole.TARGET_BAND)
+
+        assertEquals(255, Color.alpha(target))
+        assertEquals(0xFFB9EFC7.toInt(), target)
+    }
+
     @Test fun `cgm dot appearance settings are read from preferences`() {
         val context = ApplicationProvider.getApplicationContext<android.content.Context>()
         val preferences = context.getSharedPreferences("dashboard_ui", android.content.Context.MODE_PRIVATE)
@@ -121,7 +161,24 @@ class MainActivityTest {
         assertEquals(1.75f, ui.cgmDotOutlineWidthDp, 0.001f)
     }
 
-    @Test fun `fresh install defaults to CGM dots only`() {
+    @Test fun `notification graph defaults are independent from dashboard graph`() {
+        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+        val preferences = context.getSharedPreferences("dashboard_ui", android.content.Context.MODE_PRIVATE)
+        preferences.edit()
+            .clear()
+            .putInt("graphHours", 24)
+            .putBoolean(PersistentBridgeService.PREFERENCE_NOTIFICATION_GRAPH_ENABLED, false)
+            .putInt(PersistentBridgeService.PREFERENCE_NOTIFICATION_GRAPH_HOURS, 2)
+            .commit()
+
+        val ui = DashboardUiPreferences.read(preferences)
+
+        assertEquals(24, ui.graphHours)
+        assertFalse(ui.notificationGraphEnabled)
+        assertEquals(2, ui.notificationGraphHours)
+    }
+
+    @Test fun `fresh install uses requested overview and CGM defaults`() {
         val context = ApplicationProvider.getApplicationContext<android.content.Context>()
         val preferences = context.getSharedPreferences("dashboard_ui", android.content.Context.MODE_PRIVATE)
         preferences.edit().clear().commit()
@@ -129,11 +186,15 @@ class MainActivityTest {
 
         val ui = DashboardUiPreferences.read(preferences)
         assertTrue(ui.showCgmGraph)
-        assertFalse(ui.showCgmTargetRange)
+        assertTrue(ui.showDetails)
+        assertTrue(ui.showCgmTargetRange)
+        assertFalse(ui.showCgmTargetValue)
         assertFalse(ui.showCgmBasal)
         assertFalse(ui.showCgmActivity)
         assertFalse(ui.anyCgmPredictionEnabled)
         assertFalse(ui.showMetabolicGraph)
+        assertTrue(ui.notificationGraphEnabled)
+        assertEquals(3, ui.notificationGraphHours)
 
         controller.pause().stop().destroy()
     }
@@ -155,19 +216,24 @@ class MainActivityTest {
         controller.pause().stop().destroy()
     }
 
-    @Test fun `Sugarlicious about tile shows independent branding and contact`() {
+    @Test fun `Sugarlicious about tile shows compact branding and contact pills`() {
         val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
         val activity = controller.get()
 
-        activity.findViewById<View>(R.id.nav_settings).performClick()
+        activity.findViewById<View>(R.id.top_settings).performClick()
         shadowOf(android.os.Looper.getMainLooper()).idle()
         val settingsText = textOf(activity.findViewById(R.id.dashboard_content))
         assertTrue(settingsText.contains("Sugarlicious"))
         assertFalse(settingsText.contains("typ1.diafreddy@gmail.com"))
         assertFalse(settingsText.contains("FreDiabetics/aaps_wearable-suite"))
-        assertTrue(settingsText.contains("Unabhängiges Projekt"))
-        assertFalse(settingsText.contains("GITHUB"))
-        assertFalse(settingsText.contains("AndroidAPS"))
+        assertFalse(settingsText.contains("Unabhängiges Projekt"))
+        assertTrue(settingsText.contains("GitHub"))
+        assertTrue(settingsText.contains("E-Mail"))
+        assertFalse(settingsText.contains("Watchfaces"))
+
+        activity.findViewById<View>(R.id.dashboard_github).performClick()
+        val githubIntent = shadowOf(activity).nextStartedActivity
+        assertEquals("github.com", githubIntent.data?.host)
 
         activity.findViewById<View>(R.id.dashboard_contact_email).performClick()
         val emailIntent = shadowOf(activity).nextStartedActivity
@@ -176,15 +242,38 @@ class MainActivityTest {
         controller.pause().stop().destroy()
     }
 
-    @Test fun `header menus are removed and bottom navigation remains available`() {
+    @Test fun `bottom navigation is removed and compact top navigation is available`() {
         val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
         val activity = controller.get()
         assertEquals(0, activity.resources.getIdentifier("menu_button", "id", activity.packageName))
         assertEquals(0, activity.resources.getIdentifier("more_button", "id", activity.packageName))
-        assertNotNull(activity.findViewById<View>(R.id.bottom_navigation))
-        activity.findViewById<View>(R.id.nav_settings).performClick()
+        assertEquals(0, activity.resources.getIdentifier("bottom_navigation", "id", activity.packageName))
+        assertNotNull(activity.findViewById<View>(R.id.top_app_bar))
+        assertNotNull(activity.findViewById<View>(R.id.top_settings))
+        activity.findViewById<View>(R.id.top_settings).performClick()
         shadowOf(android.os.Looper.getMainLooper()).idle()
         assertTrue(textOf(activity.findViewById(R.id.dashboard_content)).contains("Einstellungen"))
+        controller.pause().stop().destroy()
+    }
+
+    @Test fun `overview is fixed and watch menu has only its inline header`() {
+        val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
+        val activity = controller.get()
+        val scroll = activity.findViewById<DashboardScrollView>(R.id.dashboard_scroll)
+
+        assertFalse(scroll.isUserScrollEnabled)
+        assertEquals(View.GONE, activity.findViewById<View>(R.id.scroll_fade).visibility)
+
+        activity.findViewById<View>(R.id.watch_fixed_header)
+        activity.javaClass.getDeclaredMethod("navigate", DashboardScreen::class.java).apply {
+            isAccessible = true
+            invoke(activity, DashboardScreen.WATCH)
+        }
+        shadowOf(android.os.Looper.getMainLooper()).idle()
+
+        assertTrue(scroll.isUserScrollEnabled)
+        assertEquals(View.GONE, activity.findViewById<View>(R.id.top_app_bar).visibility)
+        assertEquals(View.VISIBLE, activity.findViewById<View>(R.id.watch_fixed_header).visibility)
         controller.pause().stop().destroy()
     }
 
@@ -196,7 +285,7 @@ class MainActivityTest {
         val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
         val activity = controller.get()
 
-        activity.findViewById<View>(R.id.nav_settings).performClick()
+        activity.findViewById<View>(R.id.top_settings).performClick()
         activity.findViewById<View>(R.id.dashboard_live_notification_switch).performClick()
         shadowOf(android.os.Looper.getMainLooper()).idle()
 

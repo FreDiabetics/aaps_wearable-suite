@@ -1,11 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <complications>
     <complication type="SHORT_TEXT">
-        <text><plain value="2m"/></text>
-        <title><plain value="LOOP"/></title>
-    </complication>
-    <complication type="LONG_TEXT">
-        <text><plain value="Letzter Loop vor 2 min"/></text>
-        <title><plain value="Letzter Loop"/></title>
+        <text><plain value="16" valueType="integer"/></text>
+        <title><plain value="MON"/></title>
     </complication>
 </complications>

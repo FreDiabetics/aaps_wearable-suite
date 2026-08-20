@@ -17,7 +17,7 @@ internal suspend fun requestWatchFaceApply(
 
     val payload =
         index
-            .coerceIn(0, 3)
+            .coerceAtLeast(0)
             .toString()
             .encodeToByteArray()
 

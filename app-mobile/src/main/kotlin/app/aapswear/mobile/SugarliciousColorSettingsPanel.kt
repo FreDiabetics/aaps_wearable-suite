@@ -24,7 +24,9 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -74,14 +76,6 @@ internal fun SugarliciousColorSettingsPanel(
     }
     var editingRole by remember {
         mutableStateOf<SugarliciousColorRole?>(null)
-    }
-    var lightChromaticOutlineEnabled by remember {
-        mutableStateOf(
-            preferences.getBoolean(
-                SugarliciousColorStore.PREFERENCE_LIGHT_CHROMATIC_OUTLINE,
-                true,
-            ),
-        )
     }
     var cgmDotRadiusDp by remember(showCgmGraph) {
         mutableFloatStateOf(preferences.getFloat("cgm.dotRadiusDp", 2.4f).coerceIn(1.5f, 6.0f))
@@ -146,31 +140,6 @@ internal fun SugarliciousColorSettingsPanel(
                     fontWeight = FontWeight.Bold,
                 )
             }
-        }
-
-        if (palette.isLight) {
-            Text(
-                text = "LIGHT MODE",
-                color = SugarliciousColors.TextSecondary,
-                fontSize = 10.sp,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(top = 6.dp),
-            )
-            GraphSettingSwitch(
-                title = "Farbkonturen",
-                description = "Farbig codierte Elemente erhalten eine feine dunkle Kontur; Grau, Weiß und Schwarz bleiben unverändert",
-                checked = lightChromaticOutlineEnabled,
-                onCheckedChange = { enabled ->
-                    lightChromaticOutlineEnabled = enabled
-                    preferences.edit()
-                        .putBoolean(
-                            SugarliciousColorStore.PREFERENCE_LIGHT_CHROMATIC_OUTLINE,
-                            enabled,
-                        )
-                        .apply()
-                    reload()
-                },
-            )
         }
 
         if (showCgmGraph) {
@@ -286,11 +255,12 @@ private val cgmGraphColorRoles =
         SugarliciousColorRole.RANGE_LOW,
         SugarliciousColorRole.RANGE_IN_RANGE,
         SugarliciousColorRole.RANGE_HIGH,
+        SugarliciousColorRole.TARGET_BAND,
         SugarliciousColorRole.CGM_DOT_LOW,
         SugarliciousColorRole.CGM_DOT_IN_RANGE,
         SugarliciousColorRole.CGM_DOT_HIGH,
-        SugarliciousColorRole.TARGET_VALUE,
         SugarliciousColorRole.GRAPH_DIVIDER,
+        SugarliciousColorRole.GRAPH_SIGNAL_LOSS,
     )
 
 internal fun colorRoleVisible(
@@ -328,7 +298,19 @@ private fun GraphSettingSwitch(
             Text(title, color = SugarliciousColors.TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.Medium)
             Text(description, color = SugarliciousColors.TextSecondary, fontSize = 10.sp)
         }
-        Switch(checked = checked, onCheckedChange = onCheckedChange)
+        Switch(
+            checked = checked,
+            onCheckedChange = onCheckedChange,
+            modifier = Modifier.size(width = 50.dp, height = 30.dp),
+            colors =
+                SwitchDefaults.colors(
+                    checkedThumbColor = Color.White,
+                    checkedTrackColor = SugarliciousColors.Primary,
+                    uncheckedThumbColor = SugarliciousColors.TextSecondary,
+                    uncheckedTrackColor = SugarliciousColors.SurfaceRaised,
+                    uncheckedBorderColor = SugarliciousColors.Border,
+                ),
+        )
     }
 }
 
@@ -361,6 +343,15 @@ private fun GraphSettingSlider(
             onValueChange = onValueChange,
             onValueChangeFinished = onValueChangeFinished,
             valueRange = valueRange,
+            modifier = Modifier.height(32.dp),
+            colors =
+                SliderDefaults.colors(
+                    thumbColor = SugarliciousColors.Primary,
+                    activeTrackColor = SugarliciousColors.Primary,
+                    inactiveTrackColor = SugarliciousColors.SurfaceRaised,
+                    activeTickColor = Color.Transparent,
+                    inactiveTickColor = Color.Transparent,
+                ),
         )
     }
 }
@@ -577,8 +568,7 @@ private fun ColorRoleExample(
             SugarliciousColorRole.RANGE_HIGH,
             SugarliciousColorRole.CGM_DOT_LOW,
             SugarliciousColorRole.CGM_DOT_IN_RANGE,
-            SugarliciousColorRole.CGM_DOT_HIGH,
-            SugarliciousColorRole.TARGET_VALUE
+            SugarliciousColorRole.CGM_DOT_HIGH
             -> {
                 Text(
                     text = "123",
@@ -704,7 +694,8 @@ private fun ColorRoleExample(
             }
 
             SugarliciousColorRole.GRAPH_MUTED,
-            SugarliciousColorRole.GRAPH_DIVIDER -> {
+            SugarliciousColorRole.GRAPH_DIVIDER,
+            SugarliciousColorRole.GRAPH_SIGNAL_LOSS -> {
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(4.dp),
                     verticalAlignment = Alignment.CenterVertically,
@@ -1005,6 +996,100 @@ private fun AlphaPicker(color: Color, alpha: Float, onChange: (Float) -> Unit) {
         val x = alpha * size.width
         drawCircle(Color.White, 7.dp.toPx(), Offset(x, size.height / 2f), style = Stroke(2.dp.toPx()))
         drawCircle(Color.Black.copy(alpha = 0.55f), 9.dp.toPx(), Offset(x, size.height / 2f), style = Stroke(1.dp.toPx()))
+    }
+}
+
+
+@Composable
+internal fun NotificationGraphSettingsPanel() {
+    val context = LocalContext.current
+    val locale = androidx.compose.ui.platform.LocalConfiguration.current.locales[0]
+    val preferences = remember { context.getSharedPreferences("dashboard_ui", Context.MODE_PRIVATE) }
+    var revision by remember { mutableStateOf(0) }
+    var editingRole by remember { mutableStateOf<SugarliciousColorRole?>(null) }
+    val palette = SugarliciousColorStore.load(preferences)
+    val modePrefix = if (palette.isLight) "notification.color.light." else "notification.color.dark."
+    fun key(role: SugarliciousColorRole) = modePrefix + role.preferenceKey
+    fun resolved(role: SugarliciousColorRole): Int =
+        if (preferences.contains(key(role))) preferences.getInt(key(role), palette.argb(role)) else palette.argb(role)
+    var dotRadius by remember(revision) {
+        mutableFloatStateOf(preferences.getFloat(PersistentBridgeService.PREFERENCE_NOTIFICATION_DOT_RADIUS, preferences.getFloat("cgm.dotRadiusDp", 2.4f)).coerceIn(1.5f, 6f))
+    }
+    var outlineEnabled by remember(revision) {
+        mutableStateOf(preferences.getBoolean(PersistentBridgeService.PREFERENCE_NOTIFICATION_DOT_OUTLINE_ENABLED, preferences.getBoolean("cgm.dotOutlineEnabled", true)))
+    }
+    var outlineWidth by remember(revision) {
+        mutableFloatStateOf(preferences.getFloat(PersistentBridgeService.PREFERENCE_NOTIFICATION_DOT_OUTLINE_WIDTH, preferences.getFloat("cgm.dotOutlineWidthDp", 0.95f)).coerceIn(0.25f, 3f))
+    }
+    val roles = listOf(
+        SugarliciousColorRole.CGM_DOT_LOW,
+        SugarliciousColorRole.CGM_DOT_IN_RANGE,
+        SugarliciousColorRole.CGM_DOT_HIGH,
+        SugarliciousColorRole.GRAPH_CURRENT_OUTLINE,
+        SugarliciousColorRole.RANGE_IN_RANGE,
+        SugarliciousColorRole.GRAPH_BACKGROUND,
+        SugarliciousColorRole.GRAPH_DIVIDER,
+    )
+    Column(
+        Modifier.fillMaxWidth().background(SugarliciousColors.Surface, RoundedCornerShape(24.dp))
+            .border(1.dp, SugarliciousColors.Border, RoundedCornerShape(24.dp)).padding(14.dp),
+        verticalArrangement = Arrangement.spacedBy(9.dp),
+    ) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text("NOTIFICATION-GRAPH", color = SugarliciousColors.TextSecondary, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                Text("CGM-Dots & Farben", color = SugarliciousColors.TextPrimary, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                Text(if (palette.isLight) "Aktuelle Farbvariante: Hell" else "Aktuelle Farbvariante: Dunkel", color = SugarliciousColors.TextSecondary, fontSize = 9.sp)
+            }
+            TextButton(onClick = {
+                preferences.edit().apply {
+                    remove(PersistentBridgeService.PREFERENCE_NOTIFICATION_DOT_RADIUS)
+                    remove(PersistentBridgeService.PREFERENCE_NOTIFICATION_DOT_OUTLINE_ENABLED)
+                    remove(PersistentBridgeService.PREFERENCE_NOTIFICATION_DOT_OUTLINE_WIDTH)
+                    roles.forEach { remove(key(it)) }
+                }.apply()
+                revision++
+            }) { Text("RESET", color = SugarliciousColors.Primary, fontSize = 9.sp, fontWeight = FontWeight.Bold) }
+        }
+        GraphSettingSlider(
+            "Punktgröße", "Nur die CGM-Dots in der Notification", dotRadius, 1.5f..6f,
+            "${String.format(locale, "%.1f", dotRadius)} dp",
+            { dotRadius = it },
+            { preferences.edit().putFloat(PersistentBridgeService.PREFERENCE_NOTIFICATION_DOT_RADIUS, dotRadius).apply() },
+        )
+        GraphSettingSwitch("Kontur", "Kontur der Notification-CGM-Dots", outlineEnabled) {
+            outlineEnabled = it
+            preferences.edit().putBoolean(PersistentBridgeService.PREFERENCE_NOTIFICATION_DOT_OUTLINE_ENABLED, it).apply()
+        }
+        if (outlineEnabled) {
+            GraphSettingSlider(
+                "Konturdicke", "Nur für Notification-CGM-Dots", outlineWidth, 0.25f..3f,
+                "${String.format(locale, "%.2f", outlineWidth)} dp",
+                { outlineWidth = it },
+                { preferences.edit().putFloat(PersistentBridgeService.PREFERENCE_NOTIFICATION_DOT_OUTLINE_WIDTH, outlineWidth).apply() },
+            )
+        }
+        roles.forEach { role ->
+            ColorSettingRow(
+                role = role,
+                argb = resolved(role),
+                isDefault = !preferences.contains(key(role)),
+                onEdit = { editingRole = role },
+                onReset = { preferences.edit().remove(key(role)).apply(); revision++ },
+            )
+        }
+    }
+    editingRole?.let { role ->
+        ColorEditorDialog(
+            role = role,
+            initialArgb = resolved(role),
+            onDismiss = { editingRole = null },
+            onSave = { argb ->
+                preferences.edit().putInt(key(role), argb).apply()
+                revision++
+                editingRole = null
+            },
+        )
     }
 }
 

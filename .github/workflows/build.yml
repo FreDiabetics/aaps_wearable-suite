@@ -12,7 +12,26 @@ jobs:
           distribution: temurin
           java-version: '21'
       - uses: android-actions/setup-android@v3
+        with:
+          cmdline-tools-version: '15859902'
       - run: sdkmanager "platforms;android-36" "build-tools;36.0.0"
+      - name: Validate branch protection helper with PowerShell 7
+        shell: pwsh
+        run: |
+          $tokens = $null
+          $errors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile(
+            (Join-Path $PWD 'tools/protect-main.ps1'),
+            [ref]$tokens,
+            [ref]$errors
+          ) | Out-Null
+          if ($errors.Count -gt 0) {
+            $errors | Format-List *
+            throw 'tools/protect-main.ps1 failed PowerShell 7 parsing.'
+          }
+      - name: Prepare Watch Face Push marketplace assets
+        shell: pwsh
+        run: ./tools/watchface-push/Prepare-WatchFacePushAssets.ps1
       - name: Test and build all applications and watchfaces
         run: >-
           ./gradlew test assembleDebug
@@ -40,6 +59,8 @@ jobs:
           :watchfaces:robby:assembleRelease
           :watchfaces:simple-digital:assembleRelease
           :watchfaces:steam-punk:assembleRelease
+      - name: Lint Mobile and Wear frontend
+        run: ./gradlew :app-mobile:lintDebug :app-wear:lintDebug
       - name: Validate Watch Face Format XML
         shell: pwsh
         run: ./tools/wff-validator/validate.ps1

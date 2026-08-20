@@ -18,7 +18,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -28,6 +27,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -42,6 +42,7 @@ import app.aapswear.model.FreshnessPolicy
 import app.aapswear.model.GlucoseUnit
 import app.aapswear.model.TherapyDisplayState
 import app.aapswear.model.Trend
+import app.aapswear.storage.PredictionDisplayTimeline
 import java.util.Locale
 import kotlin.math.roundToInt
 
@@ -62,8 +63,8 @@ internal fun SugarliciousOverviewScreen(
         LocalWindowInfo.current.containerSize.height.toDp().value.roundToInt()
     }
     val metrics = DashboardLayoutMetrics.forScreenHeight(screenHeightDp)
-    val gap = if (preferences.compact) 6.dp else 9.dp
-    val compactGraphHeightDp = maxOf(
+    val gap = if (preferences.compact) 5.dp else 8.dp
+    val graphHeightDp = maxOf(
         metrics.metabolicChartHeight - 18,
         96,
     )
@@ -74,19 +75,14 @@ internal fun SugarliciousOverviewScreen(
                 preferences.graphHours,
             )
         }
-    val metabolicChartViewport =
-        remember {
-            ChartViewport(
-                preferences.graphHours,
-            )
-        }
+    val metabolicChartViewport = cgmChartViewport
 
     val predictionFutureWindowMs =
         if (
             preferences.showCgmGraph &&
             preferences.anyCgmPredictionEnabled
         ) {
-            state?.glucosePredictions
+            val enabledPredictions = state?.glucosePredictions
                 .orEmpty()
                 .filter { series ->
                     when (
@@ -107,27 +103,15 @@ internal fun SugarliciousOverviewScreen(
                             preferences.showCgmPredictionZeroTemp
                     }
                 }
-                .flatMap {
-                    it.samples
-                }
-                .maxOfOrNull {
-                    it.measuredAtEpochMs
-                }
-                ?.minus(
-                    now,
-                )
-                ?.coerceIn(
-                    0L,
-                    2L * 60L * 60_000L,
-                )
-                ?: 0L
+            PredictionDisplayTimeline.futureWindowMs(enabledPredictions, now)
         } else {
             0L
         }
 
     val metabolicFutureWindowMs =
         if (
-            preferences.showMetabolicGraph
+            preferences.showMetabolicGraph &&
+            preferences.anyCgmPredictionEnabled
         ) {
             90L * 60_000L
         } else {
@@ -149,17 +133,13 @@ internal fun SugarliciousOverviewScreen(
 
     LaunchedEffect(
         predictionFutureWindowMs,
-    ) {
-        cgmChartViewport.setFutureWindow(
-            predictionFutureWindowMs,
-        )
-    }
-
-    LaunchedEffect(
         metabolicFutureWindowMs,
     ) {
-        metabolicChartViewport.setFutureWindow(
-            metabolicFutureWindowMs,
+        cgmChartViewport.setFutureWindow(
+            maxOf(
+                predictionFutureWindowMs,
+                metabolicFutureWindowMs,
+            ),
         )
     }
 
@@ -192,27 +172,28 @@ internal fun SugarliciousOverviewScreen(
             diagnostics = diagnostics,
             selectedFaceIndex = preferences.watchFaceIndex,
             onSelectedFace = callbacks.setWatchFaceIndex,
-            onEdit = {
-                callbacks.navigate(
-                    DashboardScreen.WATCH,
-                )
-            },
+            onEdit = { callbacks.navigate(DashboardScreen.WATCH) },
         )
+
+        OverviewInlineHeader(onSettings = { callbacks.navigate(DashboardScreen.SETTINGS) })
 
         GlucoseHeroCard(
             glucoseText = glucoseText,
             glucoseColor = glucoseColor,
             trend = if (displayable) glucose?.trend ?: Trend.UNKNOWN else Trend.UNKNOWN,
             delta = delta,
-
-            deltaMgDl = glucose?.deltaMgDl,age = age,
+            deltaMgDl = glucose?.deltaMgDl,
+            age = age,
             unitLabel = unitLabel(unit),
             tirStats = tirStats,
             heightDp = maxOf(metrics.summaryTileHeight + 18, 108),
         )
 
         if (preferences.showDetails) {
-            QuickStatsRow(state = state.takeIf { displayable }, heightDp = metrics.statTileHeight)
+            QuickStatsRow(
+                state = state.takeIf { displayable },
+                heightDp = metrics.statTileHeight,
+            )
         }
 
         if (preferences.showCgmGraph) {
@@ -220,7 +201,8 @@ internal fun SugarliciousOverviewScreen(
                 state = state,
                 preferences = preferences,
                 viewport = cgmChartViewport,
-                chartHeightDp = compactGraphHeightDp,
+                chartHeightDp = graphHeightDp,
+                now = now,
             )
         }
 
@@ -229,7 +211,7 @@ internal fun SugarliciousOverviewScreen(
                 state = state,
                 preferences = preferences,
                 viewport = metabolicChartViewport,
-                chartHeightDp = compactGraphHeightDp,
+                chartHeightDp = graphHeightDp,
             )
         }
     }
@@ -294,7 +276,7 @@ private fun GlucoseHeroCard(
 
                         Spacer(Modifier.width(6.dp))
 
-                        TrendIndicator(
+                        SugarliciousTrendIndicator(
                             correctedTrendForDisplay(
                                 trend,
                                 deltaMgDl,
@@ -476,118 +458,21 @@ private fun correctedTrendForDisplay(
 }
 
 @Composable
-private fun TrendIndicator(trend: Trend) {
-    val arrowSize =
-        when (trend) {
-            Trend.FLAT,
-            Trend.SINGLE_UP,
-            Trend.SINGLE_DOWN,
-            -> 24.dp
-
-            Trend.FORTY_FIVE_UP,
-            Trend.FORTY_FIVE_DOWN,
-            -> 26.dp
-
-            Trend.DOUBLE_UP,
-            Trend.DOUBLE_DOWN,
-            -> 25.dp
-
-            Trend.UNKNOWN ->
-                25.dp
-        }
-
-    val rotation =
-        when (trend) {
-            Trend.DOUBLE_UP,
-            Trend.SINGLE_UP,
-            -> -90f
-
-            Trend.FORTY_FIVE_UP ->
-                -45f
-
-            Trend.FLAT ->
-                0f
-
-            Trend.FORTY_FIVE_DOWN ->
-                45f
-
-            Trend.SINGLE_DOWN,
-            Trend.DOUBLE_DOWN,
-            -> 90f
-
-            Trend.UNKNOWN ->
-                return
-        }
-
-    val doubleArrow =
-        trend == Trend.DOUBLE_UP ||
-            trend == Trend.DOUBLE_DOWN
-
-    Box(
-        modifier =
-            Modifier.size(
-                width =
-                    if (doubleArrow) {
-                        54.dp
-                    } else {
-                        32.dp
-                    },
-                height = 44.dp,
-            ),
-        contentAlignment =
-            Alignment.Center,
-    ) {
-        Row(
-            verticalAlignment =
-                Alignment.CenterVertically,
-            horizontalArrangement =
-                Arrangement.spacedBy(
-                    if (doubleArrow) {
-                        1.dp
-                    } else {
-                        0.dp
-                    },
-                ),
-        ) {
-            repeat(
-                if (doubleArrow) {
-                    2
-                } else {
-                    1
-                },
-            ) {
-                Image(
-                    painter =
-                        painterResource(
-                            R.drawable.ic_trend_arrow,
-                        ),
-                    contentDescription = null,
-                    modifier =
-                        Modifier
-                            .size(arrowSize)
-                            .graphicsLayer(
-                                rotationZ = rotation,
-                            ),
-                )
-            }
-        }
-    }
-}
-@Composable
 private fun QuickStatsRow(
     state: TherapyDisplayState?,
     heightDp: Int,
 ) {
     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        QuickStatCard(Modifier.weight(1f), "IOB", formatNumber(state?.insulin?.totalIob, 2), "IE", SugarliciousColors.Blue, heightDp)
-        QuickStatCard(Modifier.weight(1f), "COB", formatNumber(state?.carbs?.cobGrams, 0), "g", SugarliciousColors.Orange, heightDp)
-        QuickStatCard(Modifier.weight(1f), "BASAL", formatNumber(state?.basal?.currentUnitsPerHour, 2), "IE/h", SugarliciousColors.Secondary, heightDp)
+        QuickStatCard(Modifier.weight(1f), R.drawable.ic_iob, "IOB", formatNumber(state?.insulin?.totalIob, 2), "IE", SugarliciousColors.Blue, heightDp)
+        QuickStatCard(Modifier.weight(1f), R.drawable.ic_carbs, "COB", formatNumber(state?.carbs?.cobGrams, 0), "g", SugarliciousColors.Orange, heightDp)
+        QuickStatCard(Modifier.weight(1f), R.drawable.ic_basal, "BASAL", formatNumber(state?.basal?.currentUnitsPerHour, 2), "IE/h", SugarliciousColors.Secondary, heightDp)
     }
 }
 
 @Composable
 private fun QuickStatCard(
     modifier: Modifier,
+    iconRes: Int,
     title: String,
     value: String,
     suffix: String,
@@ -604,7 +489,12 @@ private fun QuickStatCard(
         verticalArrangement = Arrangement.SpaceBetween,
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.size(7.dp).background(accent, CircleShape))
+            Image(
+                painter = painterResource(iconRes),
+                contentDescription = null,
+                modifier = Modifier.size(15.dp),
+                colorFilter = ColorFilter.tint(accent),
+            )
             Spacer(Modifier.width(6.dp))
             Text(
                 text = title,
@@ -637,6 +527,7 @@ private fun GlucoseGraphSurface(
     preferences: DashboardUiPreferences,
     viewport: ChartViewport,
     chartHeightDp: Int,
+    now: Long,
 ) {
     AndroidView(
         modifier = Modifier.fillMaxWidth().height(chartHeightDp.dp),
@@ -677,10 +568,7 @@ private fun GlucoseGraphSurface(
                     preferences.cgmDotOutlineEnabled,
                 cgmDotOutlineWidthDp =
                     preferences.cgmDotOutlineWidthDp,
-                predictionDotRadiusDp =
-                    preferences.predictionDotRadiusDp,
-                predictionDotOutlineWidthDp =
-                    preferences.predictionDotOutlineWidthDp,
+                clockEpochMs = now,
             )
         },
     )

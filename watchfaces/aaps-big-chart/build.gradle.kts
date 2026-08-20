@@ -4,7 +4,7 @@ android {
     namespace="app.aapswear.watchface.aapsbigchart"
     compileSdk=36
     defaultConfig {
-        applicationId="app.aapswear.watchface.aapsbigchart"
+        applicationId="app.aapswear.watchfacepush.aapsbigchart"
         minSdk=33
         targetSdk=35
         versionCode=3

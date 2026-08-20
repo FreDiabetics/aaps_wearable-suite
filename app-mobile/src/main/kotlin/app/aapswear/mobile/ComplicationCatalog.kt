@@ -7,7 +7,9 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -23,6 +25,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -43,9 +46,14 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.aapswear.mobile.ui.theme.SugarliciousColors
+import app.aapswear.mobile.ui.theme.SugarliciousColorRole
 import app.aapswear.model.Freshness
 import app.aapswear.model.FreshnessPolicy
+import app.aapswear.model.ComplicationPresentationFormatter
+import app.aapswear.model.SugarliciousComplicationIds
+import app.aapswear.model.Trend
 import app.aapswear.model.GlucoseSample
+import app.aapswear.model.GlucoseGraphScale
 import app.aapswear.model.GlucoseUnit
 import app.aapswear.model.TherapyDisplayFormatter
 import app.aapswear.model.TherapyDisplayState
@@ -57,78 +65,148 @@ import kotlinx.coroutines.tasks.await
 import java.util.Locale
 
 internal data class ComplicationCatalogEntry(
-    val id: Int,
     val name: String,
     val category: ComplicationCategory,
-    val types: String,
+    val variants: List<ComplicationVariant>,
+) {
+    val id: Int get() = variants.first().id
+    val types: String get() = variants.joinToString(" · ") { it.type.shortLabel }
+
+    fun selectedVariant(selectedIds: List<Int>): ComplicationVariant =
+        variants.firstOrNull { it.id in selectedIds } ?: variants.first()
+}
+
+internal data class ComplicationVariant(
+    val id: Int,
+    val type: ComplicationVariantType,
 )
+
+internal enum class ComplicationVariantType(
+    val shortLabel: String,
+    val displayLabel: String,
+) {
+    SHORT_TEXT("SHORT", "Short Text"),
+    LONG_TEXT("LONG", "Long Text"),
+    RANGED_VALUE("RANGED", "Ranged Value"),
+    MONOCHROMATIC_IMAGE("ICON", "Icon"),
+    GOAL_PROGRESS("GOAL", "Goal Progress"),
+    WEIGHTED_ELEMENTS("WEIGHTED", "Weighted Elements"),
+    SMALL_IMAGE("SMALL", "Small Image"),
+    PHOTO_IMAGE("LARGE", "Large Image"),
+}
+
+private fun variant(id: Int, type: ComplicationVariantType) = ComplicationVariant(id, type)
+
+private fun entry(
+    name: String,
+    category: ComplicationCategory,
+    vararg variants: ComplicationVariant,
+) = ComplicationCatalogEntry(name, category, variants.toList())
 
 internal enum class ComplicationCategory(
     val label: String,
     val range: String,
 ) {
-    GLUCOSE("Glukose", "02 · 28 · 03 · 09 · 10"),
-    THERAPY("Therapie", "11 · 14"),
+    GLUCOSE("Glukose", "01–12"),
+    THERAPY("Therapie", "13–19"),
+    GENERAL("Allgemein", "20"),
 }
 
 internal val SugarliciousComplicationCatalog = listOf(
-    ComplicationCatalogEntry(
-        2,
-        "Glucose + Trend",
-        ComplicationCategory.GLUCOSE,
-        "RANGED",
-    ),
-    ComplicationCatalogEntry(
-        28,
-        "Glucose + Trend Text",
-        ComplicationCategory.GLUCOSE,
-        "SHORT",
-    ),
-    ComplicationCatalogEntry(
-        3,
-        "Delta + Alter",
-        ComplicationCategory.GLUCOSE,
-        "SHORT",
-    ),
-    ComplicationCatalogEntry(
-        9,
-        "Glukosegraph 3h",
-        ComplicationCategory.GLUCOSE,
-        "IMAGE",
-    ),
-    ComplicationCatalogEntry(
-        10,
-        "Glukosegraph 6h",
-        ComplicationCategory.GLUCOSE,
-        "IMAGE",
-    ),
-    ComplicationCatalogEntry(
-        11,
-        "IOB",
-        ComplicationCategory.THERAPY,
-        "SHORT",
-    ),
-    ComplicationCatalogEntry(
-        14,
-        "COB",
-        ComplicationCategory.THERAPY,
-        "SHORT",
-    ),
+    entry("Glukose", ComplicationCategory.GLUCOSE,
+        variant(SugarliciousComplicationIds.GLUCOSE, ComplicationVariantType.SHORT_TEXT),
+        variant(SugarliciousComplicationIds.GLUCOSE_LONG, ComplicationVariantType.LONG_TEXT),
+        variant(SugarliciousComplicationIds.GLUCOSE_RANGED, ComplicationVariantType.RANGED_VALUE)),
+    entry("Glukose + Trend", ComplicationCategory.GLUCOSE,
+        variant(SugarliciousComplicationIds.GLUCOSE_TREND, ComplicationVariantType.SHORT_TEXT),
+        variant(SugarliciousComplicationIds.GLUCOSE_TREND_LONG, ComplicationVariantType.LONG_TEXT),
+        variant(SugarliciousComplicationIds.GLUCOSE_TREND_RANGED, ComplicationVariantType.RANGED_VALUE)),
+    entry("Glukose + Delta", ComplicationCategory.GLUCOSE,
+        variant(SugarliciousComplicationIds.GLUCOSE_PLUS_DELTA, ComplicationVariantType.SHORT_TEXT),
+        variant(SugarliciousComplicationIds.GLUCOSE_PLUS_DELTA_LONG, ComplicationVariantType.LONG_TEXT)),
+    entry("Glukose + Trend + Zeit", ComplicationCategory.GLUCOSE,
+        variant(SugarliciousComplicationIds.GLUCOSE_TREND_AGE, ComplicationVariantType.SHORT_TEXT),
+        variant(SugarliciousComplicationIds.GLUCOSE_TREND_AGE_LONG, ComplicationVariantType.LONG_TEXT)),
+    entry("Glukose + Trend + Delta", ComplicationCategory.GLUCOSE,
+        variant(SugarliciousComplicationIds.GLUCOSE_TREND_DELTA, ComplicationVariantType.SHORT_TEXT)),
+    entry("Glukose + Trend + Delta + Zeit", ComplicationCategory.GLUCOSE,
+        variant(SugarliciousComplicationIds.GLUCOSE_TREND_DELTA_AGE, ComplicationVariantType.SHORT_TEXT),
+        variant(SugarliciousComplicationIds.GLUCOSE_TREND_DELTA_AGE_LONG, ComplicationVariantType.LONG_TEXT)),
+    entry("CGM Graph", ComplicationCategory.GLUCOSE,
+        variant(SugarliciousComplicationIds.GRAPH, ComplicationVariantType.SMALL_IMAGE),
+        variant(SugarliciousComplicationIds.GRAPH_LARGE, ComplicationVariantType.PHOTO_IMAGE)),
+    entry("Trend", ComplicationCategory.GLUCOSE,
+        variant(SugarliciousComplicationIds.TREND_ONLY, ComplicationVariantType.SHORT_TEXT)),
+    entry("Delta", ComplicationCategory.GLUCOSE,
+        variant(SugarliciousComplicationIds.DELTA_ONLY, ComplicationVariantType.SHORT_TEXT)),
+    entry("Zeit seit letztem Wert", ComplicationCategory.GLUCOSE,
+        variant(SugarliciousComplicationIds.GLUCOSE_AGE, ComplicationVariantType.SHORT_TEXT)),
+    entry("Zeit + Delta", ComplicationCategory.GLUCOSE,
+        variant(SugarliciousComplicationIds.TIME_DELTA, ComplicationVariantType.SHORT_TEXT)),
+    entry("Sensoralter", ComplicationCategory.GLUCOSE,
+        variant(SugarliciousComplicationIds.SENSOR_AGE, ComplicationVariantType.SHORT_TEXT),
+        variant(SugarliciousComplicationIds.SENSOR_AGE_RANGED, ComplicationVariantType.RANGED_VALUE)),
+    entry("Basal", ComplicationCategory.THERAPY,
+        variant(SugarliciousComplicationIds.BASAL, ComplicationVariantType.SHORT_TEXT)),
+    entry("IOB", ComplicationCategory.THERAPY,
+        variant(SugarliciousComplicationIds.IOB, ComplicationVariantType.SHORT_TEXT),
+        variant(SugarliciousComplicationIds.IOB_RANGED, ComplicationVariantType.RANGED_VALUE)),
+    entry("COB", ComplicationCategory.THERAPY,
+        variant(SugarliciousComplicationIds.COB, ComplicationVariantType.SHORT_TEXT),
+        variant(SugarliciousComplicationIds.COB_RANGED, ComplicationVariantType.RANGED_VALUE)),
+    entry("Basal + IOB + COB", ComplicationCategory.THERAPY,
+        variant(SugarliciousComplicationIds.IOB_COB_BASAL, ComplicationVariantType.SHORT_TEXT),
+        variant(SugarliciousComplicationIds.IOB_COB_BASAL_LONG, ComplicationVariantType.LONG_TEXT)),
+    entry("Loop Status", ComplicationCategory.THERAPY,
+        variant(SugarliciousComplicationIds.LOOP, ComplicationVariantType.SHORT_TEXT),
+        variant(SugarliciousComplicationIds.LOOP_ICON, ComplicationVariantType.MONOCHROMATIC_IMAGE)),
+    entry("Pumpe / Reservoir", ComplicationCategory.THERAPY,
+        variant(SugarliciousComplicationIds.RESERVOIR, ComplicationVariantType.SHORT_TEXT),
+        variant(SugarliciousComplicationIds.RESERVOIR_RANGED, ComplicationVariantType.RANGED_VALUE)),
+    entry("TIR", ComplicationCategory.GLUCOSE,
+        variant(SugarliciousComplicationIds.TIR, ComplicationVariantType.SHORT_TEXT),
+        variant(SugarliciousComplicationIds.TIR_GOAL, ComplicationVariantType.GOAL_PROGRESS),
+        variant(SugarliciousComplicationIds.TIR_WEIGHTED, ComplicationVariantType.WEIGHTED_ELEMENTS)),
+    entry("Datum", ComplicationCategory.GENERAL,
+        variant(SugarliciousComplicationIds.DATE, ComplicationVariantType.SHORT_TEXT)),
 )
+
+private fun catalogNumber(entry: ComplicationCatalogEntry): Int =
+    SugarliciousComplicationCatalog.indexOf(entry).coerceAtLeast(0) + 1
+
+internal val SugarliciousComplicationVariantIds: Set<Int> =
+    SugarliciousComplicationCatalog.flatMap { it.variants }.map { it.id }.toSet()
+
+private fun catalogEntryForVariant(id: Int): ComplicationCatalogEntry? =
+    SugarliciousComplicationCatalog.firstOrNull { entry -> entry.variants.any { it.id == id } }
 
 @Composable
 internal fun ComplicationStudio(
     state: TherapyDisplayState?,
+    onPresetChanged: (List<Int>) -> Unit = {},
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var selected by remember { mutableStateOf(loadComplicationPreset(context)) }
-    var expandedCategory by remember { mutableStateOf(ComplicationCategory.GLUCOSE) }
+    var graphHours by remember { mutableStateOf(loadComplicationGraphHours(context)) }
+    var variantDialogEntry by remember { mutableStateOf<ComplicationCatalogEntry?>(null) }
     var syncLabel by remember {
         mutableStateOf(
             if (selected.isEmpty()) "Noch kein Smartphone-Preset"
             else "Preset lokal gespeichert",
         )
+    }
+
+    fun applySelection(updated: List<Int>) {
+        if (updated == selected) return
+        selected = updated
+        onPresetChanged(updated)
+        syncLabel = "Preset geändert · wird synchronisiert"
+        scope.launch {
+            runCatching { syncComplicationPreset(context, updated, graphHours) }
+                .onSuccess { syncLabel = "Preset an Watch synchronisiert" }
+                .onFailure { syncLabel = "Lokal gespeichert · Watch-Sync ausstehend" }
+        }
     }
 
     val shape = RoundedCornerShape(24.dp)
@@ -141,55 +219,13 @@ internal fun ComplicationStudio(
             .padding(12.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Column(Modifier.weight(1f)) {
-                Text(
-                    "COMPLICATION STUDIO",
-                    color = SugarliciousColors.TextSecondary,
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    letterSpacing = 0.6.sp,
-                )
-                Text(
-                    "Watch-Preset & Live-Vorschau",
-                    color = SugarliciousColors.TextPrimary,
-                    fontSize = 17.sp,
-                    fontWeight = FontWeight.SemiBold,
-                )
-            }
-            Surface(
-                shape = RoundedCornerShape(999.dp),
-                color = SugarliciousColors.SurfaceHigh,
-            ) {
-                Text(
-                    "${selected.size}/4",
-                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                    color = SugarliciousColors.Primary,
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold,
-                )
-            }
-        }
-
-        Text(
-            "Hier stellst du bis zu vier bevorzugte Sugarlicious-Complications zusammen. " +
-                "Das Preset wird zur Watch synchronisiert. Bei fremden Samsung-/Wear-OS-Watchfaces " +
-                "bleibt die einmalige Slot-Zuordnung aus Sicherheitsgründen beim Wear-OS-Picker.",
-            color = SugarliciousColors.TextSecondary,
-            fontSize = 10.sp,
-            lineHeight = 14.sp,
-        )
-
         PresetStrip(selected)
 
         Button(
             onClick = {
                 scope.launch {
                     runCatching {
-                        syncComplicationPreset(context, selected)
+                        syncComplicationPreset(context, selected, graphHours)
                     }.onSuccess {
                         syncLabel = "Preset an Wear Data Layer übergeben"
                     }.onFailure {
@@ -213,55 +249,92 @@ internal fun ComplicationStudio(
             fontSize = 9.sp,
         )
 
-        ComplicationCategory.entries.forEach { category ->
-            val expanded = expandedCategory == category
-            CategoryHeader(
-                category = category,
-                expanded = expanded,
-                onClick = {
-                    expandedCategory =
-                        if (expanded) category else category
-                },
-            )
-
-            if (expanded) {
-                SugarliciousComplicationCatalog
-                    .filter { it.category == category }
-                    .forEach { entry ->
-                        ComplicationCatalogRow(
-                            entry = entry,
-                            state = state,
-                            selected = entry.id in selected,
-                            onToggle = {
-                                val updated = togglePresetEntry(
-                                    context = context,
-                                    current = selected,
-                                    entryId = entry.id,
-                                )
-                                if (updated == selected && entry.id !in selected && selected.size >= 4) {
-                                    Toast.makeText(
-                                        context,
-                                        "Das Watch-Preset hat maximal 4 Plätze.",
-                                        Toast.LENGTH_SHORT,
-                                    ).show()
-                                } else {
-                                    selected = updated
-                                    syncLabel = "Preset geändert · wird synchronisiert"
-                                    scope.launch {
-                                        runCatching {
-                                            syncComplicationPreset(context, updated)
-                                        }.onSuccess {
-                                            syncLabel = "Preset an Watch synchronisiert"
-                                        }.onFailure {
-                                            syncLabel = "Lokal gespeichert · Watch-Sync ausstehend"
-                                        }
-                                    }
-                                }
-                            },
-                        )
-                    }
+        Text(
+            "CGM-GRAPH ZEITRAUM",
+            color = SugarliciousColors.TextSecondary,
+            fontSize = 9.sp,
+            fontWeight = FontWeight.Bold,
+        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(5.dp),
+        ) {
+            listOf(1, 2, 6, 12, 24).forEach { hours ->
+                Surface(
+                    modifier = Modifier.weight(1f).clickable {
+                        graphHours = hours
+                        saveComplicationGraphHours(context, hours)
+                        scope.launch {
+                            runCatching { syncComplicationPreset(context, selected, hours) }
+                                .onSuccess { syncLabel = "Graph auf ${hours} h synchronisiert" }
+                                .onFailure { syncLabel = "Graph lokal auf ${hours} h gesetzt" }
+                        }
+                    },
+                    shape = RoundedCornerShape(12.dp),
+                    color = if (graphHours == hours) SugarliciousColors.SurfaceSelected else SugarliciousColors.SurfaceHigh,
+                ) {
+                    Text(
+                        "${hours}h",
+                        modifier = Modifier.padding(vertical = 8.dp),
+                        color = if (graphHours == hours) SugarliciousColors.Primary else SugarliciousColors.TextSecondary,
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.Bold,
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                    )
+                }
             }
         }
+
+        SugarliciousComplicationCatalog.chunked(3).forEach { entries ->
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(7.dp),
+            ) {
+                entries.forEach { entry ->
+                    val selectedVariant = entry.selectedVariant(selected)
+                    ComplicationCatalogTile(
+                        modifier = Modifier.weight(1f),
+                        entry = entry,
+                        variant = selectedVariant,
+                        state = state,
+                        graphHours = graphHours,
+                        selected = entry.variants.any { it.id in selected },
+                        onToggle = {
+                            val updated = togglePresetEntry(context, selected, selectedVariant.id)
+                            if (updated == selected && selectedVariant.id !in selected && selected.size >= 4) {
+                                Toast.makeText(context, "Das Watch-Preset hat maximal 4 Plätze.", Toast.LENGTH_SHORT).show()
+                            } else {
+                                applySelection(updated)
+                            }
+                        },
+                        onLongPress = {
+                            if (entry.variants.size > 1) variantDialogEntry = entry
+                        },
+                    )
+                }
+                repeat(3 - entries.size) { Spacer(Modifier.weight(1f)) }
+            }
+        }
+    }
+
+    variantDialogEntry?.let { entry ->
+        val currentVariant = entry.selectedVariant(selected)
+        ComplicationVariantDialog(
+            entry = entry,
+            currentVariant = currentVariant,
+            state = state,
+            graphHours = graphHours,
+            onDismiss = { variantDialogEntry = null },
+            onSelect = { variant ->
+                val updated = selectPresetVariant(context, selected, entry, variant.id)
+                if (updated == selected && entry.variants.none { it.id in selected } && selected.size >= 4) {
+                    Toast.makeText(context, "Das Watch-Preset hat maximal 4 Plätze.", Toast.LENGTH_SHORT).show()
+                } else {
+                    applySelection(updated)
+                    variantDialogEntry = null
+                }
+            },
+        )
     }
 }
 
@@ -273,7 +346,8 @@ private fun PresetStrip(selected: List<Int>) {
     ) {
         repeat(4) { index ->
             val id = selected.getOrNull(index)
-            val entry = SugarliciousComplicationCatalog.firstOrNull { it.id == id }
+            val entry = id?.let(::catalogEntryForVariant)
+            val variant = entry?.variants?.firstOrNull { it.id == id }
 
             Surface(
                 modifier = Modifier.weight(1f),
@@ -285,7 +359,7 @@ private fun PresetStrip(selected: List<Int>) {
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
                     Text(
-                        entry?.id?.toString()?.padStart(2, '0') ?: "—",
+                        entry?.let { catalogNumber(it).toString().padStart(2, '0') } ?: "—",
                         color = if (entry != null) {
                             SugarliciousColors.Primary
                         } else {
@@ -295,7 +369,7 @@ private fun PresetStrip(selected: List<Int>) {
                         fontWeight = FontWeight.Bold,
                     )
                     Text(
-                        entry?.name ?: "frei",
+                        entry?.let { "${it.name} ${variant?.type?.shortLabel.orEmpty()}" } ?: "frei",
                         color = SugarliciousColors.TextSecondary,
                         fontSize = 7.sp,
                         maxLines = 1,
@@ -344,6 +418,202 @@ private fun CategoryHeader(
             fontWeight = FontWeight.Bold,
         )
     }
+}
+
+@Composable
+private fun ComplicationCatalogTile(
+    modifier: Modifier,
+    entry: ComplicationCatalogEntry,
+    variant: ComplicationVariant,
+    state: TherapyDisplayState?,
+    graphHours: Int,
+    selected: Boolean,
+    onToggle: () -> Unit,
+    onLongPress: () -> Unit,
+) {
+    val shape = RoundedCornerShape(18.dp)
+    Column(
+        modifier = modifier.aspectRatio(1f)
+            .background(if (selected) SugarliciousColors.SurfaceSelected else SugarliciousColors.SurfaceHigh, shape)
+            .border(1.dp, if (selected) SugarliciousColors.Primary.copy(alpha = 0.62f) else SugarliciousColors.Border.copy(alpha = 0.55f), shape)
+            .combinedClickable(onClick = onToggle, onLongClick = onLongPress)
+            .padding(horizontal = 6.dp, vertical = 8.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(5.dp),
+    ) {
+        Text(
+            entry.name,
+            color = SugarliciousColors.TextPrimary,
+            fontSize = 8.5.sp,
+            lineHeight = 10.sp,
+            fontWeight = FontWeight.Bold,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+        )
+        Spacer(Modifier.weight(1f))
+        CompactComplicationPreview(entry, variant, state, graphHours)
+        Spacer(Modifier.weight(1f))
+        Text(
+            variant.type.shortLabel,
+            color = SugarliciousColors.TextSecondary,
+            fontSize = 7.sp,
+            fontWeight = FontWeight.Bold,
+        )
+    }
+}
+
+@Composable
+private fun CompactComplicationPreview(
+    entry: ComplicationCatalogEntry,
+    variant: ComplicationVariant,
+    state: TherapyDisplayState?,
+    graphHours: Int,
+) {
+    if (SugarliciousComplicationIds.baseId(variant.id) == SugarliciousComplicationIds.GRAPH) {
+        MiniGlucosePreview(
+            samples = state?.glucoseHistory.orEmpty(),
+            current = state?.glucose?.let { GlucoseSample(it.valueMgDl, it.measuredAtEpochMs) },
+            windowMinutes = if (variant.type == ComplicationVariantType.PHOTO_IMAGE) 360 else 90,
+        )
+        return
+    }
+
+    val preview = previewFor(variant.id, state)
+
+    when (variant.type) {
+        ComplicationVariantType.RANGED_VALUE,
+        ComplicationVariantType.GOAL_PROGRESS -> {
+            Box(
+                modifier = Modifier
+                    .size(52.dp)
+                    .border(4.dp, SugarliciousColors.Primary, CircleShape),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    preview.primary,
+                    color = preview.color,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                )
+            }
+            return
+        }
+
+        ComplicationVariantType.MONOCHROMATIC_IMAGE -> {
+            Text("↻", color = SugarliciousColors.Primary, fontSize = 28.sp, fontWeight = FontWeight.Bold)
+            return
+        }
+
+        ComplicationVariantType.WEIGHTED_ELEMENTS -> {
+            Row(horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+                listOf(SugarliciousColors.GlucoseLow, SugarliciousColors.GlucoseInRange, SugarliciousColors.GlucoseHigh)
+                    .forEach { color ->
+                        Box(Modifier.size(width = 12.dp, height = 28.dp).background(color, RoundedCornerShape(5.dp)))
+                    }
+            }
+            return
+        }
+
+        else -> Unit
+    }
+
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        if (preview.trend != null && SugarliciousComplicationIds.baseId(variant.id) == SugarliciousComplicationIds.TREND_ONLY) {
+            SugarliciousTrendIndicator(preview.trend, arrowSize = 25.dp, color = preview.color)
+        } else {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(2.dp),
+            ) {
+                Text(
+                    preview.primary,
+                    color = preview.color,
+                    fontSize = 14.sp,
+                    lineHeight = 14.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                )
+                preview.trend?.let {
+                    SugarliciousTrendIndicator(it, arrowSize = 17.dp, color = preview.color)
+                }
+            }
+        }
+        if (preview.secondary.isNotBlank()) {
+            Text(
+                preview.secondary,
+                modifier = Modifier.offset(y = (-2).dp),
+                color = SugarliciousColors.TextSecondary,
+                fontSize = 9.sp,
+                lineHeight = 9.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
+}
+
+@Composable
+private fun ComplicationVariantDialog(
+    entry: ComplicationCatalogEntry,
+    currentVariant: ComplicationVariant,
+    state: TherapyDisplayState?,
+    graphHours: Int,
+    onDismiss: () -> Unit,
+    onSelect: (ComplicationVariant) -> Unit,
+) {
+    val alternatives = entry.variants.filterNot { it.id == currentVariant.id }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Column {
+                Text(entry.name, color = SugarliciousColors.TextPrimary, fontWeight = FontWeight.Bold)
+                Text(
+                    "Aktiv: ${currentVariant.type.displayLabel}",
+                    color = SugarliciousColors.TextSecondary,
+                    fontSize = 10.sp,
+                )
+            }
+        },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                alternatives.forEach { variant ->
+                    Surface(
+                        modifier = Modifier.fillMaxWidth().clickable { onSelect(variant) },
+                        shape = RoundedCornerShape(16.dp),
+                        color = SugarliciousColors.SurfaceHigh,
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Box(Modifier.size(width = 78.dp, height = 58.dp), contentAlignment = Alignment.Center) {
+                                CompactComplicationPreview(entry, variant, state, graphHours)
+                            }
+                            Spacer(Modifier.width(12.dp))
+                            Text(
+                                variant.type.displayLabel,
+                                color = SugarliciousColors.TextPrimary,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.SemiBold,
+                            )
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {},
+        dismissButton = {
+            Button(onClick = onDismiss) { Text("Schließen") }
+        },
+        containerColor = SugarliciousColors.Surface,
+    )
 }
 
 @Composable
@@ -450,7 +720,7 @@ private fun ComplicationDataPreview(
     val preview = previewFor(entry.id, state)
     val shape = RoundedCornerShape(14.dp)
 
-    if (entry.id == 2) {
+    if (entry.id == SugarliciousComplicationIds.GLUCOSE_TREND) {
         val now = System.currentTimeMillis()
         val glucose = state?.glucose
         val freshness = FreshnessPolicy.classify(glucose?.measuredAtEpochMs, now)
@@ -471,7 +741,8 @@ private fun ComplicationDataPreview(
         return
     }
 
-    if (entry.id == 9 || entry.id == 10) {
+    if (entry.id == SugarliciousComplicationIds.GRAPH) {
+        val windowMinutes = 180
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -480,7 +751,7 @@ private fun ComplicationDataPreview(
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    if (entry.id == 9) "3h Datenvorschau" else "6h Datenvorschau",
+                    "3h Datenvorschau",
                     color = SugarliciousColors.TextSecondary,
                     fontSize = 8.sp,
                 )
@@ -498,7 +769,7 @@ private fun ComplicationDataPreview(
                 current = state?.glucose?.let {
                     GlucoseSample(it.valueMgDl, it.measuredAtEpochMs)
                 },
-                hours = if (entry.id == 9) 3 else 6,
+                windowMinutes = windowMinutes,
             )
         }
         return
@@ -559,11 +830,11 @@ private fun CircularGlucoseComplicationPreview(
         contentAlignment = Alignment.Center,
     ) {
         Box(
-            modifier = Modifier.size(122.dp),
+            modifier = Modifier.size(146.dp),
             contentAlignment = Alignment.Center,
         ) {
             Canvas(modifier = Modifier.fillMaxSize()) {
-                val stroke = 17.dp.toPx()
+                val stroke = 20.dp.toPx()
                 val diameter = size.minDimension - stroke
                 val topLeft = Offset(
                     (size.width - diameter) / 2f,
@@ -627,57 +898,55 @@ private fun CircularGlucoseComplicationPreview(
         }
     }
 }
+
 @Composable
 private fun MiniGlucosePreview(
     samples: List<GlucoseSample>,
     current: GlucoseSample?,
-    hours: Int,
+    windowMinutes: Int,
 ) {
+    val context = LocalContext.current
+    val preferences = remember { context.getSharedPreferences("dashboard_ui", Context.MODE_PRIVATE) }
     val now = System.currentTimeMillis()
-    val cutoff = now - hours * 60L * 60_000L
-    val fallback = demoHistory(now, hours)
+    val windowMs = windowMinutes * 60_000L
+    val cutoff = now - windowMs
+    val demoHours = maxOf(1, (windowMinutes + 59) / 60)
     val merged = (samples + listOfNotNull(current))
-        .filter { it.measuredAtEpochMs >= cutoff && it.valueMgDl in 20.0..1000.0 }
+        .filter { it.measuredAtEpochMs in cutoff..(now + 5 * 60_000L) && it.valueMgDl in 20.0..1000.0 }
         .distinctBy { it.measuredAtEpochMs }
         .sortedBy { it.measuredAtEpochMs }
-        .ifEmpty { fallback }
-
+        .ifEmpty { demoHistory(now, demoHours).filter { it.measuredAtEpochMs >= cutoff } }
+    val dotRadiusDp =
+        (preferences.getFloat("cgm.dotRadiusDp", 2.4f) - 0.5f)
+            .coerceIn(1.0f, 5.5f)
+    val outlineEnabled = preferences.getBoolean("cgm.dotOutlineEnabled", true)
+    val outlineWidthDp = preferences.getFloat("cgm.dotOutlineWidthDp", 0.95f).coerceIn(0.25f, 3f)
     Canvas(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(48.dp),
+        Modifier.fillMaxWidth().height(52.dp)
+            .background(SugarliciousColors.color(SugarliciousColorRole.GRAPH_BACKGROUND)),
     ) {
-        val lowY = size.height * ((260.0 - 80.0) / 220.0).toFloat()
-        val highY = size.height * ((260.0 - 160.0) / 220.0).toFloat()
-
-        drawRect(
-            color = SugarliciousColors.TargetBand,
-            topLeft = Offset(0f, highY),
-            size = androidx.compose.ui.geometry.Size(
-                size.width,
-                (lowY - highY).coerceAtLeast(1f),
-            ),
-        )
-
-        fun x(timestamp: Long): Float =
-            (((timestamp - cutoff).toDouble() /
-                (hours * 60L * 60_000L).toDouble())
-                .coerceIn(0.0, 1.0) * size.width).toFloat()
-
-        fun y(value: Double): Float =
-            (((260.0 - value.coerceIn(40.0, 260.0)) / 220.0) *
-                size.height).toFloat()
-
-        merged.forEach { sample ->
-            drawCircle(
-                color = if (sample.valueMgDl in 80.0..160.0) {
-                    SugarliciousColors.Green
-                } else {
-                    SugarliciousColors.Red
-                },
-                radius = 2.4.dp.toPx(),
-                center = Offset(x(sample.measuredAtEpochMs), y(sample.valueMgDl)),
-            )
+        val left = 3.dp.toPx()
+        val right = size.width - 3.dp.toPx()
+        val top = 3.dp.toPx()
+        val bottom = size.height - 3.dp.toPx()
+        fun x(timestamp: Long) = left + (((timestamp - cutoff).toDouble() / windowMs.toDouble()).coerceIn(0.0, 1.0) * (right - left)).toFloat()
+        fun y(value: Double) = bottom - (GlucoseGraphScale.ratio(value) * (bottom - top)).toFloat()
+        val low = 80.0
+        val high = 160.0
+        drawLine(SugarliciousColors.color(SugarliciousColorRole.GRAPH_DIVIDER), Offset(left, y(high)), Offset(right, y(high)), 0.7.dp.toPx())
+        drawLine(SugarliciousColors.color(SugarliciousColorRole.GRAPH_DIVIDER), Offset(left, y(low)), Offset(right, y(low)), 0.7.dp.toPx())
+        merged.forEachIndexed { index, sample ->
+            val radius = dotRadiusDp.dp.toPx() * if (index == merged.lastIndex) 1.25f else 1f
+            val center = Offset(x(sample.measuredAtEpochMs), y(sample.valueMgDl))
+            if (outlineEnabled) {
+                drawCircle(SugarliciousColors.color(SugarliciousColorRole.GRAPH_CURRENT_OUTLINE), radius + outlineWidthDp.dp.toPx(), center)
+            }
+            val dotColor = when {
+                sample.valueMgDl < low -> SugarliciousColors.color(SugarliciousColorRole.CGM_DOT_LOW)
+                sample.valueMgDl > high -> SugarliciousColors.color(SugarliciousColorRole.CGM_DOT_HIGH)
+                else -> SugarliciousColors.color(SugarliciousColorRole.CGM_DOT_IN_RANGE)
+            }
+            drawCircle(dotColor, radius, center)
         }
     }
 }
@@ -686,6 +955,7 @@ private data class PhonePreview(
     val primary: String,
     val secondary: String,
     val color: Color = SugarliciousColors.TextPrimary,
+    val trend: Trend? = null,
 )
 
 private fun previewFor(
@@ -693,116 +963,54 @@ private fun previewFor(
     state: TherapyDisplayState?,
 ): PhonePreview {
     val now = System.currentTimeMillis()
-    val glucose = state?.glucose
-    val freshness = FreshnessPolicy.classify(glucose?.measuredAtEpochMs, now)
-    val current = freshness == Freshness.CURRENT || freshness == Freshness.DELAYED
-    val g = glucose.takeIf { current }
-
-    val glucoseText = g?.let { TherapyDisplayFormatter.glucose(it) } ?: "123"
-    val trend = g?.let { TherapyDisplayFormatter.trendArrow(it.trend) }
-        ?.ifBlank { "→" } ?: "→"
-    val delta = g?.let {
-        TherapyDisplayFormatter.signedDelta(it.deltaMgDl, it.displayUnit)
-    }?.ifBlank { "+5" } ?: "+5"
-    val age = g?.measuredAtEpochMs?.let {
-        TherapyDisplayFormatter.ageMinutes(it, now)
-    } ?: "2m"
-
+    val effectiveState = state ?: previewTherapyState(now)
+    val baseId = SugarliciousComplicationIds.baseId(id)
+    val presentation = ComplicationPresentationFormatter.format(baseId, effectiveState, now)
+    val g = effectiveState.glucose
     val glucoseColor = when {
         g == null -> SugarliciousColors.TextPrimary
         g.valueMgDl < 80.0 -> SugarliciousColors.GlucoseLow
         g.valueMgDl > 160.0 -> SugarliciousColors.GlucoseHigh
         else -> SugarliciousColors.GlucoseInRange
     }
+    return PhonePreview(
+        primary = presentation.text,
+        secondary = presentation.title.orEmpty(),
+        color = if (baseId in setOf(
+                SugarliciousComplicationIds.GLUCOSE,
+                SugarliciousComplicationIds.GLUCOSE_TREND,
+                SugarliciousComplicationIds.GLUCOSE_PLUS_DELTA,
+                SugarliciousComplicationIds.GLUCOSE_TREND_DELTA,
+                SugarliciousComplicationIds.GLUCOSE_TREND_DELTA_AGE,
+                SugarliciousComplicationIds.GLUCOSE_TREND_AGE,
+            )) glucoseColor else SugarliciousColors.TextPrimary,
+        trend = presentation.trend,
+    )
+}
 
-    fun number(v: Double?, digits: Int, fallback: String): String =
-        v?.let { String.format(Locale.US, "%.${digits}f", it) } ?: fallback
+private fun previewTherapyState(now: Long): TherapyDisplayState =
+    TherapyDisplayState(
+        receivedAtEpochMs = now,
+        sourceVersion = "AndroidAPS",
+        glucose = app.aapswear.model.GlucoseState(
+            valueMgDl = 123.0,
+            displayUnit = GlucoseUnit.MG_DL,
+            trend = Trend.FORTY_FIVE_UP,
+            measuredAtEpochMs = now - 2 * 60_000L,
+            deltaMgDl = 5.0,
+        ),
+        glucoseHistory = demoHistory(now, 24),
+        insulin = app.aapswear.model.InsulinState(totalIob = 1.2, bolusIob = 0.8, basalIob = 0.4),
+        carbs = app.aapswear.model.CarbState(cobGrams = 15.0),
+        basal = app.aapswear.model.BasalState(currentUnitsPerHour = 0.70),
+        loop = app.aapswear.model.LoopState(status = "enacted", lastRunAtEpochMs = now - 2 * 60_000L),
+        pump = app.aapswear.model.PumpState(status = "OK", reservoirUnits = 120.0, batteryPercent = 80),
+    )
 
-    return when (id) {
-        1 -> PhonePreview(glucoseText, unitLabel(g?.displayUnit), glucoseColor)
-        2 -> PhonePreview("$glucoseText$trend", "Glucose + Trend", glucoseColor)
-        28 -> PhonePreview("$glucoseText$trend", "Text", glucoseColor)
-        3 -> PhonePreview("$delta · $age", "")
-        4 -> PhonePreview("$glucoseText$trend", "Δ $delta", glucoseColor)
-        5 -> PhonePreview(age, freshness.name.lowercase())
-        6 -> PhonePreview("$glucoseText$trend", "Bild-Complication", glucoseColor)
-        7 -> PhonePreview(
-            glucoseText,
-            when {
-                g == null -> "Demo: im Bereich"
-                g.valueMgDl < 80.0 -> "niedrig"
-                g.valueMgDl > 160.0 -> "hoch"
-                else -> "im Bereich"
-            },
-            glucoseColor,
-        )
-        8 -> PhonePreview(glucoseText, trend, glucoseColor)
-        9, 10 -> PhonePreview("$glucoseText$trend", "Dot-Graph", glucoseColor)
-
-        11 -> PhonePreview(number(state?.insulin?.totalIob, 2, "1.20") + "U", "")
-        12 -> PhonePreview(number(state?.insulin?.bolusIob, 2, "0.80") + " U", "Bolus")
-        13 -> PhonePreview(number(state?.insulin?.basalIob, 2, "0.40") + " U", "Basal IOB")
-        14 -> PhonePreview(number(state?.carbs?.cobGrams, 0, "15") + "g", "")
-        15 -> PhonePreview(
-            "${number(state?.insulin?.totalIob, 1, "1.2")} U · " +
-                "${number(state?.carbs?.cobGrams, 0, "15")} g",
-            "IOB · COB",
-        )
-        16 -> PhonePreview(
-            number(state?.basal?.currentUnitsPerHour, 2, "0.80") + " U/h",
-            "Basal",
-        )
-        17 -> PhonePreview(
-            state?.basal?.displayText
-                ?: state?.basal?.tempPercent?.let { "$it%" }
-                ?: "120%",
-            "Temp basal",
-        )
-        18 -> PhonePreview(
-            TherapyDisplayFormatter.target(
-                state?.target ?: app.aapswear.model.TargetState(80.0, 160.0),
-                g?.displayUnit ?: GlucoseUnit.MG_DL,
-            ),
-            "Target",
-        )
-        19 -> {
-            val loopStatus = state?.loop?.status
-            PhonePreview(
-                when (loopStatus?.lowercase()) {
-                    "enacted" -> "aktiv"
-                    "suggested" -> "Vorschlag"
-                    null -> "aktiv"
-                    else -> loopStatus
-                },
-                "Loop",
-            )
-        }
-        20 -> PhonePreview(
-            state?.loop?.lastRunAtEpochMs?.let {
-                TherapyDisplayFormatter.ageMinutes(it, now)
-            } ?: "2m",
-            "letzter Loop",
-        )
-        21 -> PhonePreview(state?.profile?.name ?: "Daily 1.9", "Profil")
-
-        22 -> PhonePreview(number(state?.pump?.reservoirUnits, 0, "120") + " U", "Reservoir")
-        23 -> PhonePreview(state?.pump?.batteryPercent?.let { "$it%" } ?: "80%", "Pumpenakku")
-        24 -> PhonePreview(state?.device?.phoneBatteryPercent?.let { "$it%" } ?: "85%", "Telefonakku")
-        25 -> PhonePreview("Lokale Quelle", "Datenquelle")
-        26 -> PhonePreview(
-            "$glucoseText$trend",
-            "IOB ${number(state?.insulin?.totalIob, 1, "1.2")} · " +
-                "COB ${number(state?.carbs?.cobGrams, 0, "15")}",
-            glucoseColor,
-        )
-        27 -> PhonePreview(
-            "$glucoseText$trend · Δ $delta",
-            "IOB ${number(state?.insulin?.totalIob, 1, "1.2")} · " +
-                "COB ${number(state?.carbs?.cobGrams, 0, "15")} · Loop",
-            glucoseColor,
-        )
-        else -> PhonePreview("—", "")
-    }
+internal fun complicationPreviewLabel(id: Int, state: TherapyDisplayState?): String {
+    val entry = catalogEntryForVariant(id)
+    val preview = previewFor(id, state)
+    return "${entry?.name ?: "Comp"} ${preview.primary}".take(20)
 }
 
 private fun demoHistory(now: Long, hours: Int): List<GlucoseSample> {
@@ -824,16 +1032,28 @@ private fun unitLabel(unit: GlucoseUnit?): String =
 
 private const val PRESET_PREFS = "complication_setup"
 private const val PRESET_KEY = "selected_ids"
+private const val COMPLICATION_GRAPH_HOURS_KEY = "graph_hours"
 
-private fun loadComplicationPreset(context: Context): List<Int> =
+internal fun loadComplicationPreset(context: Context): List<Int> =
     context.getSharedPreferences(PRESET_PREFS, Context.MODE_PRIVATE)
         .getString(PRESET_KEY, null)
         ?.split(',')
         ?.mapNotNull { it.toIntOrNull() }
-        ?.filter { id -> SugarliciousComplicationCatalog.any { it.id == id } }
+        ?.filter { id -> id in SugarliciousComplicationVariantIds }
         ?.distinct()
         ?.take(4)
         .orEmpty()
+
+private fun loadComplicationGraphHours(context: Context): Int =
+    context.getSharedPreferences(PRESET_PREFS, Context.MODE_PRIVATE)
+        .getInt(COMPLICATION_GRAPH_HOURS_KEY, 3)
+        .takeIf { it in listOf(1, 2, 6, 12, 24) } ?: 3
+
+private fun saveComplicationGraphHours(context: Context, hours: Int) {
+    context.getSharedPreferences(PRESET_PREFS, Context.MODE_PRIVATE).edit {
+        putInt(COMPLICATION_GRAPH_HOURS_KEY, hours.takeIf { it in listOf(1, 2, 6, 12, 24) } ?: 3)
+    }
+}
 
 private fun togglePresetEntry(
     context: Context,
@@ -853,12 +1073,36 @@ private fun togglePresetEntry(
     return updated
 }
 
+private fun selectPresetVariant(
+    context: Context,
+    current: List<Int>,
+    entry: ComplicationCatalogEntry,
+    variantId: Int,
+): List<Int> {
+    if (entry.variants.none { it.id == variantId }) return current
+
+    val familyIds = entry.variants.map { it.id }.toSet()
+    val existingIndex = current.indexOfFirst { it in familyIds }
+    val updated = when {
+        existingIndex >= 0 -> current.toMutableList().also { it[existingIndex] = variantId }
+        current.size < 4 -> current + variantId
+        else -> current
+    }.distinct()
+
+    context.getSharedPreferences(PRESET_PREFS, Context.MODE_PRIVATE).edit {
+        putString(PRESET_KEY, updated.joinToString(","))
+    }
+    return updated
+}
+
 internal suspend fun syncComplicationPreset(
     context: Context,
     ids: List<Int>,
+    graphHours: Int = loadComplicationGraphHours(context),
 ) {
     val request = PutDataMapRequest.create(WearProtocol.COMPLICATION_PRESET_PATH).apply {
         dataMap.putIntegerArrayList("ids", ArrayList(ids))
+        dataMap.putInt("graphHours", graphHours.takeIf { it in listOf(1, 2, 6, 12, 24) } ?: 3)
         dataMap.putLong("updatedAt", System.currentTimeMillis())
     }.asPutDataRequest().setUrgent()
 

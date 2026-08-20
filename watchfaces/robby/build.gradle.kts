@@ -4,7 +4,7 @@ android {
     namespace="app.aapswear.watchface.robby"
     compileSdk=36
     defaultConfig {
-        applicationId="app.aapswear.watchface.robby"
+        applicationId="app.aapswear.watchfacepush.robby"
         minSdk=33
         targetSdk=35
         versionCode=3

@@ -1,6 +1,8 @@
 package app.aapswear.mobile.ui.theme
 
 import android.content.SharedPreferences
+import android.content.res.Configuration
+import android.content.res.Resources
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -48,8 +50,15 @@ enum class SugarliciousColorRole(
     CGM_DOT_LOW("cgm_dot_low", "CGM-Punkte · tief", SugarliciousColorGroup.GLUCOSE, 0xFFFF5C69.toInt(), configurable = true),
     CGM_DOT_IN_RANGE("cgm_dot_in_range", "CGM-Punkte · im Ziel", SugarliciousColorGroup.GLUCOSE, 0xFF54DF30.toInt(), 0xFF2E9C45.toInt(), true),
     CGM_DOT_HIGH("cgm_dot_high", "CGM-Punkte · hoch", SugarliciousColorGroup.GLUCOSE, 0xFFFFD040.toInt(), 0xFFD47D00.toInt(), true),
-    TARGET_BAND("target_band", "Zielbereich im Graph", SugarliciousColorGroup.GLUCOSE, 0xFF0A391C.toInt()),
-    TARGET_VALUE("target_value", "Zielwert im Graph", SugarliciousColorGroup.GLUCOSE, 0xFFF5F5F5.toInt(), 0xFF252525.toInt(), true),
+    /** Legacy role retained so existing saved settings remain readable. The graph now uses RANGE_IN_RANGE. */
+    TARGET_BAND(
+        "target_band",
+        "Zielbereich im Graph (Legacy)",
+        SugarliciousColorGroup.GLUCOSE,
+        0xFF0A391C.toInt(),
+        0xFFB9EFC7.toInt(),
+        false,
+    ),
 
     GREEN("green", "Grün / Status", SugarliciousColorGroup.THERAPY, 0xFF54DF30.toInt()),
     BLUE("blue", "Blau / IOB", SugarliciousColorGroup.THERAPY, 0xFF64BFFF.toInt()),
@@ -69,13 +78,13 @@ enum class SugarliciousColorRole(
     GRAPH_LABEL("graph_label", "Achsenbeschriftung", SugarliciousColorGroup.GRAPH, 0xFFD2D2D2.toInt(), 0xFF575757.toInt()),
     GRAPH_MUTED("graph_muted", "Graph-Hinweise / Trennlinie", SugarliciousColorGroup.GRAPH, 0xFF969696.toInt(), 0xFF777777.toInt()),
     GRAPH_DIVIDER("graph_divider", "Trennlinie", SugarliciousColorGroup.GRAPH, 0xFF969696.toInt(), 0xFF747474.toInt(), true),
+    GRAPH_SIGNAL_LOSS("graph_signal_loss", "Signalverlust", SugarliciousColorGroup.GRAPH, 0x46FF5C69, 0x38D11A2A, true),
     GRAPH_CURRENT_OUTLINE("graph_current_outline", "Aktueller Punkt · Kontur", SugarliciousColorGroup.GRAPH, 0xFF000000.toInt()),
 }
 
 data class SugarliciousPalette(
     private val values: Map<SugarliciousColorRole, Int>,
     val isLight: Boolean = false,
-    val lightChromaticOutlineEnabled: Boolean = false,
 ) {
     fun argb(role: SugarliciousColorRole): Int =
         values[role] ?: if (isLight) role.lightArgb else role.defaultArgb
@@ -96,13 +105,20 @@ data class SugarliciousPalette(
 }
 
 object SugarliciousColorStore {
-    const val PREFERENCE_LIGHT_CHROMATIC_OUTLINE = "light.chromaticOutlineEnabled"
     private const val LEGACY_PREFIX = "color."
     private const val DARK_PREFIX = "color.dark."
     private const val LIGHT_PREFIX = "color.light."
 
+    private fun systemIsLight(): Boolean =
+        (Resources.getSystem().configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) !=
+            Configuration.UI_MODE_NIGHT_YES
+
     private fun isLight(preferences: SharedPreferences): Boolean =
-        preferences.getString("themeMode", "DARK") == "LIGHT"
+        when (preferences.getString("themeMode", "SYSTEM")) {
+            "LIGHT" -> true
+            "DARK" -> false
+            else -> systemIsLight()
+        }
 
     private fun currentPrefix(preferences: SharedPreferences): String =
         if (isLight(preferences)) LIGHT_PREFIX else DARK_PREFIX
@@ -144,12 +160,6 @@ object SugarliciousColorStore {
                     }
                 },
             isLight = light,
-            lightChromaticOutlineEnabled =
-                light &&
-                    preferences.getBoolean(
-                        PREFERENCE_LIGHT_CHROMATIC_OUTLINE,
-                        true,
-                    ),
         )
     }
 
@@ -189,7 +199,6 @@ object SugarliciousColorStore {
 
     fun resetAll(preferences: SharedPreferences) {
         preferences.edit {
-            remove(PREFERENCE_LIGHT_CHROMATIC_OUTLINE)
             SugarliciousColorRole.entries.forEach { role ->
                 remove(
                     LEGACY_PREFIX +
@@ -230,17 +239,6 @@ object SugarliciousColors {
     fun color(role: SugarliciousColorRole): Color =
         palette.compose(role)
 
-    fun shouldOutlineChromatic(argb: Int): Boolean {
-        if (!palette.isLight || !palette.lightChromaticOutlineEnabled) return false
-        val red = (argb shr 16) and 0xFF
-        val green = (argb shr 8) and 0xFF
-        val blue = argb and 0xFF
-        return maxOf(red, green, blue) - minOf(red, green, blue) >= 18
-    }
-
-    val ChromaticOutlineArgb: Int
-        get() = 0x78000000
-
     val Primary get() = color(SugarliciousColorRole.PRIMARY)
     val OnPrimary get() = color(SugarliciousColorRole.ON_PRIMARY)
     val Secondary get() = color(SugarliciousColorRole.SECONDARY)
@@ -259,8 +257,7 @@ object SugarliciousColors {
     val GlucoseLow get() = color(SugarliciousColorRole.GLUCOSE_LOW)
     val GlucoseInRange get() = color(SugarliciousColorRole.GLUCOSE_IN_RANGE)
     val GlucoseHigh get() = color(SugarliciousColorRole.GLUCOSE_HIGH)
-    val TargetBand get() = color(SugarliciousColorRole.TARGET_BAND)
-    val TargetValue get() = color(SugarliciousColorRole.TARGET_VALUE)
+    val TargetBand get() = color(SugarliciousColorRole.RANGE_IN_RANGE)
 
     val Green get() = color(SugarliciousColorRole.GREEN)
     val Blue get() = color(SugarliciousColorRole.BLUE)

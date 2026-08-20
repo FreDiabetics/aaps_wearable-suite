@@ -9,6 +9,7 @@ import app.aapswear.datasource.xdrip.XdripPayloadAdapter
 import app.aapswear.model.DataSourceId
 import app.aapswear.model.Freshness
 import app.aapswear.model.FreshnessPolicy
+import app.aapswear.model.DiagnosticSeverity
 import app.aapswear.storage.TherapyStateStore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -16,7 +17,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
-enum class DataSourcePreference { AUTOMATIC, ANDROID_APS, XDRIP_PLUS }
+enum class DataSourcePreference { AUTOMATIC, ANDROID_APS, XDRIP_PLUS, DEXCOM_G7_WATCH }
 
 class XdripStatusReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
@@ -36,19 +37,34 @@ class XdripStatusReceiver : BroadcastReceiver() {
                     XdripContract.EXTRA_VERSION to intent.getStringExtra(XdripContract.EXTRA_VERSION),
                 )
                 val parsed = XdripPayloadAdapter().parse(values, now)
-                    ?: return@launch
+                if (parsed == null) {
+                    app.recordMobileDiagnostic("SOURCE", "SRC-XDRIP-401", "xDrip payload could not be decoded", DiagnosticSeverity.WARNING)
+                    return@launch
+                }
                 val prefs = app.getSharedPreferences("dashboard_ui", Context.MODE_PRIVATE)
                 val preference = runCatching {
                     DataSourcePreference.valueOf(prefs.getString("dataSource", "AUTOMATIC")!!)
                 }.getOrDefault(DataSourcePreference.AUTOMATIC)
-                if (preference == DataSourcePreference.ANDROID_APS) return@launch
+                if (preference in setOf(DataSourcePreference.ANDROID_APS, DataSourcePreference.DEXCOM_G7_WATCH)) {
+                    app.recordMobileDiagnostic("SOURCE", "SRC-XDRIP-102", "xDrip payload ignored by explicit source selection")
+                    return@launch
+                }
 
                 val store = TherapyStateStore(app)
                 val previous = store.state.first()
                 val aapsIsCurrent = previous?.source == DataSourceId.ANDROID_APS &&
                     FreshnessPolicy.classify(previous.glucose?.measuredAtEpochMs, now) != Freshness.STALE &&
                     FreshnessPolicy.classify(previous.glucose?.measuredAtEpochMs, now) != Freshness.NO_DATA
-                if (preference == DataSourcePreference.AUTOMATIC && aapsIsCurrent) return@launch
+                if (preference == DataSourcePreference.AUTOMATIC && aapsIsCurrent) {
+                    app.recordMobileDiagnostic("SOURCE", "SRC-XDRIP-103", "xDrip payload deferred to current AAPS reading")
+                    return@launch
+                }
+                val g7IsCurrent = previous?.source == DataSourceId.DEXCOM_G7_WATCH &&
+                    FreshnessPolicy.classify(previous.glucose?.measuredAtEpochMs, now) in setOf(Freshness.CURRENT, Freshness.DELAYED)
+                if (preference == DataSourcePreference.AUTOMATIC && g7IsCurrent) {
+                    app.recordMobileDiagnostic("SOURCE", "SRC-XDRIP-104", "xDrip payload deferred to current direct G7 reading")
+                    return@launch
+                }
 
                 val preserved = parsed.copy(
                     insulin = previous?.insulin,
@@ -63,8 +79,33 @@ class XdripStatusReceiver : BroadcastReceiver() {
                     capabilities = parsed.capabilities + previous?.capabilities.orEmpty(),
                 )
                 val state = DisplayHistoryAccumulator.merge(previous, preserved, now)
+                app.recordMobileDiagnostic(
+                    "PREDICTION",
+                    if (state.glucosePredictions.isNotEmpty()) "PRED-CACHE-202" else "PRED-CACHE-204",
+                    if (state.glucosePredictions.isNotEmpty()) "AAPS predictions retained across xDrip glucose fallback" else "xDrip state contains no cached predictions",
+                    metadata = mapOf("displayPredictions" to state.glucosePredictions.size, "historyCount" to state.glucoseHistory.size),
+                )
+                if (previous?.copy(receivedAtEpochMs = state.receivedAtEpochMs) == state) {
+                    app.getSharedPreferences("diagnostics", Context.MODE_PRIVATE).edit {
+                        putLong("received", now)
+                        putString("lastSyncStatus", "unchanged")
+                    }
+                    return@launch
+                }
                 store.save(state)
-                publishState(app, state)
+                runCatching { HealthConnectIntegration.exportCgmReading(app, state) }
+                SugarliciousWidgets.update(app)
+                runCatching { publishState(app, state) }
+                    .onSuccess { app.recordMobileDiagnostic("SYNC", "SYNC-WATCH-200", "xDrip fallback state published to Watch") }
+                    .onFailure { error ->
+                        app.recordMobileDiagnostic(
+                            "SYNC",
+                            "SYNC-WATCH-503",
+                            "xDrip fallback state could not be published",
+                            DiagnosticSeverity.WARNING,
+                            mapOf("error" to error.javaClass.simpleName),
+                        )
+                    }
                 app.getSharedPreferences("diagnostics", Context.MODE_PRIVATE).edit {
                     putLong("received", now)
                     putLong("measurement", state.glucose?.measuredAtEpochMs ?: 0L)

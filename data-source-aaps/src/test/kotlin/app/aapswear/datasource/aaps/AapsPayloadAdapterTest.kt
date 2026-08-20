@@ -11,6 +11,11 @@ class AapsPayloadAdapterTest {
   assertEquals("AAPS_EXTENDED_STATUS_V1",state.sourceContract); assertNull(state.sourceVersion); assertEquals(2.0,state.glucose?.deltaMgDl); assertEquals(0.8,state.insulin?.bolusIob); assertEquals(5.0,state.carbs?.futureCarbsGrams); assertEquals(1_801_000L,state.basal?.tempEndsAtEpochMs); assertEquals(950L,state.loop?.lastRunAtEpochMs); assertEquals(120.0,state.pump?.reservoirUnits); assertEquals(75,state.device?.phoneBatteryPercent)
   assertTrue(DataCapability.PUMP in state.capabilities); assertTrue(DataCapability.TEMP_BASAL in state.capabilities); assertTrue(DataCapability.AVERAGE_DELTA in state.capabilities)
  }
+ @Test fun fallsBackToEnactedTargetWhenSuggestedHasNoTarget() {
+  val state=assertNotNull(AapsPayloadAdapter.parse(mapOf<String,Any?>("glucoseMgdl" to 110.0,"glucoseTimeStamp" to 1_000L,"suggested" to "{}","enacted" to "{\"targetBG\":140}"),1_100L))
+  assertEquals(140.0,state.target?.valueMgDl)
+  assertTrue(DataCapability.TARGET in state.capabilities)
+ }
  @Test fun missingOptionalAndInvalidBatteryDoNotCrash() { val state=assertNotNull(AapsPayloadAdapter.parse(mapOf("glucoseMgdl" to 90.0,"glucoseTimeStamp" to 1L,"pumpBattery" to 150),2)); assertNull(state.pump); assertTrue(DataCapability.PUMP_BATTERY !in state.capabilities) }
  @Test fun rejectsImplausibleFutureTimestamp() { assertNull(AapsPayloadAdapter.parse(mapOf("glucoseMgdl" to 100.0,"glucoseTimeStamp" to 400_001L),100_000L)) }
 

@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <complications>
-    <complication type="SMALL_IMAGE" smallImage="@drawable/comp_preview_09" />
-    <complication type="LARGE_IMAGE" largeImage="@drawable/comp_preview_09" />
+    <complication type="SHORT_TEXT">
+        <text><plain value="+5"/></text>
+    </complication>
 </complications>

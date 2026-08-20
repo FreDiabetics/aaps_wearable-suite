@@ -4,7 +4,7 @@ android {
     namespace="app.aapswear.watchface.digitalgwatch"
     compileSdk=36
     defaultConfig {
-        applicationId="app.aapswear.watchface.digitalgwatch"
+        applicationId="app.aapswear.watchfacepush.digitalgwatch"
         minSdk=33
         targetSdk=35
         versionCode=3

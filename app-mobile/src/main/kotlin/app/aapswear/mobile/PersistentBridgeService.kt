@@ -18,6 +18,7 @@ import android.graphics.drawable.Icon
 import android.os.Build
 import android.os.Bundle
 import android.os.IBinder
+import android.view.View
 import android.widget.RemoteViews
 import androidx.core.content.edit
 import androidx.core.graphics.createBitmap
@@ -91,136 +92,66 @@ class PersistentBridgeService : Service(), SharedPreferences.OnSharedPreferenceC
     private fun promoteToForeground(notification: Notification) {
         if (Build.VERSION.SDK_INT >= 34) {
             startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
-        } else startForeground(NOTIFICATION_ID, notification)
+        } else {
+            startForeground(NOTIFICATION_ID, notification)
+        }
     }
 
     private fun buildNotification(): Notification {
-        val liveRequested =
-            uiPreferences.getBoolean(
-                PREFERENCE_LIVE_NOTIFICATION,
-                false,
-            )
-        val liveCapable =
-            liveRequested &&
-                Build.VERSION.SDK_INT >= 36
-
-        val openApp =
-            PendingIntent.getActivity(
-                this,
-                0,
-                Intent(
-                    this,
-                    MainActivity::class.java,
-                ).addFlags(
-                    Intent.FLAG_ACTIVITY_SINGLE_TOP,
-                ),
-                PendingIntent.FLAG_UPDATE_CURRENT or
-                    PendingIntent.FLAG_IMMUTABLE,
-            )
-
-        val display =
-            notificationDisplay(latestState)
-
+        val liveRequested = uiPreferences.getBoolean(PREFERENCE_LIVE_NOTIFICATION, false)
+        val liveCapable = liveRequested && Build.VERSION.SDK_INT >= 36
+        val openApp = PendingIntent.getActivity(
+            this,
+            0,
+            Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
+        val notificationGraphEnabled =
+            uiPreferences.getBoolean(PREFERENCE_NOTIFICATION_GRAPH_ENABLED, true)
+        val display = notificationDisplay(latestState, notificationGraphEnabled)
         val collapsedGraph =
-            NotificationGraphRenderer.renderCollapsed(
-                context = this,
-                state = latestState,
-                preferences = uiPreferences,
-            )
+            if (notificationGraphEnabled) {
+                NotificationGraphRenderer.renderCollapsed(this, latestState, uiPreferences)
+            } else null
         val expandedGraph =
-            NotificationGraphRenderer.renderExpanded(
-                context = this,
-                state = latestState,
-                preferences = uiPreferences,
-            )
-
+            if (notificationGraphEnabled) {
+                NotificationGraphRenderer.renderExpanded(this, latestState, uiPreferences)
+            } else null
         val collapsedView =
-            notificationRemoteView(
-                layoutId =
-                    R.layout.notification_sugarlicious_collapsed,
-                display = display,
-                graph = collapsedGraph,
-            )
+            notificationRemoteView(R.layout.notification_sugarlicious_collapsed, display, collapsedGraph)
         val expandedView =
-            notificationRemoteView(
-                layoutId =
-                    R.layout.notification_sugarlicious_expanded,
-                display = display,
-                graph = expandedGraph,
-            )
+            notificationRemoteView(R.layout.notification_sugarlicious_expanded, display, expandedGraph)
 
-        val builder =
-            Notification.Builder(
-                this,
-                CHANNEL_ID,
-            )
-                .setSmallIcon(
-                    R.drawable.ic_notification_outlined,
-                )
-                .setColor(
-                    getColor(
-                        R.color.app_accent,
-                    ),
-                )
-                .setContentTitle(
-                    display.title,
-                )
-                .setContentText(
-                    display.subtitle,
-                )
-                .setCategory(
-                    Notification.CATEGORY_SERVICE,
-                )
-                .setContentIntent(
-                    openApp,
-                )
-                .setOngoing(true)
-                .setOnlyAlertOnce(true)
-                .setShowWhen(false)
-                .setStyle(
-                    Notification.DecoratedCustomViewStyle(),
-                )
-                .setCustomContentView(
-                    collapsedView,
-                )
-                .setCustomBigContentView(
-                    expandedView,
-                )
+        val builder = Notification.Builder(this, CHANNEL_ID)
+            .setSmallIcon(R.drawable.ic_notification_outlined)
+            .setColor(getColor(R.color.app_accent))
+            .setContentTitle(display.title)
+            .setContentText(display.subtitle)
+            .setCategory(Notification.CATEGORY_SERVICE)
+            .setContentIntent(openApp)
+            .setOngoing(true)
+            .setOnlyAlertOnce(true)
+            .setShowWhen(false)
+            .setStyle(Notification.DecoratedCustomViewStyle())
+            .setCustomContentView(collapsedView)
+            .setCustomBigContentView(expandedView)
 
         if (liveCapable) {
-            val disableLive =
-                PendingIntent.getService(
-                    this,
-                    1,
-                    Intent(
-                        this,
-                        PersistentBridgeService::class.java,
-                    ).setAction(
-                        ACTION_DISABLE_LIVE,
-                    ),
-                    PendingIntent.FLAG_UPDATE_CURRENT or
-                        PendingIntent.FLAG_IMMUTABLE,
-                )
-
+            val disableLive = PendingIntent.getService(
+                this,
+                1,
+                Intent(this, PersistentBridgeService::class.java).setAction(ACTION_DISABLE_LIVE),
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+            )
             builder
                 .addAction(
                     Notification.Action.Builder(
-                        Icon.createWithResource(
-                            this,
-                            R.drawable.ic_notification,
-                        ),
+                        Icon.createWithResource(this, R.drawable.ic_notification),
                         "Live beenden",
                         disableLive,
                     ).build(),
                 )
-                .addExtras(
-                    Bundle().apply {
-                        putBoolean(
-                            EXTRA_REQUEST_PROMOTED_ONGOING,
-                            true,
-                        )
-                    },
-                )
+                .addExtras(Bundle().apply { putBoolean(EXTRA_REQUEST_PROMOTED_ONGOING, true) })
         }
 
         return builder.build()
@@ -229,70 +160,68 @@ class PersistentBridgeService : Service(), SharedPreferences.OnSharedPreferenceC
     private fun notificationRemoteView(
         layoutId: Int,
         display: NotificationDisplay,
-        graph: Bitmap,
+        graph: Bitmap?,
     ): RemoteViews {
-        val palette =
-            SugarliciousColorStore.load(
-                uiPreferences,
-            )
-        val textPrimary =
-            palette.argb(
-                SugarliciousColorRole.TEXT_PRIMARY,
-            )
-        val textSecondary =
-            palette.argb(
-                SugarliciousColorRole.TEXT_SECONDARY,
-            )
+        val palette = SugarliciousColorStore.load(uiPreferences)
+        val textPrimary = palette.argb(SugarliciousColorRole.TEXT_PRIMARY)
+        val textSecondary = palette.argb(SugarliciousColorRole.TEXT_SECONDARY)
 
-        return RemoteViews(
-            packageName,
-            layoutId,
-        ).apply {
-            setTextViewText(
-                R.id.notification_value,
-                display.title,
-            )
-            setTextViewText(
-                R.id.notification_meta,
-                display.subtitle,
-            )
-            setTextColor(
-                R.id.notification_value,
-                textPrimary,
-            )
-            setTextColor(
-                R.id.notification_meta,
-                textSecondary,
-            )
-            setImageViewBitmap(
-                R.id.notification_graph,
-                graph,
-            )
+        return RemoteViews(packageName, layoutId).apply {
+            setTextViewText(R.id.notification_value, display.title)
+            setTextViewText(R.id.notification_meta, display.subtitle)
+            setTextColor(R.id.notification_value, textPrimary)
+            setTextColor(R.id.notification_meta, textSecondary)
+            val trendBitmap =
+                display.trend?.let { NotificationTrendRenderer.render(this@PersistentBridgeService, it) }
+            if (trendBitmap != null) {
+                setViewVisibility(R.id.notification_trend, View.VISIBLE)
+                setImageViewBitmap(R.id.notification_trend, trendBitmap)
+            } else {
+                setViewVisibility(R.id.notification_trend, View.GONE)
+            }
+            if (graph != null) {
+                setViewVisibility(R.id.notification_graph, View.VISIBLE)
+                setImageViewBitmap(R.id.notification_graph, graph)
+            } else {
+                setViewVisibility(R.id.notification_graph, View.GONE)
+            }
         }
     }
 
-    private fun notificationDisplay(state: TherapyDisplayState?): NotificationDisplay {
+    private fun notificationDisplay(
+        state: TherapyDisplayState?,
+        graphEnabled: Boolean,
+    ): NotificationDisplay {
         val glucose = state?.glucose
-        val freshness = FreshnessPolicy.classify(glucose?.measuredAtEpochMs, System.currentTimeMillis())
+        val now = System.currentTimeMillis()
+        val freshness = FreshnessPolicy.classify(glucose?.measuredAtEpochMs, now)
         if (glucose == null || freshness == Freshness.STALE || freshness == Freshness.NO_DATA) {
-            return NotificationDisplay("—", "Keine aktuellen Glukosedaten")
+            return NotificationDisplay("—", "Keine aktuellen Glukosedaten", null)
         }
+
         val selectedUnit = DashboardUiPreferences.read(uiPreferences).unitFor(state)
-        val value = if (selectedUnit == GlucoseUnit.MMOL_L) {
-            String.format(Locale.getDefault(), "%.1f", glucose.valueMgDl / 18.0)
-        } else glucose.valueMgDl.roundToInt().toString()
-        val unit = if (selectedUnit == GlucoseUnit.MMOL_L) "mmol/L" else "mg/dL"
-        val trend =
-            TherapyDisplayFormatter.trendArrow(
-                glucose.trend,
-            )
-        val age = ((System.currentTimeMillis() - glucose.measuredAtEpochMs).coerceAtLeast(0L) / 60_000L)
+        val value =
+            if (selectedUnit == GlucoseUnit.MMOL_L) {
+                String.format(Locale.getDefault(), "%.1f", glucose.valueMgDl / 18.0)
+            } else {
+                glucose.valueMgDl.roundToInt().toString()
+            }
+        val delta =
+            TherapyDisplayFormatter.signedDelta(glucose.deltaMgDl, selectedUnit)
+                .ifBlank { "—" }
+        val age = ((now - glucose.measuredAtEpochMs).coerceAtLeast(0L) / 60_000L)
         val prefix = if (freshness == Freshness.DELAYED) "Verzögert · " else ""
-        return NotificationDisplay("$value $trend", "$prefix$unit · $age min alt")
+        // Delta intentionally replaces the former mg/dL/mmol/L line in both layouts.
+        val subtitle = "$prefix$delta · $age min alt"
+        return NotificationDisplay(value, subtitle, glucose.trend)
     }
 
     private fun createNotificationChannel() {
-        val channel = NotificationChannel(CHANNEL_ID, "Glukose im Hintergrund", NotificationManager.IMPORTANCE_LOW).apply {
+        val channel = NotificationChannel(
+            CHANNEL_ID,
+            "Glukose im Hintergrund",
+            NotificationManager.IMPORTANCE_LOW,
+        ).apply {
             description = "Zeigt den aktuellen Glukosewert und hält die lokale Watch-Verbindung aktiv"
             setSound(null, null)
             enableVibration(false)
@@ -301,10 +230,19 @@ class PersistentBridgeService : Service(), SharedPreferences.OnSharedPreferenceC
         getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
     }
 
-    private data class NotificationDisplay(val title: String, val subtitle: String)
+    private data class NotificationDisplay(
+        val title: String,
+        val subtitle: String,
+        val trend: app.aapswear.model.Trend?,
+    )
 
     companion object {
         const val PREFERENCE_LIVE_NOTIFICATION = "liveNotification"
+        const val PREFERENCE_NOTIFICATION_GRAPH_ENABLED = "notification.graphEnabled"
+        const val PREFERENCE_NOTIFICATION_GRAPH_HOURS = "notification.graphHours"
+        const val PREFERENCE_NOTIFICATION_DOT_RADIUS = "notification.cgmDotRadiusDp"
+        const val PREFERENCE_NOTIFICATION_DOT_OUTLINE_ENABLED = "notification.cgmDotOutlineEnabled"
+        const val PREFERENCE_NOTIFICATION_DOT_OUTLINE_WIDTH = "notification.cgmDotOutlineWidthDp"
         const val EXTRA_REQUEST_PROMOTED_ONGOING = "android.requestPromotedOngoing"
         const val CHANNEL_ID = "sugarlicious_background"
         const val NOTIFICATION_ID = 4101
@@ -315,55 +253,64 @@ class PersistentBridgeService : Service(), SharedPreferences.OnSharedPreferenceC
 
         fun start(context: Context): Boolean = startWithAction(context, null)
         fun refresh(context: Context): Boolean = startWithAction(context, ACTION_REFRESH)
+
         private fun startWithAction(context: Context, action: String?): Boolean = try {
-            context.startForegroundService(Intent(context, PersistentBridgeService::class.java).apply { this.action = action })
+            context.startForegroundService(
+                Intent(context, PersistentBridgeService::class.java).apply { this.action = action },
+            )
             true
-        } catch (_: SecurityException) { false } catch (_: IllegalStateException) { false }
+        } catch (_: SecurityException) {
+            false
+        } catch (_: IllegalStateException) {
+            false
+        }
     }
 }
 
 internal object NotificationGraphRenderer {
-    const val COLLAPSED_WIDTH = 560
-    const val COLLAPSED_HEIGHT = 96
-    const val EXPANDED_WIDTH = 640
-    const val EXPANDED_HEIGHT = 256
-
-    // Kept for compatibility with older tests/callers.
+    const val COLLAPSED_WIDTH = 704
+    const val COLLAPSED_HEIGHT = 184
+    const val EXPANDED_WIDTH = 720
+    const val EXPANDED_HEIGHT = 296
     const val WIDTH = EXPANDED_WIDTH
     const val HEIGHT = EXPANDED_HEIGHT
 
-    private const val COLLAPSED_DISPLAY_HEIGHT_DP = 44f
+    private const val COLLAPSED_DISPLAY_HEIGHT_DP = 46f
     private const val EXPANDED_DISPLAY_HEIGHT_DP = 148f
 
     fun renderCollapsed(
         context: Context,
         state: TherapyDisplayState?,
         preferences: SharedPreferences,
-    ): Bitmap =
-        render(
-            context = context,
-            state = state,
-            preferences = preferences,
-            width = COLLAPSED_WIDTH,
-            height = COLLAPSED_HEIGHT,
-            displayHeightDp =
-                COLLAPSED_DISPLAY_HEIGHT_DP,
-        )
+    ): Bitmap = render(
+        context = context,
+        state = state,
+        preferences = preferences,
+        width = COLLAPSED_WIDTH,
+        height = COLLAPSED_HEIGHT,
+        displayHeightDp = COLLAPSED_DISPLAY_HEIGHT_DP,
+        graphHoursOverride = notificationGraphHours(preferences),
+    )
 
     fun renderExpanded(
         context: Context,
         state: TherapyDisplayState?,
         preferences: SharedPreferences,
-    ): Bitmap =
-        render(
-            context = context,
-            state = state,
-            preferences = preferences,
-            width = EXPANDED_WIDTH,
-            height = EXPANDED_HEIGHT,
-            displayHeightDp =
-                EXPANDED_DISPLAY_HEIGHT_DP,
-        )
+    ): Bitmap = render(
+        context = context,
+        state = state,
+        preferences = preferences,
+        width = EXPANDED_WIDTH,
+        height = EXPANDED_HEIGHT,
+        displayHeightDp = EXPANDED_DISPLAY_HEIGHT_DP,
+        graphHoursOverride = notificationGraphHours(preferences),
+    )
+
+    internal fun notificationGraphHours(preferences: SharedPreferences): Int =
+        preferences
+            .getInt(PersistentBridgeService.PREFERENCE_NOTIFICATION_GRAPH_HOURS, 3)
+            .takeIf { it in 1..3 }
+            ?: 3
 
     fun render(
         context: Context,
@@ -371,392 +318,156 @@ internal object NotificationGraphRenderer {
         preferences: SharedPreferences,
         width: Int = WIDTH,
         height: Int = HEIGHT,
-        displayHeightDp: Float =
-            EXPANDED_DISPLAY_HEIGHT_DP,
+        displayHeightDp: Float = EXPANDED_DISPLAY_HEIGHT_DP,
+        graphHoursOverride: Int? = null,
     ): Bitmap {
-        val bitmap =
-            createBitmap(
-                width,
-                height,
-            )
-        val canvas =
-            Canvas(bitmap)
-        val palette =
-            SugarliciousColorStore.load(
-                preferences,
-            )
-
-        val bounds =
-            RectF(
-                0f,
-                0f,
-                width.toFloat(),
-                height.toFloat(),
-            )
-        val radius =
-            height * 0.075f
-
-        val clip =
-            Path().apply {
-                addRoundRect(
-                    bounds,
-                    radius,
-                    radius,
-                    Path.Direction.CW,
-                )
+        val bitmap = createBitmap(width, height)
+        val canvas = Canvas(bitmap)
+        val palette = SugarliciousColorStore.load(preferences)
+        val notificationColorPrefix =
+            if (palette.isLight) "notification.color.light." else "notification.color.dark."
+        fun graphColor(role: SugarliciousColorRole): Int {
+            val key = notificationColorPrefix + role.preferenceKey
+            return if (preferences.contains(key)) {
+                preferences.getInt(key, palette.argb(role))
+            } else {
+                palette.argb(role)
             }
+        }
+
+        val bounds = RectF(0f, 0f, width.toFloat(), height.toFloat())
+        val dpToBitmap = height / displayHeightDp
+        val cornerDp = if (displayHeightDp > 100f) 18f else 10f
+        val radius = cornerDp * dpToBitmap
+        val clip = Path().apply {
+            addRoundRect(bounds, radius, radius, Path.Direction.CW)
+        }
         canvas.clipPath(clip)
 
-        val paint =
-            Paint(
-                Paint.ANTI_ALIAS_FLAG,
-            )
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+        paint.color = graphColor(SugarliciousColorRole.GRAPH_BACKGROUND)
+        canvas.drawRoundRect(bounds, radius, radius, paint)
 
-        paint.color =
-            palette.argb(
-                SugarliciousColorRole.GRAPH_BACKGROUND,
-            )
-        canvas.drawRoundRect(
-            bounds,
-            radius,
-            radius,
-            paint,
-        )
+        val now = System.currentTimeMillis()
+        val graphHours = graphHoursOverride ?: preferences
+            .getInt("graphHours", 3)
+            .takeIf { it in listOf(3, 6, 12, 24) }
+            ?: 3
+        val windowMs = graphHours * 60L * 60L * 1000L
+        val start = now - windowMs
+        val merged = linkedMapOf<Long, Double>()
 
-        val now =
-            System.currentTimeMillis()
-        val graphHours =
-            preferences
-                .getInt(
-                    "graphHours",
-                    3,
-                )
-                .takeIf {
-                    it in
-                        listOf(
-                            3,
-                            6,
-                            12,
-                            24,
-                        )
-                }
-                ?: 3
-        val windowMs =
-            graphHours *
-                60L *
-                60L *
-                1000L
-        val start =
-            now - windowMs
-
-        val merged =
-            linkedMapOf<Long, Double>()
-
-        state
-            ?.glucoseHistory
-            .orEmpty()
-            .forEach { point ->
-                if (
-                    point.measuredAtEpochMs in
-                    start..(now + 5 * 60_000L)
-                ) {
-                    merged[
-                        point.measuredAtEpochMs
-                    ] =
-                        point.valueMgDl
-                }
+        state?.glucoseHistory.orEmpty().forEach { point ->
+            if (point.measuredAtEpochMs in start..(now + 5 * 60_000L)) {
+                merged[point.measuredAtEpochMs] = point.valueMgDl
             }
-
-        state
-            ?.glucose
-            ?.let { glucose ->
-                if (
-                    glucose.measuredAtEpochMs in
-                    start..(now + 5 * 60_000L)
-                ) {
-                    merged[
-                        glucose.measuredAtEpochMs
-                    ] =
-                        glucose.valueMgDl
-                }
+        }
+        state?.glucose?.let { glucose ->
+            if (glucose.measuredAtEpochMs in start..(now + 5 * 60_000L)) {
+                merged[glucose.measuredAtEpochMs] = glucose.valueMgDl
             }
-
-        val points =
-            merged
-                .entries
-                .sortedBy {
-                    it.key
-                }
-
-        if (points.isEmpty()) {
-            return bitmap
         }
 
-        val targetLow =
-            state
-                ?.target
-                ?.lowMgDl
-                ?: 80.0
-        val targetHigh =
-            state
-                ?.target
-                ?.highMgDl
-                ?: 160.0
+        val points = merged.entries.sortedBy { it.key }
+        if (points.isEmpty()) return bitmap
 
-        val lowest =
-            points.minOf {
-                it.value
-            }
-        val highest =
-            points.maxOf {
-                it.value
-            }
+        val targetLow = state?.target?.lowMgDl ?: 80.0
+        val targetHigh = state?.target?.highMgDl ?: 160.0
+        val lowest = points.minOf { it.value }
+        val highest = points.maxOf { it.value }
+        val minValue = min(targetLow - 24.0, lowest - max(12.0, lowest * 0.08))
+        val maxValue = max(targetHigh + 24.0, highest + max(12.0, highest * 0.08))
 
-        val minValue =
-            min(
-                targetLow - 24.0,
-                lowest -
-                    max(
-                        12.0,
-                        lowest * 0.08,
-                    ),
-            )
-        val maxValue =
-            max(
-                targetHigh + 24.0,
-                highest +
-                    max(
-                        12.0,
-                        highest * 0.08,
-                    ),
-            )
+        val plotLeft = bounds.left
+        val plotRight = bounds.right
+        val plotTop = bounds.top
+        val plotBottom = bounds.bottom
 
-        val topPadding =
-            height * 0.07f
-        val bottomPadding =
-            height * 0.07f
-        val leftPadding =
-            width * 0.018f
-        val rightPadding =
-            width * 0.018f
-
-        val plotLeft =
-            leftPadding
-        val plotRight =
-            width - rightPadding
-        val plotTop =
-            topPadding
-        val plotBottom =
-            height - bottomPadding
-
-        fun y(
-            value: Double,
-        ): Float {
-            val fraction =
-                (
-                    (
-                        value -
-                            minValue
-                        ) /
-                        (
-                            maxValue -
-                                minValue
-                            ).coerceAtLeast(
-                            1.0,
-                        )
-                    ).coerceIn(
-                    0.0,
-                    1.0,
-                )
-
-            return (
-                plotBottom -
-                    fraction *
-                    (
-                        plotBottom -
-                            plotTop
-                        )
-                ).toFloat()
+        fun y(value: Double): Float {
+            val fraction = ((value - minValue) / (maxValue - minValue).coerceAtLeast(1.0))
+                .coerceIn(0.0, 1.0)
+            return (plotBottom - fraction * (plotBottom - plotTop)).toFloat()
         }
 
-        fun x(
-            timestamp: Long,
-        ): Float {
-            val fraction =
-                (
-                    (
-                        timestamp -
-                            start
-                        ).toDouble() /
-                        windowMs.toDouble()
-                    ).coerceIn(
-                    0.0,
-                    1.0,
-                )
-
-            return (
-                plotLeft +
-                    fraction *
-                    (
-                        plotRight -
-                            plotLeft
-                        )
-                ).toFloat()
+        fun x(timestamp: Long): Float {
+            val fraction = ((timestamp - start).toDouble() / windowMs.toDouble())
+                .coerceIn(0.0, 1.0)
+            return (plotLeft + fraction * (plotRight - plotLeft)).toFloat()
         }
 
-        // Preserve the ARGB value selected in the phone app.
-        paint.style =
-            Paint.Style.FILL
-        paint.color =
-            palette.argb(
-                SugarliciousColorRole.RANGE_IN_RANGE,
-            )
-        canvas.drawRoundRect(
+        paint.style = Paint.Style.FILL
+        paint.color = graphColor(SugarliciousColorRole.RANGE_HIGH)
+        canvas.drawRect(
             plotLeft,
-            y(targetHigh),
-            plotRight,
-            y(targetLow),
-            height * 0.025f,
-            height * 0.025f,
-            paint,
-        )
-
-        paint.style =
-            Paint.Style.STROKE
-        paint.strokeWidth =
-            max(
-                1f,
-                height / displayHeightDp,
-            )
-        paint.color =
-            palette.argb(
-                SugarliciousColorRole.GRAPH_DIVIDER,
-            )
-
-        canvas.drawLine(
-            plotLeft,
-            y(targetHigh),
+            plotTop,
             plotRight,
             y(targetHigh),
             paint,
         )
-        canvas.drawLine(
+        paint.color = graphColor(SugarliciousColorRole.TARGET_BAND)
+        canvas.drawRect(
             plotLeft,
-            y(targetLow),
+            y(targetHigh),
             plotRight,
             y(targetLow),
             paint,
         )
+        paint.color = graphColor(SugarliciousColorRole.RANGE_LOW)
+        canvas.drawRect(
+            plotLeft,
+            y(targetLow),
+            plotRight,
+            plotBottom,
+            paint,
+        )
 
-        val dpToBitmap =
-            height /
-                displayHeightDp
-        val dotRadiusDp =
-            preferences
-                .getFloat(
-                    "cgm.dotRadiusDp",
-                    2.4f,
-                )
-                .coerceIn(
-                    1.5f,
-                    6.0f,
-                )
-        val outlineEnabled =
-            preferences.getBoolean(
-                "cgm.dotOutlineEnabled",
-                true,
-            )
-        val outlineWidthDp =
-            preferences
-                .getFloat(
-                    "cgm.dotOutlineWidthDp",
-                    0.95f,
-                )
-                .coerceIn(
-                    0.25f,
-                    3.0f,
-                )
+        paint.style = Paint.Style.STROKE
+        paint.strokeWidth = max(1f, height / displayHeightDp)
+        paint.color = graphColor(SugarliciousColorRole.GRAPH_DIVIDER)
+        canvas.drawLine(plotLeft, y(targetHigh), plotRight, y(targetHigh), paint)
+        canvas.drawLine(plotLeft, y(targetLow), plotRight, y(targetLow), paint)
 
-        val outlineRadius =
-            (
-                dotRadiusDp +
-                    outlineWidthDp
-                ) *
-                dpToBitmap
-        val dotRadius =
-            dotRadiusDp *
-                dpToBitmap
-        val currentExtra =
-            0.18f *
-                dpToBitmap
+        val dotRadiusDp = preferences.getFloat(
+            PersistentBridgeService.PREFERENCE_NOTIFICATION_DOT_RADIUS,
+            preferences.getFloat("cgm.dotRadiusDp", 2.4f),
+        ).coerceIn(1.5f, 6.0f)
+        val outlineEnabled = preferences.getBoolean(
+            PersistentBridgeService.PREFERENCE_NOTIFICATION_DOT_OUTLINE_ENABLED,
+            preferences.getBoolean("cgm.dotOutlineEnabled", true),
+        )
+        val outlineWidthDp = preferences.getFloat(
+            PersistentBridgeService.PREFERENCE_NOTIFICATION_DOT_OUTLINE_WIDTH,
+            preferences.getFloat("cgm.dotOutlineWidthDp", 0.95f),
+        ).coerceIn(0.25f, 3.0f)
+        val outlineRadius = (dotRadiusDp + outlineWidthDp) * dpToBitmap
+        val dotRadius = dotRadiusDp * dpToBitmap
+        val currentExtra = 0.18f * dpToBitmap
 
-        points.forEachIndexed {
-                index,
-                point,
-            ->
-            val px =
-                x(
-                    point.key,
-                )
-            val py =
-                y(
-                    point.value,
-                )
-            val current =
-                index ==
-                    points.lastIndex
-
+        points.forEachIndexed { index, point ->
+            val px = x(point.key)
+            val py = y(point.value)
+            val current = index == points.lastIndex
             if (outlineEnabled) {
-                paint.style =
-                    Paint.Style.FILL
-                paint.color =
-                    palette.argb(
-                        SugarliciousColorRole.GRAPH_CURRENT_OUTLINE,
-                    )
+                paint.style = Paint.Style.FILL
+                paint.color = graphColor(SugarliciousColorRole.GRAPH_CURRENT_OUTLINE)
                 canvas.drawCircle(
                     px,
                     py,
-                    outlineRadius +
-                        if (current) {
-                            currentExtra
-                        } else {
-                            0f
-                        },
+                    outlineRadius + if (current) currentExtra else 0f,
                     paint,
                 )
             }
 
-            paint.style =
-                Paint.Style.FILL
-            paint.color =
-                when {
-                    point.value <
-                        targetLow ->
-                        palette.argb(
-                            SugarliciousColorRole.CGM_DOT_LOW,
-                        )
-
-                    point.value >
-                        targetHigh ->
-                        palette.argb(
-                            SugarliciousColorRole.CGM_DOT_HIGH,
-                        )
-
-                    else ->
-                        palette.argb(
-                            SugarliciousColorRole.CGM_DOT_IN_RANGE,
-                        )
-                }
-
+            paint.style = Paint.Style.FILL
+            paint.color = when {
+                point.value < targetLow -> graphColor(SugarliciousColorRole.CGM_DOT_LOW)
+                point.value > targetHigh -> graphColor(SugarliciousColorRole.CGM_DOT_HIGH)
+                else -> graphColor(SugarliciousColorRole.CGM_DOT_IN_RANGE)
+            }
             canvas.drawCircle(
                 px,
                 py,
-                dotRadius +
-                    if (current) {
-                        currentExtra
-                    } else {
-                        0f
-                    },
+                dotRadius + if (current) currentExtra else 0f,
                 paint,
             )
         }
@@ -764,4 +475,3 @@ internal object NotificationGraphRenderer {
         return bitmap
     }
 }
-

@@ -11,7 +11,6 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.LinearLayout
-import android.widget.SeekBar
 import android.widget.Switch
 import android.widget.TextView
 import app.aapswear.mobile.ui.theme.SugarliciousColorRole
@@ -19,17 +18,17 @@ import app.aapswear.mobile.ui.theme.SugarliciousColors
 import app.aapswear.mobile.ui.theme.SugarliciousTheme
 import app.aapswear.model.GlucoseUnit
 import app.aapswear.model.TherapyDisplayState
-import java.util.Locale
 
 enum class DashboardScreen { OVERVIEW, WATCH, SETTINGS }
 enum class DisplayUnitPreference { AAPS, MG_DL, MMOL_L }
-enum class DashboardThemeMode { DARK, LIGHT }
+enum class DashboardThemeMode { SYSTEM, LIGHT, DARK }
 
 data class DashboardUiPreferences(
     val unit: DisplayUnitPreference = DisplayUnitPreference.AAPS,
     val showDetails: Boolean = true,
     val showCgmGraph: Boolean = true,
-    val showCgmTargetRange: Boolean = false,
+    val showCgmTargetRange: Boolean = true,
+    val showCgmTargetValue: Boolean = false,
     val showCgmBasal: Boolean = false,
     val showCgmActivity: Boolean = false,
     val showCgmPredictionIob: Boolean = false,
@@ -40,14 +39,14 @@ data class DashboardUiPreferences(
     val cgmDotRadiusDp: Float = 2.4f,
     val cgmDotOutlineEnabled: Boolean = true,
     val cgmDotOutlineWidthDp: Float = 0.95f,
-    val predictionDotRadiusDp: Float = 1.75f,
-    val predictionDotOutlineWidthDp: Float = 0.70f,
     val compact: Boolean = true,
     val graphHours: Int = 3,
     val liveNotification: Boolean = false,
+    val notificationGraphEnabled: Boolean = true,
+    val notificationGraphHours: Int = 3,
     val watchFaceIndex: Int = 1,
     val dataSource: DataSourcePreference = DataSourcePreference.AUTOMATIC,
-    val themeMode: DashboardThemeMode = DashboardThemeMode.DARK,
+    val themeMode: DashboardThemeMode = DashboardThemeMode.SYSTEM,
 ) {
     val anyCgmPredictionEnabled: Boolean
         get() =
@@ -86,6 +85,11 @@ data class DashboardUiPreferences(
                 showCgmTargetRange =
                     preferences.getBoolean(
                         "cgm.targetRange",
+                        true,
+                    ),
+                showCgmTargetValue =
+                    preferences.getBoolean(
+                        "cgm.targetValue",
                         false,
                     ),
                 showCgmBasal =
@@ -136,14 +140,6 @@ data class DashboardUiPreferences(
                     preferences
                         .getFloat("cgm.dotOutlineWidthDp", 0.95f)
                         .coerceIn(0.25f, 3.0f),
-                predictionDotRadiusDp =
-                    preferences
-                        .getFloat("cgm.prediction.dotRadiusDp", 1.75f)
-                        .coerceIn(1.0f, 6.0f),
-                predictionDotOutlineWidthDp =
-                    preferences
-                        .getFloat("cgm.prediction.dotOutlineWidthDp", 0.70f)
-                        .coerceIn(0.0f, 3.0f),
                 compact =
                     preferences.getBoolean(
                         "compact",
@@ -160,21 +156,34 @@ data class DashboardUiPreferences(
                         PersistentBridgeService.PREFERENCE_LIVE_NOTIFICATION,
                         false,
                     ),
+                notificationGraphEnabled =
+                    preferences.getBoolean(
+                        PersistentBridgeService.PREFERENCE_NOTIFICATION_GRAPH_ENABLED,
+                        true,
+                    ),
+                notificationGraphHours =
+                    preferences
+                        .getInt(
+                            PersistentBridgeService.PREFERENCE_NOTIFICATION_GRAPH_HOURS,
+                            3,
+                        )
+                        .takeIf { it in 1..3 }
+                        ?: 3,
                 watchFaceIndex =
                     preferences
                         .getInt(
                             "watchFaceIndex",
                             1,
                         )
-                        .coerceIn(0, 3),
+                        .coerceIn(0, 4),
                 dataSource = runCatching {
                     DataSourcePreference.valueOf(
                         preferences.getString("dataSource", "AUTOMATIC")!!,
                     )
                 }.getOrDefault(DataSourcePreference.AUTOMATIC),
                 themeMode = runCatching {
-                    DashboardThemeMode.valueOf(preferences.getString("themeMode", "DARK")!!)
-                }.getOrDefault(DashboardThemeMode.DARK),
+                    DashboardThemeMode.valueOf(preferences.getString("themeMode", "SYSTEM")!!)
+                }.getOrDefault(DashboardThemeMode.SYSTEM),
             )
     }
 }
@@ -246,16 +255,27 @@ data class DashboardCallbacks(
     val navigate: (DashboardScreen) -> Unit,
     val setUnit: (DisplayUnitPreference) -> Unit,
     val setDataSource: (DataSourcePreference) -> Unit,
+    val openG7Setup: () -> Unit,
+    val openDiagnostics: () -> Unit,
     val setThemeMode: (DashboardThemeMode) -> Unit,
     val setShowDetails: (Boolean) -> Unit,
     val setShowCgmGraph: (Boolean) -> Unit,
     val setCgmStream: (String, Boolean) -> Unit = { _, _ -> },
-    val setCgmFloat: (String, Float) -> Unit = { _, _ -> },
     val setShowMetabolicGraph: (Boolean) -> Unit,
     val setCompact: (Boolean) -> Unit,
     val setLiveNotification: (Boolean) -> Unit,
+    val setNotificationGraphEnabled: (Boolean) -> Unit,
+    val setNotificationGraphHours: (Int) -> Unit,
     val setWatchFaceIndex: (Int) -> Unit,
     val syncNow: () -> Unit,
+    val connectHealthConnect: () -> Unit,
+    val syncHealthConnect: () -> Unit,
+    val manageHealthConnect: () -> Unit,
+    val requestNotificationAccess: () -> Unit,
+    val requestUnrestrictedBattery: () -> Unit,
+    val exportSettings: () -> Unit,
+    val importSettings: () -> Unit,
+    val openProjectGitHub: () -> Unit,
     val openContactEmail: () -> Unit,
 )
 
@@ -263,21 +283,6 @@ class DashboardViewFactory(
     private val context: Context,
     private val callbacks: DashboardCallbacks,
 ) {
-    private enum class SettingsPanel {
-        COLORS,
-        CGM_PREDICTIONS,
-    }
-
-    private val expandedSettingsPanels = mutableSetOf<SettingsPanel>()
-
-    private fun settingsPanelVisibility(panel: SettingsPanel): Int =
-        if (panel in expandedSettingsPanels) View.VISIBLE else View.GONE
-
-    private fun toggleSettingsPanel(panel: SettingsPanel): Int {
-        if (!expandedSettingsPanels.add(panel)) expandedSettingsPanels.remove(panel)
-        return settingsPanelVisibility(panel)
-    }
-
     private data class ComposeRenderState(
         val state: TherapyDisplayState?,
         val diagnostics: DiagnosticsSnapshot,
@@ -291,6 +296,9 @@ class DashboardViewFactory(
         androidx.compose.runtime.mutableStateOf<ComposeRenderState?>(null)
     private var activeComposeScreen: DashboardScreen? = null
     private var activeComposeView: androidx.compose.ui.platform.ComposeView? = null
+    private var colorSettingsExpanded = false
+    private var predictionSettingsExpanded = false
+    private var notificationGraphSettingsExpanded = false
 
     private val density =
         context.resources.displayMetrics.density
@@ -355,6 +363,7 @@ class DashboardViewFactory(
         preferences: DashboardUiPreferences,
         now: Long,
     ) {
+        collapseSettingsSections()
         overviewRenderState.value = ComposeRenderState(state, diagnostics, preferences, now)
         if (activeComposeScreen == DashboardScreen.OVERVIEW &&
             activeComposeView?.parent === parent
@@ -403,6 +412,7 @@ class DashboardViewFactory(
         preferences: DashboardUiPreferences,
         now: Long,
     ) {
+        collapseSettingsSections()
         watchRenderState.value = ComposeRenderState(state, diagnostics, preferences, now)
         if (activeComposeScreen == DashboardScreen.WATCH &&
             activeComposeView?.parent === parent
@@ -464,15 +474,22 @@ class DashboardViewFactory(
                             Triple("Automatisch", preferences.dataSource == DataSourcePreference.AUTOMATIC) {
                                 callbacks.setDataSource(DataSourcePreference.AUTOMATIC)
                             },
-                            Triple("Loop-App", preferences.dataSource == DataSourcePreference.ANDROID_APS) {
+                            Triple("AndroidAPS", preferences.dataSource == DataSourcePreference.ANDROID_APS) {
                                 callbacks.setDataSource(DataSourcePreference.ANDROID_APS)
                             },
                             Triple("xDrip+", preferences.dataSource == DataSourcePreference.XDRIP_PLUS) {
                                 callbacks.setDataSource(DataSourcePreference.XDRIP_PLUS)
                             },
+                            Triple("Dexcom G7 Watch", preferences.dataSource == DataSourcePreference.DEXCOM_G7_WATCH) {
+                                callbacks.setDataSource(DataSourcePreference.DEXCOM_G7_WATCH)
+                            },
                         ),
                     ),
                 )
+                if (preferences.dataSource == DataSourcePreference.DEXCOM_G7_WATCH) {
+                    addView(divider())
+                    addView(actionRow("G7-Sensor auf der Watch einrichten", "Öffnen") { callbacks.openG7Setup() })
+                }
                 addView(divider())
                 addView(
                     choiceRow(
@@ -496,11 +513,84 @@ class DashboardViewFactory(
             cardParams(top = 4),
         )
 
+        parent.addView(settingsGroupLabel("APP-BETRIEB & SICHERUNG"), fullWidth())
+        parent.addView(
+            tile(null).apply {
+                addView(
+                    actionRow(
+                        "Benachrichtigungen",
+                        AppRuntimeAccess.notificationLabel(context),
+                        callbacks.requestNotificationAccess,
+                    ),
+                )
+                addView(divider())
+                addView(
+                    actionRow(
+                        "Dauerbetrieb",
+                        AppRuntimeAccess.batteryLabel(context),
+                        callbacks.requestUnrestrictedBattery,
+                    ),
+                )
+                addView(
+                    helper(
+                        "Der sichtbare Sugarlicious-Dienst startet mit der App und nach einem Geräteneustart. " +
+                            "Für möglichst zuverlässige Watch-Synchronisierung kann die Akku-Optimierung freigegeben werden.",
+                        3,
+                    ),
+                )
+                addView(divider())
+                addView(actionRow("Einstellungen sichern", "Exportieren", callbacks.exportSettings))
+                addView(divider())
+                addView(actionRow("Einstellungen wiederherstellen", "Importieren", callbacks.importSettings))
+                addView(
+                    helper(
+                        "Die Sicherung enthält nur Darstellung, Verhalten und Watchface-/Complication-Auswahl. " +
+                            "Diagnosen, Gesundheitsdaten und Sensorzugänge bleiben ausgeschlossen.",
+                        3,
+                    ),
+                )
+                addView(
+                    helper(
+                        "Nahgeräte und Benachrichtigungen werden für den G7-Collector direkt auf der Watch abgefragt. " +
+                            "QR-Scan und Dateiauswahl funktionieren ohne pauschalen Kamera-, Standort- oder Speicherzugriff.",
+                        3,
+                    ),
+                )
+            },
+            cardParams(top = 4),
+        )
+
+        parent.addView(settingsGroupLabel("HEALTH CONNECT"), fullWidth())
+        parent.addView(
+            tile(null).apply {
+                addView(actionRow("Google Health Connect", HealthConnectIntegration.statusLabel(context)) { callbacks.connectHealthConnect() })
+                addView(divider())
+                addView(actionRow("Gesundheitsdaten aktualisieren", "Synchronisieren") { callbacks.syncHealthConnect() })
+                addView(divider())
+                addView(actionRow("Zugriff verwalten", "Öffnen") { callbacks.manageHealthConnect() })
+                addView(
+                    LinearLayout(context).apply {
+                        orientation = LinearLayout.HORIZONTAL
+                        gravity = Gravity.END
+                        setPadding(0, 8.dp, 0, 4.dp)
+                        addView(
+                            chip("Alle Health-Daten", true) {
+                                HealthConnectDataDialog.show(context)
+                            },
+                        )
+                    },
+                )
+                addView(helper(HealthConnectIntegration.detailLabel(context), 3))
+                addView(helper("Liest nach deiner Freigabe Aktivität, Puls/HRV, Bewegung, Training, Schlaf, Ernährung/Trinken, Körperwerte und Vitaldaten. Sugarlicious schreibt ausschließlich eigene CGM-Werte als Blutzucker; IOB, COB und Basal haben in Health Connect keinen passenden Datentyp.", 3))
+            },
+            cardParams(top = 4),
+        )
+
         parent.addView(settingsGroupLabel("ANZEIGE"), fullWidth())
         val colorContainer =
             LinearLayout(context).apply {
                 orientation = LinearLayout.VERTICAL
-                visibility = settingsPanelVisibility(SettingsPanel.COLORS)
+                visibility = if (colorSettingsExpanded) View.VISIBLE else View.GONE
                 val colorSettings =
                     androidx.compose.ui.platform.ComposeView(context).apply {
                         setViewCompositionStrategy(
@@ -521,11 +611,20 @@ class DashboardViewFactory(
         parent.addView(
             tile(null).apply {
                 addView(
-                    switchRowCompact(
-                        "Heller Modus",
-                        preferences.themeMode == DashboardThemeMode.LIGHT,
-                        View.generateViewId(),
-                    ) { callbacks.setThemeMode(if (it) DashboardThemeMode.LIGHT else DashboardThemeMode.DARK) },
+                    choiceRow(
+                        "Darstellung",
+                        listOf(
+                            Triple("System", preferences.themeMode == DashboardThemeMode.SYSTEM) {
+                                callbacks.setThemeMode(DashboardThemeMode.SYSTEM)
+                            },
+                            Triple("Hell", preferences.themeMode == DashboardThemeMode.LIGHT) {
+                                callbacks.setThemeMode(DashboardThemeMode.LIGHT)
+                            },
+                            Triple("Dunkel", preferences.themeMode == DashboardThemeMode.DARK) {
+                                callbacks.setThemeMode(DashboardThemeMode.DARK)
+                            },
+                        ),
+                    ),
                 )
                 addView(divider())
                 addView(
@@ -539,7 +638,7 @@ class DashboardViewFactory(
                 addView(divider())
                 addView(
                     switchRowCompact(
-                        "Kompakte \u00dcbersicht",
+                        "Kompakte Übersicht",
                         preferences.compact,
                         R.id.dashboard_compact_switch,
                         callbacks.setCompact,
@@ -548,8 +647,8 @@ class DashboardViewFactory(
                 addView(divider())
                 addView(
                     actionRow("Farben & Darstellung", "Anpassen") {
-                        colorContainer.visibility =
-                            toggleSettingsPanel(SettingsPanel.COLORS)
+                        colorSettingsExpanded = !colorSettingsExpanded
+                        colorContainer.visibility = if (colorSettingsExpanded) View.VISIBLE else View.GONE
                     },
                 )
             },
@@ -561,7 +660,7 @@ class DashboardViewFactory(
         val predictionContainer =
             LinearLayout(context).apply {
                 orientation = LinearLayout.VERTICAL
-                visibility = settingsPanelVisibility(SettingsPanel.CGM_PREDICTIONS)
+                visibility = if (predictionSettingsExpanded) View.VISIBLE else View.GONE
                 addView(
                     tile(null).apply {
                         addView(
@@ -595,28 +694,6 @@ class DashboardViewFactory(
                                 View.generateViewId(),
                             ) { callbacks.setCgmStream("cgm.prediction.zeroTemp", it) },
                         )
-                        addView(divider())
-                        addView(
-                            sliderRowCompact(
-                                title = "Prediction-Punktgröße",
-                                description = "Größe der Vorhersagepunkte im CGM-Graph",
-                                value = preferences.predictionDotRadiusDp,
-                                minimum = 1.0f,
-                                maximum = 6.0f,
-                                decimals = 1,
-                            ) { callbacks.setCgmFloat("cgm.prediction.dotRadiusDp", it) },
-                        )
-                        addView(divider())
-                        addView(
-                            sliderRowCompact(
-                                title = "Prediction-Konturdicke",
-                                description = "0,00 dp blendet die Kontur aus",
-                                value = preferences.predictionDotOutlineWidthDp,
-                                minimum = 0.0f,
-                                maximum = 3.0f,
-                                decimals = 2,
-                            ) { callbacks.setCgmFloat("cgm.prediction.dotOutlineWidthDp", it) },
-                        )
                     },
                     fullWidth(),
                 )
@@ -645,6 +722,14 @@ class DashboardViewFactory(
                     addView(divider())
                     addView(
                         switchRowCompact(
+                            "Aktueller Zielwert",
+                            preferences.showCgmTargetValue,
+                            View.generateViewId(),
+                        ) { callbacks.setCgmStream("cgm.targetValue", it) },
+                    )
+                    addView(divider())
+                    addView(
+                        switchRowCompact(
                             "Basal",
                             preferences.showCgmBasal,
                             View.generateViewId(),
@@ -653,7 +738,7 @@ class DashboardViewFactory(
                     addView(divider())
                     addView(
                         switchRowCompact(
-                            "Insulinaktivit\u00e4t",
+                            "Insulinaktivität",
                             preferences.showCgmActivity,
                             View.generateViewId(),
                         ) { callbacks.setCgmStream("cgm.activity", it) },
@@ -664,8 +749,8 @@ class DashboardViewFactory(
                             "Vorhersagen",
                             if (preferences.anyCgmPredictionEnabled) "Aktiv" else "Aus",
                         ) {
-                            predictionContainer.visibility =
-                                toggleSettingsPanel(SettingsPanel.CGM_PREDICTIONS)
+                            predictionSettingsExpanded = !predictionSettingsExpanded
+                            predictionContainer.visibility = if (predictionSettingsExpanded) View.VISIBLE else View.GONE
                         },
                     )
                 }
@@ -690,6 +775,41 @@ class DashboardViewFactory(
         )
 
         parent.addView(settingsGroupLabel("BENACHRICHTIGUNG"), fullWidth())
+        val notificationGraphCustomization =
+            LinearLayout(context).apply {
+                orientation = LinearLayout.VERTICAL
+                visibility = if (notificationGraphSettingsExpanded) View.VISIBLE else View.GONE
+                addView(
+                    tile(null).apply {
+                        addView(
+                            choiceRow(
+                                "Graph-Skalierung",
+                                listOf(
+                                    Triple("1 h", preferences.notificationGraphHours == 1) {
+                                        callbacks.setNotificationGraphHours(1)
+                                    },
+                                    Triple("2 h", preferences.notificationGraphHours == 2) {
+                                        callbacks.setNotificationGraphHours(2)
+                                    },
+                                    Triple("3 h", preferences.notificationGraphHours == 3) {
+                                        callbacks.setNotificationGraphHours(3)
+                                    },
+                                ),
+                            ),
+                        )
+                    },
+                    fullWidth(),
+                )
+                addView(
+                    androidx.compose.ui.platform.ComposeView(context).apply {
+                        setViewCompositionStrategy(
+                            androidx.compose.ui.platform.ViewCompositionStrategy.DisposeOnDetachedFromWindow,
+                        )
+                        setContent { SugarliciousTheme { NotificationGraphSettingsPanel() } }
+                    },
+                    fullWidth(),
+                )
+            }
         parent.addView(
             tile(null).apply {
                 addView(
@@ -700,25 +820,49 @@ class DashboardViewFactory(
                         callbacks.setLiveNotification,
                     ),
                 )
+                addView(divider())
+                addView(
+                    switchRowCompact(
+                        "CGM-Graph anzeigen",
+                        preferences.notificationGraphEnabled,
+                        View.generateViewId(),
+                        callbacks.setNotificationGraphEnabled,
+                    ),
+                )
+                if (preferences.notificationGraphEnabled) {
+                    addView(divider())
+                    addView(
+                        actionRow("CGM-Graph", "Anpassen") {
+                            notificationGraphSettingsExpanded = !notificationGraphSettingsExpanded
+                            notificationGraphCustomization.visibility = if (notificationGraphSettingsExpanded) View.VISIBLE else View.GONE
+                        },
+                    )
+                }
             },
             cardParams(top = 4),
         )
 
-        parent.addView(settingsGroupLabel("UHR & WATCHFACES"), fullWidth())
+        parent.addView(notificationGraphCustomization, cardParams(top = 4))
+
+        parent.addView(settingsGroupLabel("DIAGNOSE"), fullWidth())
         parent.addView(
             tile(null).apply {
-                addView(
-                    actionRow("Watchfaces", "Ausw\u00e4hlen") {
-                        callbacks.navigate(DashboardScreen.WATCH)
-                    },
-                )
+                addView(actionRow("Ereignisse & Fehlercodes", "Öffnen") { callbacks.openDiagnostics() })
+                addView(helper("Lokale, begrenzte Ablaufdiagnose von Smartphone und Watch. Sensor- und Authentifizierungs-Rohdaten werden nicht exportiert.", 3))
             },
             cardParams(top = 4),
         )
 
-        parent.addView(settingsGroupLabel("INFO & SUPPORT"), fullWidth())
+        parent.addView(settingsGroupLabel("ÜBER"), fullWidth())
         parent.addView(aboutCard(), cardParams(top = 4, bottom = 10))
     }
+
+    private fun collapseSettingsSections() {
+        colorSettingsExpanded = false
+        predictionSettingsExpanded = false
+        notificationGraphSettingsExpanded = false
+    }
+
     private fun aboutCard(): View =
         tile(null).apply {
             val header =
@@ -730,7 +874,8 @@ class DashboardViewFactory(
 
             header.addView(
                 ImageView(context).apply {
-                    setImageResource(R.drawable.frediabetics_logo)
+                    setImageResource(R.drawable.ic_foreground)
+                    imageTintList = null
                     contentDescription = context.getString(R.string.brand_logo)
                     scaleType = ImageView.ScaleType.FIT_CENTER
                 },
@@ -738,16 +883,59 @@ class DashboardViewFactory(
             )
 
             header.addView(value("Sugarlicious", text, 20f, 1).apply { gravity = Gravity.CENTER })
-            header.addView(helper("Unabhängiges Projekt · by FreDiabetics", 1).apply { gravity = Gravity.CENTER })
+            header.addView(helper("by FreDiabetics", 1).apply { gravity = Gravity.CENTER })
             addView(header)
-            addView(divider())
             addView(
-                actionRow("E-Mail", null) {
-                    callbacks.openContactEmail()
-                }.also {
-                    it.id = R.id.dashboard_contact_email
+                LinearLayout(context).apply {
+                    orientation = LinearLayout.HORIZONTAL
+                    gravity = Gravity.CENTER
+                    setPadding(0, 8.dp, 0, 1.dp)
+                    addView(
+                        aboutActionPill(
+                            icon = R.drawable.ic_github,
+                            label = "GitHub",
+                            action = callbacks.openProjectGitHub,
+                        ).also { it.id = R.id.dashboard_github },
+                        LinearLayout.LayoutParams(0, 44.dp, 1f).apply { marginEnd = 5.dp },
+                    )
+                    addView(
+                        aboutActionPill(
+                            icon = R.drawable.ic_mail,
+                            label = "E-Mail",
+                            action = callbacks.openContactEmail,
+                        ).also { it.id = R.id.dashboard_contact_email },
+                        LinearLayout.LayoutParams(0, 44.dp, 1f).apply { marginStart = 5.dp },
+                    )
                 },
             )
+        }
+
+    private fun aboutActionPill(
+        icon: Int,
+        label: String,
+        action: () -> Unit,
+    ) =
+        LinearLayout(context).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER
+            isClickable = true
+            isFocusable = true
+            background =
+                roundedBackground(
+                    SugarliciousColors.argb(SugarliciousColorRole.SURFACE_HIGH),
+                    SugarliciousColors.argb(SugarliciousColorRole.BORDER),
+                    999,
+                )
+            setOnClickListener { action() }
+            addView(
+                ImageView(context).apply {
+                    setImageResource(icon)
+                    imageTintList = ColorStateList.valueOf(accent)
+                    contentDescription = label
+                },
+                LinearLayout.LayoutParams(19.dp, 19.dp).apply { marginEnd = 7.dp },
+            )
+            addView(value(label, text, 13f, 1))
         }
 
     private fun settingsGroupLabel(label: String) =
@@ -755,7 +943,6 @@ class DashboardViewFactory(
             text = label
             textSize = 11f
             setTextColor(accent)
-            applyChromaticOutline(accent)
             typeface = Typeface.create("sans", Typeface.BOLD)
             letterSpacing = 0.04f
             setPadding(4.dp, 12.dp, 4.dp, 3.dp)
@@ -855,13 +1042,21 @@ class DashboardViewFactory(
                 Switch(context).apply {
                     this.id = id
                     isChecked = checked
+                    minWidth = 50.dp
+                    minimumHeight = 30.dp
+                    splitTrack = false
+                    scaleX = 0.92f
+                    scaleY = 0.92f
                     thumbTintList =
                         ColorStateList(
                             arrayOf(
                                 intArrayOf(android.R.attr.state_checked),
                                 intArrayOf(),
                             ),
-                            intArrayOf(accent, secondary),
+                            intArrayOf(
+                                android.graphics.Color.WHITE,
+                                SugarliciousColors.argb(SugarliciousColorRole.TEXT_SECONDARY),
+                            ),
                         )
                     trackTintList =
                         ColorStateList(
@@ -870,9 +1065,7 @@ class DashboardViewFactory(
                                 intArrayOf(),
                             ),
                             intArrayOf(
-                                SugarliciousColors.argb(
-                                    SugarliciousColorRole.SURFACE_SELECTED,
-                                ),
+                                accent,
                                 SugarliciousColors.argb(
                                     SugarliciousColorRole.SURFACE_HIGH,
                                 ),
@@ -885,116 +1078,16 @@ class DashboardViewFactory(
             )
         }
 
-    private fun sliderRowCompact(
-        title: String,
-        description: String,
-        value: Float,
-        minimum: Float,
-        maximum: Float,
-        decimals: Int,
-        callback: (Float) -> Unit,
-    ) =
-        LinearLayout(context).apply {
-            orientation = LinearLayout.VERTICAL
-            minimumHeight = 72.dp
-            setPadding(0, 7.dp, 0, 7.dp)
-
-            val valueLabel =
-                TextView(context).apply {
-                    textSize = 12f
-                    gravity = Gravity.END
-                    setTextColor(accent)
-                    applyChromaticOutline(accent)
-                }
-
-            val titleRow =
-                LinearLayout(context).apply {
-                    orientation = LinearLayout.HORIZONTAL
-                    gravity = Gravity.CENTER_VERTICAL
-                    addView(
-                        LinearLayout(context).apply {
-                            orientation = LinearLayout.VERTICAL
-                            addView(value(title, text, 15f, 1))
-                            addView(helper(description, 1))
-                        },
-                        LinearLayout.LayoutParams(
-                            0,
-                            ViewGroup.LayoutParams.WRAP_CONTENT,
-                            1f,
-                        ),
-                    )
-                    addView(
-                        valueLabel,
-                        LinearLayout.LayoutParams(
-                            72.dp,
-                            ViewGroup.LayoutParams.WRAP_CONTENT,
-                        ),
-                    )
-                }
-            addView(titleRow)
-
-            val steps = 1000
-            fun progressToValue(progress: Int): Float =
-                minimum + (maximum - minimum) * progress.toFloat() / steps.toFloat()
-            fun valueToProgress(current: Float): Int =
-                (((current.coerceIn(minimum, maximum) - minimum) / (maximum - minimum)) * steps)
-                    .toInt()
-                    .coerceIn(0, steps)
-            fun format(current: Float): String =
-                String.format(Locale.getDefault(), "%.${decimals}f dp", current)
-
-            valueLabel.text = format(value)
-            addView(
-                SeekBar(context).apply {
-                    max = steps
-                    progress = valueToProgress(value)
-                    progressTintList = ColorStateList.valueOf(accent)
-                    thumbTintList = ColorStateList.valueOf(accent)
-                    setOnSeekBarChangeListener(
-                        object : SeekBar.OnSeekBarChangeListener {
-                            private var currentValue = value.coerceIn(minimum, maximum)
-
-                            override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
-                                currentValue = progressToValue(progress)
-                                valueLabel.text = format(currentValue)
-                            }
-
-                            override fun onStartTrackingTouch(seekBar: SeekBar?) = Unit
-
-                            override fun onStopTrackingTouch(seekBar: SeekBar?) {
-                                callback(currentValue)
-                            }
-                        },
-                    )
-                },
-                fullWidth(),
-            )
-        }
-
     private fun chipRow(
-        items:
-            List<
-                Triple<
-                    String,
-                    Boolean,
-                    () -> Unit,
-                >,
-            >,
+        items: List<Triple<String, Boolean, () -> Unit>>,
     ) =
         LinearLayout(context).apply {
-            orientation =
-                LinearLayout.HORIZONTAL
-            gravity =
-                Gravity.START
-            setPadding(
-                0,
-                7.dp,
-                0,
-                4.dp,
-            )
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.START
+            setPadding(0, 7.dp, 0, 4.dp)
 
             items.forEach { (label, selected, click) ->
-addView(
+                addView(
                     chip(
                         label,
                         selected,
@@ -1004,8 +1097,7 @@ addView(
                         ViewGroup.LayoutParams.WRAP_CONTENT,
                         ViewGroup.LayoutParams.WRAP_CONTENT,
                     ).apply {
-                        marginEnd =
-                            7.dp
+                        marginEnd = 7.dp
                     },
                 )
             }
@@ -1017,20 +1109,16 @@ addView(
         click: () -> Unit,
     ) =
         TextView(context).apply {
-            text =
-                label
-            textSize =
-                11f
-            minHeight =
-                36.dp
-            val chipTextColor =
+            text = label
+            textSize = 11f
+            minHeight = 36.dp
+            setTextColor(
                 if (selected) {
                     accent
                 } else {
                     secondary
-                }
-            setTextColor(chipTextColor)
-            applyChromaticOutline(chipTextColor)
+                },
+            )
             background =
                 roundedBackground(
                     if (selected) {
@@ -1051,35 +1139,19 @@ addView(
                     },
                     999,
                 )
-            gravity =
-                Gravity.CENTER
-            isClickable =
-                true
-            isFocusable =
-                true
-            setPadding(
-                12.dp,
-                0,
-                12.dp,
-                0,
-            )
-            setOnClickListener {
-                click()
-            }
+            gravity = Gravity.CENTER
+            isClickable = true
+            isFocusable = true
+            setPadding(12.dp, 0, 12.dp, 0)
+            setOnClickListener { click() }
         }
 
     private fun tile(
         title: String?,
     ): LinearLayout =
         LinearLayout(context).apply {
-            orientation =
-                LinearLayout.VERTICAL
-            setPadding(
-                12.dp,
-                11.dp,
-                12.dp,
-                11.dp,
-            )
+            orientation = LinearLayout.VERTICAL
+            setPadding(12.dp, 11.dp, 12.dp, 11.dp)
             background =
                 roundedBackground(
                     SugarliciousColors.argb(
@@ -1090,13 +1162,10 @@ addView(
                     ),
                     22,
                 )
-            clipToOutline =
-                true
+            clipToOutline = true
 
             title?.let {
-                addView(
-                    sectionLabel(it),
-                )
+                addView(sectionLabel(it))
             }
         }
 
@@ -1106,17 +1175,10 @@ addView(
         radiusDp: Int,
     ): GradientDrawable =
         GradientDrawable().apply {
-            shape =
-                GradientDrawable.RECTANGLE
-            cornerRadius =
-                radiusDp.dp.toFloat()
-            setColor(
-                fillColor,
-            )
-            setStroke(
-                1.dp,
-                strokeColor,
-            )
+            shape = GradientDrawable.RECTANGLE
+            cornerRadius = radiusDp.dp.toFloat()
+            setColor(fillColor)
+            setStroke(1.dp, strokeColor)
         }
 
     private fun screenTitle() =
@@ -1132,24 +1194,16 @@ addView(
                 ),
             )
         }
+
     private fun sectionLabel(
         label: String,
     ) =
         TextView(context).apply {
-            text =
-                label
-            textSize =
-                12f
-            setTextColor(
-                this@DashboardViewFactory.text,
-            )
-            typeface =
-                Typeface.create(
-                    "sans",
-                    Typeface.NORMAL,
-                )
-            letterSpacing =
-                0.03f
+            text = label
+            textSize = 12f
+            setTextColor(this@DashboardViewFactory.text)
+            typeface = Typeface.create("sans", Typeface.NORMAL)
+            letterSpacing = 0.03f
         }
 
     private fun value(
@@ -1159,25 +1213,14 @@ addView(
         maxLines: Int = 2,
     ) =
         TextView(context).apply {
-            text =
-                value
-            textSize =
-                size
-            setTextColor(
-                color,
-            )
-            applyChromaticOutline(color)
-            typeface =
-                Typeface.create(
-                    "sans",
-                    Typeface.NORMAL,
-                )
-            this.maxLines =
-                maxLines
+            text = value
+            textSize = size
+            setTextColor(color)
+            typeface = Typeface.create("sans", Typeface.NORMAL)
+            this.maxLines = maxLines
 
             if (maxLines == 1) {
-                ellipsize =
-                    TextUtils.TruncateAt.END
+                ellipsize = TextUtils.TruncateAt.END
             }
         }
 
@@ -1187,30 +1230,11 @@ addView(
         color: Int = secondary,
     ) =
         TextView(context).apply {
-            text =
-                value
-            textSize =
-                11f
-            setTextColor(
-                color,
-            )
-            applyChromaticOutline(color)
-            this.maxLines =
-                maxLines
+            text = value
+            textSize = 11f
+            setTextColor(color)
+            this.maxLines = maxLines
         }
-
-    private fun TextView.applyChromaticOutline(color: Int) {
-        if (SugarliciousColors.shouldOutlineChromatic(color)) {
-            setShadowLayer(
-                0.65f * density,
-                0f,
-                0f,
-                SugarliciousColors.ChromaticOutlineArgb,
-            )
-        } else {
-            setShadowLayer(0f, 0f, 0f, 0)
-        }
-    }
 
     private fun fullWidth() =
         LinearLayout.LayoutParams(
@@ -1226,13 +1250,10 @@ addView(
             ViewGroup.LayoutParams.MATCH_PARENT,
             ViewGroup.LayoutParams.WRAP_CONTENT,
         ).apply {
-            topMargin =
-                top.dp
-            bottomMargin =
-                bottom.dp
+            topMargin = top.dp
+            bottomMargin = bottom.dp
         }
 
     private val Int.dp: Int
-        get() =
-            (this * density).toInt()
+        get() = (this * density).toInt()
 }
