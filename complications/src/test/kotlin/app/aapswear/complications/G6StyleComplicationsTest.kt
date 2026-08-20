@@ -1,12 +1,15 @@
 package app.aapswear.complications
 
 import app.aapswear.model.DataSourceId
+import app.aapswear.model.FreshnessPolicy
 import app.aapswear.model.GlucoseSample
 import app.aapswear.model.GlucoseState
 import app.aapswear.model.GlucoseUnit
 import app.aapswear.model.TherapyDisplayState
 import app.aapswear.model.Trend
+import java.time.Instant
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -27,6 +30,26 @@ class G6StyleComplicationsTest {
         val header = G6StylePresentationFormatter.header(state, now)
         assertEquals("—", header.text)
         assertEquals("VERALTET", header.title)
+    }
+
+    @Test
+    fun `current complication payload expires exactly when reading becomes stale`() {
+        val measuredAt = now - 2 * 60_000L
+        val state = state(measuredAt = measuredAt)
+        val validRange = G6StylePresentationFormatter.validTimeRange(state, now)
+        val staleAt = measuredAt + FreshnessPolicy.DELAYED_MAX_MS
+
+        assertTrue(Instant.ofEpochMilli(now) in validRange)
+        assertTrue(Instant.ofEpochMilli(staleAt) in validRange)
+        assertFalse(Instant.ofEpochMilli(staleAt + 1L) in validRange)
+    }
+
+    @Test
+    fun `already stale payload stays valid so explicit stale state can render`() {
+        val state = state(measuredAt = now - FreshnessPolicy.DELAYED_MAX_MS - 1L)
+        val validRange = G6StylePresentationFormatter.validTimeRange(state, now)
+
+        assertTrue(Instant.ofEpochMilli(now + 24 * 60 * 60_000L) in validRange)
     }
 
     @Test
