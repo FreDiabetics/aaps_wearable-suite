@@ -327,6 +327,10 @@ internal object NotificationGraphRenderer {
         val notificationColorPrefix =
             if (palette.isLight) "notification.color.light." else "notification.color.dark."
         fun graphColor(role: SugarliciousColorRole): Int {
+            // The in-range band is a shared semantic color. Notification rendering must match
+            // the app graph exactly and must not be overridden by stale notification-only keys.
+            if (role == SugarliciousColorRole.RANGE_IN_RANGE) return palette.argb(role)
+
             val key = notificationColorPrefix + role.preferenceKey
             return if (preferences.contains(key)) {
                 preferences.getInt(key, palette.argb(role))
@@ -404,7 +408,7 @@ internal object NotificationGraphRenderer {
             y(targetHigh),
             paint,
         )
-        paint.color = graphColor(SugarliciousColorRole.TARGET_BAND)
+        paint.color = graphColor(SugarliciousColorRole.RANGE_IN_RANGE)
         canvas.drawRect(
             plotLeft,
             y(targetHigh),

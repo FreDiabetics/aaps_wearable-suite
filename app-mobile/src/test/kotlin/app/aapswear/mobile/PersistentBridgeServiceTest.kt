@@ -14,6 +14,7 @@ import android.widget.ImageView
 import android.widget.TextView
 import androidx.test.core.app.ApplicationProvider
 import app.aapswear.mobile.ui.theme.SugarliciousColorRole
+import app.aapswear.mobile.ui.theme.SugarliciousColorStore
 import app.aapswear.model.GlucoseState
 import app.aapswear.model.GlucoseUnit
 import app.aapswear.model.TherapyDisplayState
@@ -118,6 +119,7 @@ class PersistentBridgeServiceTest {
         val context = ApplicationProvider.getApplicationContext<android.content.Context>()
         context.getSharedPreferences("dashboard_ui", android.content.Context.MODE_PRIVATE).edit()
             .clear()
+            .putString("themeMode", "DARK")
             .putBoolean(PersistentBridgeService.PREFERENCE_LIVE_NOTIFICATION, true)
             .commit()
         context.getSharedPreferences("diagnostics", android.content.Context.MODE_PRIVATE).edit()
@@ -159,17 +161,27 @@ class PersistentBridgeServiceTest {
         val graphPreferences =
             context.getSharedPreferences("dashboard_ui", android.content.Context.MODE_PRIVATE)
         val highEdgeColor = Color.rgb(198, 36, 91)
-        val targetBandColor = Color.rgb(0, 184, 126)
+        val appInRangeColor = Color.rgb(0, 184, 126)
         val lowEdgeColor = Color.rgb(24, 156, 214)
+        SugarliciousColorStore.save(
+            graphPreferences,
+            SugarliciousColorRole.RANGE_IN_RANGE,
+            appInRangeColor,
+        )
         val graphColors = graphPreferences.edit()
         listOf("dark", "light").forEach { mode ->
             graphColors.putInt(
                 "notification.color.$mode.${SugarliciousColorRole.RANGE_HIGH.preferenceKey}",
                 highEdgeColor,
             )
+            // Legacy/notification-only values must never turn the shared in-range band white.
+            graphColors.putInt(
+                "notification.color.$mode.${SugarliciousColorRole.RANGE_IN_RANGE.preferenceKey}",
+                Color.WHITE,
+            )
             graphColors.putInt(
                 "notification.color.$mode.${SugarliciousColorRole.TARGET_BAND.preferenceKey}",
-                targetBandColor,
+                Color.WHITE,
             )
             graphColors.putInt(
                 "notification.color.$mode.${SugarliciousColorRole.RANGE_LOW.preferenceKey}",
@@ -202,8 +214,8 @@ class PersistentBridgeServiceTest {
             assertEquals(lowEdgeColor, graph.getPixel(graph.width / 2, graph.height - 1))
         }
         val targetTop = (expandedGraph.height * 0.1875f).toInt() + 2
-        assertEquals(targetBandColor, expandedGraph.getPixel(0, targetTop))
-        assertEquals(targetBandColor, expandedGraph.getPixel(expandedGraph.width - 1, targetTop))
+        assertEquals(appInRangeColor, expandedGraph.getPixel(0, targetTop))
+        assertEquals(appInRangeColor, expandedGraph.getPixel(expandedGraph.width - 1, targetTop))
         assertEquals(null, notification.extras.getCharSequence(Notification.EXTRA_SUB_TEXT))
         assertEquals(1, notification.actions.size)
         controller.destroy()
