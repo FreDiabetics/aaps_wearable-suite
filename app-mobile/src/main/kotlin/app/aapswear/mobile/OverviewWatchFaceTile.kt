@@ -185,8 +185,15 @@ internal fun OverviewWatchFaceTile(
         runCatching { requestWatchRuntimeStatus(appContext) }
     }
 
+    val g6StyleRelevant = SugarliciousWatchFaceSelectionStore.isG6StyleRelevant(appContext, state)
     val savedFaceIndex = SugarliciousWatchFaceSelectionStore.read(appContext, selectedFaceIndex)
-    val effectiveFaceIndex = runtime.activeSugarliciousFaceIndex ?: savedFaceIndex
+    val selectableSavedFaceIndex =
+        SugarliciousWatchFaceSelectionStore.resolveSelectableFallback(
+            savedFaceIndex = savedFaceIndex,
+            legacyFallback = selectedFaceIndex,
+            g6StyleRelevant = g6StyleRelevant,
+        )
+    val effectiveFaceIndex = runtime.activeSugarliciousFaceIndex ?: selectableSavedFaceIndex
     val selected = effectiveFaceIndex.coerceIn(0, sugarliciousWatchFaceNames.lastIndex)
     val activeComplicationIds =
         runtime.activeComplicationIds.ifEmpty {
@@ -210,12 +217,16 @@ internal fun OverviewWatchFaceTile(
         if (currentIndex != selected) pager.scrollToPage(aligned + selected)
     }
 
-    LaunchedEffect(pager.settledPage, runtime.activeSugarliciousFaceIndex) {
+    LaunchedEffect(pager.settledPage, runtime.activeSugarliciousFaceIndex, g6StyleRelevant) {
         if (runtime.activeSugarliciousFaceIndex == null) {
             val index = pager.settledPage % sugarliciousWatchFaceNames.size
             if (index != selected) {
-                SugarliciousWatchFaceSelectionStore.write(appContext, index)
-                if (index != SUGARLICIOUS_G6_STYLE_FACE_INDEX) onSelectedFace(index)
+                if (SugarliciousWatchFaceSelectionStore.isSelectable(index, g6StyleRelevant)) {
+                    SugarliciousWatchFaceSelectionStore.write(appContext, index)
+                    if (index != SUGARLICIOUS_G6_STYLE_FACE_INDEX) onSelectedFace(index)
+                } else {
+                    pager.scrollToPage(aligned + selected)
+                }
             }
         }
     }
@@ -238,7 +249,7 @@ internal fun OverviewWatchFaceTile(
                 if (runtime.activeSugarliciousFaceIndex != null) {
                     Modifier
                 } else {
-                    Modifier.pointerInput(pager.settledPage) {
+                    Modifier.pointerInput(pager.settledPage, g6StyleRelevant) {
                         var dragDistance = 0f
                         detectHorizontalDragGestures(
                             onDragStart = { dragDistance = 0f },
@@ -248,7 +259,11 @@ internal fun OverviewWatchFaceTile(
                             },
                             onDragEnd = {
                                 val target = carouselTargetPage(pager.settledPage, dragDistance)
-                                if (target != pager.settledPage) {
+                                val targetIndex = target % sugarliciousWatchFaceNames.size
+                                if (
+                                    target != pager.settledPage &&
+                                    SugarliciousWatchFaceSelectionStore.isSelectable(targetIndex, g6StyleRelevant)
+                                ) {
                                     carouselScope.launch { pager.animateScrollToPage(target) }
                                 }
                             },
