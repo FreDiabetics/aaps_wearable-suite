@@ -38,12 +38,15 @@ class CgmGraphCustomizationTest {
         preferences.edit().clear().putString("themeMode", "DARK").commit()
         val targetColor = Color.rgb(224, 42, 205)
         val rangeColor = Color.rgb(24, 180, 65)
+        val oldTargetBandColor = Color.rgb(6, 48, 18)
 
         assertEquals(SugarliciousColorRole.TARGET_BAND, SugarliciousColorRole.TARGET_VALUE)
+        assertEquals("target_value", SugarliciousColorRole.TARGET_VALUE.preferenceKey)
         assertTrue(SugarliciousColorRole.TARGET_VALUE.configurable)
         assertTrue(colorRoleVisible(SugarliciousColorRole.TARGET_VALUE, showCgmGraph = true, showMetabolicGraph = false))
         assertFalse(colorRoleVisible(SugarliciousColorRole.TARGET_VALUE, showCgmGraph = false, showMetabolicGraph = false))
 
+        preferences.edit().putInt("color.dark.target_band", oldTargetBandColor).commit()
         SugarliciousColorStore.save(preferences, SugarliciousColorRole.TARGET_VALUE, targetColor)
         SugarliciousColorStore.save(preferences, SugarliciousColorRole.RANGE_IN_RANGE, rangeColor)
         val palette = SugarliciousColorStore.load(preferences)
@@ -51,6 +54,7 @@ class CgmGraphCustomizationTest {
         assertEquals(targetColor, palette.argb(SugarliciousColorRole.TARGET_VALUE))
         assertEquals(rangeColor, palette.argb(SugarliciousColorRole.RANGE_IN_RANGE))
         assertTrue(targetColor != rangeColor)
+        assertTrue(oldTargetBandColor != palette.argb(SugarliciousColorRole.TARGET_VALUE))
     }
 
     @Test
