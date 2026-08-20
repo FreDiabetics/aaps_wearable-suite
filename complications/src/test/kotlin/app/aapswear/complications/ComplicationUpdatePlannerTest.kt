@@ -13,6 +13,16 @@ import org.junit.Test
 
 class ComplicationUpdatePlannerTest {
     @Test
+    fun `managed provider set includes fixed G6 style providers`() {
+        val providers = ComplicationUpdatePlanner.allManagedProviders
+
+        assertTrue(G6StyleHeaderComplication::class.java in providers)
+        assertTrue(G6StyleGraphComplication::class.java in providers)
+        assertTrue(G6StyleStatusComplication::class.java in providers)
+        assertEquals(providers.size, providers.distinct().size)
+    }
+
+    @Test
     fun `identical state requests no provider updates`() {
         val state = state()
         assertTrue(ComplicationUpdatePlanner.affectedProviders(state, state).isEmpty())
