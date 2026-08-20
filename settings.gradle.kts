@@ -54,6 +54,7 @@ include(
     ":watchfaces:sugarlicious-orbit",
     ":watchfaces:sugarlicious-rings",
     ":watchfaces:sugarlicious-graph",
+    ":watchfaces:sugarlicious-g6-style",
     ":tools:aaps-cwf-parser",
     ":tools:wff-generator",
     ":tools:screenshot-comparator",

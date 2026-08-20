@@ -20,7 +20,6 @@ function Assert-LastExitCode([string]$Step) {
 function Get-ConnectedAdbDevices {
     & adb start-server | Out-Host
     Assert-LastExitCode "ADB start"
-
     $serials = @(
         & adb devices |
             Select-Object -Skip 1 |
@@ -31,13 +30,10 @@ function Get-ConnectedAdbDevices {
     Assert-LastExitCode "ADB device query"
 
     foreach ($serial in $serials) {
-        $characteristics =
-            ((& adb -s $serial shell getprop ro.build.characteristics) | Out-String).Trim()
+        $characteristics = ((& adb -s $serial shell getprop ro.build.characteristics) | Out-String).Trim()
         Assert-LastExitCode "ADB characteristics query for $serial"
-        $model =
-            ((& adb -s $serial shell getprop ro.product.model) | Out-String).Trim()
+        $model = ((& adb -s $serial shell getprop ro.product.model) | Out-String).Trim()
         Assert-LastExitCode "ADB model query for $serial"
-
         [pscustomobject]@{
             Serial = $serial
             Model = $model
@@ -53,29 +49,20 @@ function Resolve-AdbDevice(
     [string]$RequestedSerial
 ) {
     $expectWatch = $Kind -eq "watch"
-
     if ($RequestedSerial) {
         $requested = @($Devices | Where-Object { $_.Serial -eq $RequestedSerial })
-        if ($requested.Count -ne 1) {
-            throw "Requested $Kind '$RequestedSerial' is not an active ADB device."
-        }
-        if ($requested[0].IsWatch -ne $expectWatch) {
-            throw "Requested device '$RequestedSerial' is not a $Kind."
-        }
+        if ($requested.Count -ne 1) { throw "Requested $Kind '$RequestedSerial' is not an active ADB device." }
+        if ($requested[0].IsWatch -ne $expectWatch) { throw "Requested device '$RequestedSerial' is not a $Kind." }
         return $requested[0].Serial
     }
 
     $candidates = @($Devices | Where-Object { $_.IsWatch -eq $expectWatch })
     if (($Kind -eq "phone") -and ($candidates.Count -gt 1)) {
-        $usbCandidates = @(
-            $candidates |
-                Where-Object { $_.Serial -notmatch '(_adb-tls-connect|:\d+$)' }
-        )
+        $usbCandidates = @($candidates | Where-Object { $_.Serial -notmatch '(_adb-tls-connect|:\d+$)' })
         if ($usbCandidates.Count -eq 1) { return $usbCandidates[0].Serial }
     }
     if ($candidates.Count -ne 1) {
-        $connected =
-            ($Devices | ForEach-Object { "$($_.Serial) ($($_.Model))" }) -join ", "
+        $connected = ($Devices | ForEach-Object { "$($_.Serial) ($($_.Model))" }) -join ", "
         if (-not $connected) { $connected = "none" }
         throw "Expected exactly one $kind, found $($candidates.Count). Connected: $connected"
     }
@@ -95,13 +82,13 @@ function Test-WatchFacePushAssetsStale {
         "sugarlicious_graph_token.txt",
         "sugarlicious_digital.apk",
         "sugarlicious_digital_token.txt",
+        "sugarlicious_g6_style.apk",
+        "sugarlicious_g6_style_token.txt",
         "..\default_watchface.apk"
     )
 
-    $defaultTokenResource =
-        ".\app-wear\build\generated\watchfacePushRes\values\default_watchface_token.xml"
+    $defaultTokenResource = ".\app-wear\build\generated\watchfacePushRes\values\default_watchface_token.xml"
     if (-not (Test-Path $defaultTokenResource)) { return $true }
-
     foreach ($name in $required) {
         if (-not (Test-Path (Join-Path $generated $name))) { return $true }
     }
@@ -112,23 +99,18 @@ function Test-WatchFacePushAssetsStale {
         Get-ChildItem .\watchfaces\sugarlicious-rings -Recurse -File
         Get-ChildItem .\watchfaces\sugarlicious-graph -Recurse -File
         Get-ChildItem .\watchfaces\sugarlicious-digital -Recurse -File
-    ) | Where-Object {
-        $_.FullName -notmatch '[\\/](build|\.gradle)[\\/]'
-    }
+        Get-ChildItem .\watchfaces\sugarlicious-g6-style -Recurse -File
+    ) | Where-Object { $_.FullName -notmatch '[\\/](build|\.gradle)[\\/]' }
 
     $sourceNewest = @(
         $watchFaceSources
         Get-Item .\tools\watchface-push\Prepare-WatchFacePushAssets.ps1
-    ) |
-        Sort-Object LastWriteTime -Descending |
-        Select-Object -First 1
+    ) | Sort-Object LastWriteTime -Descending | Select-Object -First 1
 
     $assetOldest = @(
         $required | ForEach-Object { Get-Item (Join-Path $generated $_) }
         Get-Item $defaultTokenResource
-    ) |
-        Sort-Object LastWriteTime |
-        Select-Object -First 1
+    ) | Sort-Object LastWriteTime | Select-Object -First 1
 
     return $sourceNewest.LastWriteTime -gt $assetOldest.LastWriteTime
 }
@@ -136,9 +118,7 @@ function Test-WatchFacePushAssetsStale {
 if (-not $NoPull) {
     $dirty = @(git status --porcelain)
     Assert-LastExitCode "git status"
-    if ($dirty.Count -gt 0) {
-        throw "Local changes exist. Commit or stash them first, or use -NoPull intentionally."
-    }
+    if ($dirty.Count -gt 0) { throw "Local changes exist. Commit or stash them first, or use -NoPull intentionally." }
     Write-Host "Syncing GitHub..."
     git pull --ff-only
     Assert-LastExitCode "git pull"
@@ -168,9 +148,7 @@ if ($needsWatchFaceAssets -and (($Target -eq "wfp") -or (Test-WatchFacePushAsset
     & .\tools\watchface-push\Prepare-WatchFacePushAssets.ps1
     if (-not $?) { throw "Watch Face Push asset preparation failed" }
 }
-if ($Target -eq "wfp") {
-    $effectiveTarget = "wear"
-}
+if ($Target -eq "wfp") { $effectiveTarget = "wear" }
 
 [string[]]$gradleTasks = @()
 if ($effectiveTarget -eq "mobile") {
@@ -206,9 +184,7 @@ foreach ($task in $gradleTasks) { Write-Host "  $task" }
 Assert-LastExitCode "Gradle"
 
 if (($effectiveTarget -eq "mobile") -or ($effectiveTarget -eq "all")) {
-    $mobileApk = Get-ChildItem .\app-mobile\build\outputs\apk\debug\*.apk |
-        Sort-Object LastWriteTime -Descending |
-        Select-Object -First 1
+    $mobileApk = Get-ChildItem .\app-mobile\build\outputs\apk\debug\*.apk | Sort-Object LastWriteTime -Descending | Select-Object -First 1
     if ($null -eq $mobileApk) { throw "Mobile APK not found" }
     Write-Host "Installing Mobile on $phone..."
     adb -s $phone install -r $mobileApk.FullName
@@ -221,9 +197,7 @@ if (($effectiveTarget -eq "mobile") -or ($effectiveTarget -eq "all")) {
 
 if (($effectiveTarget -eq "wear") -or ($effectiveTarget -eq "g7") -or ($effectiveTarget -eq "all")) {
     if (($effectiveTarget -eq "g7") -or ($effectiveTarget -eq "all")) {
-        $g7WatchApk = Get-ChildItem .\g7watch\build\outputs\apk\debug\*.apk |
-            Sort-Object LastWriteTime -Descending |
-            Select-Object -First 1
+        $g7WatchApk = Get-ChildItem .\g7watch\build\outputs\apk\debug\*.apk | Sort-Object LastWriteTime -Descending | Select-Object -First 1
         if ($null -eq $g7WatchApk) { throw "G7 Watch Collector APK not found" }
         Write-Host "Installing G7 Watch Collector on $watch..."
         adb -s $watch install -r $g7WatchApk.FullName
@@ -236,9 +210,7 @@ if (($effectiveTarget -eq "wear") -or ($effectiveTarget -eq "g7") -or ($effectiv
         exit 0
     }
 
-    $wearApk = Get-ChildItem .\app-wear\build\outputs\apk\debug\*.apk |
-        Sort-Object LastWriteTime -Descending |
-        Select-Object -First 1
+    $wearApk = Get-ChildItem .\app-wear\build\outputs\apk\debug\*.apk | Sort-Object LastWriteTime -Descending | Select-Object -First 1
     if ($null -eq $wearApk) { throw "Wear APK not found" }
     Write-Host "Installing Wear on $watch..."
     adb -s $watch install -r $wearApk.FullName
@@ -250,9 +222,7 @@ if (($effectiveTarget -eq "wear") -or ($effectiveTarget -eq "g7") -or ($effectiv
 
     if ($installWatchFaces) {
         Write-Host "Installing Sugarlicious watchfaces on $watch..."
-        & .\tools\install-sugarlicious-watchfaces.ps1 `
-            -WatchSerial $watch `
-            -Adb ((Get-Command adb).Source)
+        & .\tools\install-sugarlicious-watchfaces.ps1 -WatchSerial $watch -Adb ((Get-Command adb).Source)
         if (-not $?) { throw "Sugarlicious watchface installation failed" }
     }
 }
