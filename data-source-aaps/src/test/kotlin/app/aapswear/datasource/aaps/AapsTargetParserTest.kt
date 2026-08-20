@@ -9,7 +9,7 @@ class AapsTargetParserTest {
     fun `parses effective targetBG from APS payload`() {
         assertEquals(
             100.0,
-            AapsTargetParser.parse("{\"targetBG\":100,\"predBGs\":{\"IOB\":[120,115]}}"),
+            requireNotNull(AapsTargetParser.parse("{\"targetBG\":100,\"predBGs\":{\"IOB\":[120,115]}}")),
             0.0,
         )
     }
@@ -18,7 +18,7 @@ class AapsTargetParserTest {
     fun `parses temp target value without inventing expiry`() {
         assertEquals(
             140.0,
-            AapsTargetParser.parse("{\"targetBG\":140,\"reason\":\"active temp target\"}"),
+            requireNotNull(AapsTargetParser.parse("{\"targetBG\":140,\"reason\":\"active temp target\"}")),
             0.0,
         )
     }
