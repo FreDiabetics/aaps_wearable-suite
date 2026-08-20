@@ -35,13 +35,13 @@ internal fun OverviewInlineHeader(onSettings: () -> Unit) {
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(
-            modifier = Modifier.size(width = 28.dp, height = 38.dp),
+            modifier = Modifier.size(width = 22.dp, height = 38.dp),
             contentAlignment = Alignment.CenterStart,
         ) {
             Image(
                 painter = painterResource(R.drawable.ic_foreground),
                 contentDescription = null,
-                modifier = Modifier.requiredSize(46.dp).offset(x = (-6).dp),
+                modifier = Modifier.requiredSize(46.dp).offset(x = (-10).dp),
             )
         }
 
@@ -54,6 +54,7 @@ internal fun OverviewInlineHeader(onSettings: () -> Unit) {
                     append("licious")
                 }
             },
+            modifier = Modifier.offset(x = (-2).dp),
             fontSize = 21.sp,
             fontWeight = FontWeight.Bold,
         )

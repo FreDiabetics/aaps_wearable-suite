@@ -32,7 +32,15 @@ import kotlinx.serialization.Serializable
 @Serializable data class InsulinState(val totalIob: Double? = null, val bolusIob: Double? = null, val basalIob: Double? = null)
 @Serializable data class CarbState(val cobGrams: Double? = null, val futureCarbsGrams: Double? = null)
 @Serializable data class BasalState(val currentUnitsPerHour: Double? = null, val tempAbsoluteUnitsPerHour: Double? = null, val tempPercent: Int? = null, val tempStartedAtEpochMs: Long? = null, val tempDurationMinutes: Long? = null, val tempEndsAtEpochMs: Long? = null, val displayText: String? = null)
-@Serializable data class TargetState(val lowMgDl: Double? = null, val highMgDl: Double? = null, val temporary: Boolean = false)
+@Serializable data class TargetState(
+    /** Display-range lower boundary exported by AAPS (Overview low mark). */
+    val lowMgDl: Double? = null,
+    /** Display-range upper boundary exported by AAPS (Overview high mark). */
+    val highMgDl: Double? = null,
+    val temporary: Boolean = false,
+    /** Effective APS target (targetBG), including an active temp target when AAPS applies one. */
+    val valueMgDl: Double? = null,
+)
 @Serializable data class LoopState(val status: String? = null, val lastRunAtEpochMs: Long? = null, val suggestedAtEpochMs: Long? = null, val enactedAtEpochMs: Long? = null, val suggestedPayload: String? = null, val enactedPayload: String? = null, val smbUnits: Double? = null, val smbAtEpochMs: Long? = null)
 @Serializable data class PumpState(val status: String? = null, val reservoirUnits: Double? = null, val batteryPercent: Int? = null)
 @Serializable data class DeviceState(val phoneBatteryPercent: Int? = null, val rigBatteryPercent: Int? = null)
