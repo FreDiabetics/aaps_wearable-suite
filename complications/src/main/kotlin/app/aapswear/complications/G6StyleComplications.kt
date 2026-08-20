@@ -104,7 +104,7 @@ internal object G6StylePresentationFormatter {
     private const val DASH = "—"
 }
 
-private abstract class G6StyleComplicationService : SuspendingComplicationDataSourceService() {
+abstract class G6StyleComplicationService : SuspendingComplicationDataSourceService() {
     final override fun getPreviewData(type: ComplicationType): ComplicationData =
         build(previewState(), System.currentTimeMillis())
 
