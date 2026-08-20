@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -28,20 +29,43 @@ import app.aapswear.mobile.ui.theme.SugarliciousColors
 
 private val SettingsIconGray = Color(0xFF4A4A4A)
 
+internal object OverviewHeaderLayout {
+    const val START_PADDING_DP = 12
+    const val END_PADDING_DP = 8
+    const val LOGO_SLOT_WIDTH_DP = 40
+    const val LOGO_SIZE_DP = 46
+    const val LOGO_X_OFFSET_DP = 0
+}
+
 @Composable
 internal fun OverviewInlineHeader(onSettings: () -> Unit) {
     Row(
-        modifier = Modifier.fillMaxWidth().height(38.dp).offset(y = (-2).dp),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .height(38.dp)
+                .offset(y = (-2).dp)
+                .padding(
+                    start = OverviewHeaderLayout.START_PADDING_DP.dp,
+                    end = OverviewHeaderLayout.END_PADDING_DP.dp,
+                ),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(
-            modifier = Modifier.size(width = 22.dp, height = 38.dp),
+            modifier =
+                Modifier.size(
+                    width = OverviewHeaderLayout.LOGO_SLOT_WIDTH_DP.dp,
+                    height = 38.dp,
+                ),
             contentAlignment = Alignment.CenterStart,
         ) {
             Image(
                 painter = painterResource(R.drawable.ic_foreground),
                 contentDescription = null,
-                modifier = Modifier.requiredSize(46.dp).offset(x = (-10).dp),
+                modifier =
+                    Modifier
+                        .requiredSize(OverviewHeaderLayout.LOGO_SIZE_DP.dp)
+                        .offset(x = OverviewHeaderLayout.LOGO_X_OFFSET_DP.dp),
             )
         }
 
@@ -54,7 +78,6 @@ internal fun OverviewInlineHeader(onSettings: () -> Unit) {
                     append("licious")
                 }
             },
-            modifier = Modifier.offset(x = (-2).dp),
             fontSize = 21.sp,
             fontWeight = FontWeight.Bold,
         )
