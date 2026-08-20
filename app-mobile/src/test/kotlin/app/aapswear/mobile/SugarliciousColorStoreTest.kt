@@ -6,7 +6,7 @@ import androidx.test.core.app.ApplicationProvider
 import app.aapswear.mobile.ui.theme.SugarliciousColorRole
 import app.aapswear.mobile.ui.theme.SugarliciousColorStore
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -38,7 +38,20 @@ class SugarliciousColorStoreTest {
     }
 
     @Test
-    fun `legacy target band picker is no longer exposed`() {
-        assertFalse(SugarliciousColorRole.TARGET_BAND.configurable)
+    fun `target value picker is exposed without inheriting legacy target band preference`() {
+        val preferences = context.getSharedPreferences("target_value_legacy_isolation", Context.MODE_PRIVATE)
+        val legacyTargetBand = Color.rgb(6, 48, 18)
+        preferences.edit()
+            .clear()
+            .putString("themeMode", "DARK")
+            .putInt("color.dark.target_band", legacyTargetBand)
+            .commit()
+
+        assertTrue(SugarliciousColorRole.TARGET_VALUE.configurable)
+        assertEquals("target_value", SugarliciousColorRole.TARGET_VALUE.preferenceKey)
+        assertEquals(
+            SugarliciousColorRole.TARGET_VALUE.defaultArgb,
+            SugarliciousColorStore.load(preferences).argb(SugarliciousColorRole.TARGET_VALUE),
+        )
     }
 }
