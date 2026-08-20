@@ -48,6 +48,13 @@ class G7WatchActivity : Activity() {
         window.statusBarColor = BACKGROUND
         window.navigationBarColor = BACKGROUND
         requestMissingPermissions()
+        // onResume follows immediately and performs the single initial render. Previously the
+        // complete view tree was rebuilt here and again in onResume, which looked like an app reload.
+    }
+
+    override fun onNewIntent(intent: Intent?) {
+        super.onNewIntent(intent)
+        setIntent(intent)
         render()
     }
 
@@ -82,6 +89,7 @@ class G7WatchActivity : Activity() {
     private fun render() {
         val state = G7SensorStateStore(this).read()
         val credentials = G7CredentialStore(this).read()
+        val userStatus = deriveG7UserStatus(state, credentials != null)
         val content = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER_HORIZONTAL
@@ -105,7 +113,7 @@ class G7WatchActivity : Activity() {
                 letterSpacing = 0.08f
             },
         )
-        content.addView(statusPill(state.collectorEnabled, state.lastError != null))
+        content.addView(statusPill(userStatus))
 
         val reading = state.lastReading
         content.addView(
@@ -113,6 +121,26 @@ class G7WatchActivity : Activity() {
                 addView(sectionLabel("AKTUELLER WERT"))
                 addView(label(reading?.let { "${it.glucoseMgDl.toInt()} mg/dL" } ?: "—", 28f, TEXT_PRIMARY, bold = true))
                 addView(label(reading?.let { "Empfangen ${DateFormat.getTimeInstance(DateFormat.SHORT).format(Date(it.receivedAtEpochMs))}" } ?: "Noch kein lokaler G7-Wert", 11f, TEXT_SECONDARY))
+            },
+            cardParams(),
+        )
+
+        content.addView(
+            card().apply {
+                addView(sectionLabel("STATUS"))
+                addView(valueRow("Zustand", userStatus.title))
+                addView(valueRow("Phase", userStatus.phase))
+                addView(valueRow("Status", userStatus.status))
+                addView(divider())
+                addView(label(userStatus.description, 11f, TEXT_PRIMARY).apply { gravity = Gravity.START })
+                addView(label("Was tun: ${userStatus.action}", 10f, if (userStatus.level == G7UserStatusLevel.ERROR) ERROR else TEXT_SECONDARY, bold = userStatus.level == G7UserStatusLevel.ERROR).apply { gravity = Gravity.START })
+                state.lastError?.let { error ->
+                    if (userStatus.level != G7UserStatusLevel.OK) {
+                        addView(divider())
+                        addView(label("Technik: ${error.code}", 9f, TEXT_SECONDARY, bold = true).apply { gravity = Gravity.START })
+                    }
+                }
+                addView(label("Intern: ${state.protocolState.name} / ${state.sessionState.name}", 8f, TEXT_SECONDARY).apply { gravity = Gravity.START })
             },
             cardParams(),
         )
@@ -151,21 +179,6 @@ class G7WatchActivity : Activity() {
 
         content.addView(
             card().apply {
-                addView(sectionLabel("VERBINDUNG"))
-                addView(valueRow("Sensor", state.sensor?.deviceName ?: "Nicht eingerichtet"))
-                addView(valueRow("Phase", state.protocolState.displayName()))
-                addView(valueRow("Status", state.sessionState.displayName()))
-                state.lastError?.let { error ->
-                    addView(divider())
-                    addView(label(error.code, 12f, ERROR, bold = true).apply { gravity = Gravity.START })
-                    addView(label(error.safeMessage, 12f, TEXT_PRIMARY).apply { gravity = Gravity.START })
-                }
-            },
-            cardParams(),
-        )
-
-        content.addView(
-            card().apply {
                 addView(sectionLabel("APP-BETRIEB"))
                 val nearbyAllowed =
                     checkSelfPermission(Manifest.permission.BLUETOOTH_SCAN) == PackageManager.PERMISSION_GRANTED &&
@@ -179,6 +192,7 @@ class G7WatchActivity : Activity() {
                 addView(valueRow("Benachrichtigungen", if (notificationsAllowed) "Erlaubt" else "Freigeben"))
                 addView(valueRow("Akku-Optimierung", if (batteryUnrestricted) "Uneingeschränkt" else "Optimiert"))
                 addView(valueRow("Präzise Sensor-Abfragen", if (exactReconnectAllowed) "Erlaubt" else "Freigeben"))
+                addView(valueRow("Alarmmodus", if (G7AlertPolicyStore.isWatchOnly(this@G7WatchActivity)) "Watch Collector Only" else "Recovery still · keine Collector-Alarme"))
                 if (!nearbyAllowed || !notificationsAllowed) {
                     addView(
                         actionButton("Berechtigungen freigeben", primary = false) {
@@ -205,7 +219,7 @@ class G7WatchActivity : Activity() {
                 }
                 addView(
                     label(
-                        "Der Collector verbindet sich nur mit dem eingerichteten G7-Sensor. Präzise Sensor-Abfragen halten den 5-Minuten-Reconnect zeitnah, ohne einen dauerhaften BLE-Scan zu verwenden.",
+                        "Der Collector scannt nur in begrenzten G7-Sensorfenstern. Verpasste einzelne Fenster werden automatisch zum nächsten 5-Minuten-Zyklus wiederholt und lösen noch keinen Signalverlustalarm aus.",
                         9f,
                         TEXT_SECONDARY,
                     ).apply { gravity = Gravity.START },
@@ -280,18 +294,16 @@ class G7WatchActivity : Activity() {
         )
     }
 
-    private fun statusPill(active: Boolean, hasError: Boolean): TextView {
-        val color = when {
-            hasError -> ERROR
-            active -> ACCENT
-            else -> TEXT_SECONDARY
+    private fun statusPill(status: G7UserStatus): TextView {
+        val color = when (status.level) {
+            G7UserStatusLevel.OK, G7UserStatusLevel.WORKING -> ACCENT
+            G7UserStatusLevel.ATTENTION -> WARNING
+            G7UserStatusLevel.ERROR -> ERROR
+            G7UserStatusLevel.OFF -> TEXT_SECONDARY
         }
+        val marker = if (status.level == G7UserStatusLevel.OFF) "○" else "●"
         return label(
-            when {
-                hasError -> "●  PRÜFEN"
-                active -> "●  AKTIV"
-                else -> "○  INAKTIV"
-            },
+            "$marker  ${status.title.uppercase(Locale.GERMANY)}",
             11f,
             color,
             bold = true,
@@ -317,7 +329,7 @@ class G7WatchActivity : Activity() {
         addView(label(title, 11f, TEXT_SECONDARY).apply { gravity = Gravity.START }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
         addView(label(value, 11f, TEXT_PRIMARY, bold = true).apply {
             gravity = Gravity.END
-            maxLines = 2
+            maxLines = 3
         }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1.25f))
     }
 
@@ -452,25 +464,6 @@ class G7WatchActivity : Activity() {
         super.onDestroy()
     }
 
-    private fun app.aapswear.g7.G7ProtocolState.displayName(): String = when (this) {
-        app.aapswear.g7.G7ProtocolState.SCANNING -> "Sensor suchen"
-        app.aapswear.g7.G7ProtocolState.CONNECTING -> "Verbinden"
-        app.aapswear.g7.G7ProtocolState.DISCOVERING_SERVICES -> "Dienste prüfen"
-        app.aapswear.g7.G7ProtocolState.ENABLING_NOTIFICATIONS -> "Datenkanäle öffnen"
-        app.aapswear.g7.G7ProtocolState.AUTHENTICATION_START,
-        app.aapswear.g7.G7ProtocolState.AUTHENTICATING,
-        -> "Authentifizieren"
-        app.aapswear.g7.G7ProtocolState.BONDING -> "Koppeln"
-        app.aapswear.g7.G7ProtocolState.REQUESTING_GLUCOSE -> "Wert anfordern"
-        app.aapswear.g7.G7ProtocolState.RECEIVING_GLUCOSE -> "Wert empfangen"
-        app.aapswear.g7.G7ProtocolState.WAITING_FOR_NEXT_READING -> "Nächsten Wert abwarten"
-        app.aapswear.g7.G7ProtocolState.ERROR -> "Fehler"
-        else -> name.lowercase().replace('_', ' ').replaceFirstChar(Char::uppercase)
-    }
-
-    private fun app.aapswear.g7.G7SessionState.displayName(): String =
-        name.lowercase().replace('_', ' ').replaceFirstChar(Char::uppercase)
-
     private fun formatTimestamp(timestamp: Long?): String =
         timestamp?.let { DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT).format(Date(it)) } ?: "—"
 
@@ -486,6 +479,7 @@ class G7WatchActivity : Activity() {
         val TEXT_PRIMARY = Color.rgb(245, 245, 245)
         val TEXT_SECONDARY = Color.rgb(181, 181, 181)
         val ACCENT = Color.rgb(109, 232, 146)
+        val WARNING = Color.rgb(255, 193, 7)
         val ERROR = Color.rgb(255, 92, 105)
     }
 }
