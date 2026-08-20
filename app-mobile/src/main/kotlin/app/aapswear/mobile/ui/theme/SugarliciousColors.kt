@@ -59,6 +59,14 @@ enum class SugarliciousColorRole(
         0xFFB9EFC7.toInt(),
         false,
     ),
+    TARGET_VALUE(
+        "target_value",
+        "Zielwert im Graph",
+        SugarliciousColorGroup.GLUCOSE,
+        0xFFF5F5F5.toInt(),
+        0xFF252525.toInt(),
+        true,
+    ),
 
     GREEN("green", "Grün / Status", SugarliciousColorGroup.THERAPY, 0xFF54DF30.toInt()),
     BLUE("blue", "Blau / IOB", SugarliciousColorGroup.THERAPY, 0xFF64BFFF.toInt()),
@@ -258,6 +266,7 @@ object SugarliciousColors {
     val GlucoseInRange get() = color(SugarliciousColorRole.GLUCOSE_IN_RANGE)
     val GlucoseHigh get() = color(SugarliciousColorRole.GLUCOSE_HIGH)
     val TargetBand get() = color(SugarliciousColorRole.RANGE_IN_RANGE)
+    val TargetValue get() = color(SugarliciousColorRole.TARGET_VALUE)
 
     val Green get() = color(SugarliciousColorRole.GREEN)
     val Blue get() = color(SugarliciousColorRole.BLUE)
