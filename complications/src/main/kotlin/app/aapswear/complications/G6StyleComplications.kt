@@ -13,10 +13,12 @@ import androidx.wear.watchface.complications.data.ShortTextComplicationData
 import androidx.wear.watchface.complications.data.SmallImage
 import androidx.wear.watchface.complications.data.SmallImageComplicationData
 import androidx.wear.watchface.complications.data.SmallImageType
+import androidx.wear.watchface.complications.data.TimeRange
 import androidx.wear.watchface.complications.datasource.ComplicationRequest
 import androidx.wear.watchface.complications.datasource.SuspendingComplicationDataSourceService
 import app.aapswear.model.DataSourceId
 import app.aapswear.model.Freshness
+import app.aapswear.model.FreshnessPolicy
 import app.aapswear.model.GlucoseSample
 import app.aapswear.model.GlucoseState
 import app.aapswear.model.GlucoseUnit
@@ -25,6 +27,7 @@ import app.aapswear.model.TherapyDisplayFormatter
 import app.aapswear.model.TherapyDisplayState
 import app.aapswear.model.Trend
 import app.aapswear.storage.TherapyStateStore
+import java.time.Instant
 import kotlinx.coroutines.flow.first
 import kotlin.math.roundToInt
 
@@ -96,6 +99,17 @@ internal object G6StylePresentationFormatter {
         return merged.values.sortedBy(GlucoseSample::measuredAtEpochMs)
     }
 
+    fun validTimeRange(
+        state: TherapyDisplayState?,
+        nowEpochMs: Long,
+    ): TimeRange {
+        val freshness = TherapyDisplayFormatter.freshness(state, nowEpochMs)
+        if (freshness != Freshness.CURRENT && freshness != Freshness.DELAYED) return TimeRange.ALWAYS
+        val measuredAt = state?.glucose?.measuredAtEpochMs ?: return TimeRange.ALWAYS
+        val validUntil = measuredAt + FreshnessPolicy.DELAYED_MAX_MS
+        return TimeRange.before(Instant.ofEpochMilli(validUntil))
+    }
+
     private fun unitLabel(unit: GlucoseUnit): String =
         if (unit == GlucoseUnit.MMOL_L) "mmol/L" else "mg/dL"
 
@@ -154,7 +168,10 @@ class G6StyleHeaderComplication : G6StyleComplicationService() {
         return ShortTextComplicationData.Builder(
             PlainComplicationText.Builder(presentation.text).build(),
             PlainComplicationText.Builder("Sugarlicious G6 Style ${presentation.text}").build(),
-        ).setTitle(PlainComplicationText.Builder(presentation.title).build()).build()
+        )
+            .setTitle(PlainComplicationText.Builder(presentation.title).build())
+            .setValidTimeRange(G6StylePresentationFormatter.validTimeRange(state, nowEpochMs))
+            .build()
     }
 }
 
@@ -164,7 +181,10 @@ class G6StyleStatusComplication : G6StyleComplicationService() {
         return ShortTextComplicationData.Builder(
             PlainComplicationText.Builder(presentation.text).build(),
             PlainComplicationText.Builder("${presentation.text}, ${presentation.title}").build(),
-        ).setTitle(PlainComplicationText.Builder(presentation.title).build()).build()
+        )
+            .setTitle(PlainComplicationText.Builder(presentation.title).build())
+            .setValidTimeRange(G6StylePresentationFormatter.validTimeRange(state, nowEpochMs))
+            .build()
     }
 }
 
@@ -176,7 +196,9 @@ class G6StyleGraphComplication : G6StyleComplicationService() {
         return SmallImageComplicationData.Builder(
             SmallImage.Builder(icon, SmallImageType.PHOTO).build(),
             description,
-        ).build()
+        )
+            .setValidTimeRange(G6StylePresentationFormatter.validTimeRange(state, nowEpochMs))
+            .build()
     }
 
     private fun renderGraph(state: TherapyDisplayState?, nowEpochMs: Long): Bitmap {
