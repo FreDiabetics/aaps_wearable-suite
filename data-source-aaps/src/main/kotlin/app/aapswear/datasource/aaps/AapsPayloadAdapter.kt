@@ -35,7 +35,7 @@ object AapsPayloadAdapter {
   val enactedAt=values.number("enactedTimeStamp")?.toLong()?.takeIf { it>0 }
   val suggestedPayload=values["suggested"] as? String
   val enactedPayload=values["enacted"] as? String
-  val targetValue=AapsTargetParser.parse(suggestedPayload?:enactedPayload)
+  val targetValue=AapsTargetParser.parse(suggestedPayload)?:AapsTargetParser.parse(enactedPayload)
   val smb=AapsSmbParser.parse(enactedPayload,enactedAt)
   val predictions=AapsPredictionParser.parse(suggestedPayload?:enactedPayload,suggestedAt?:enactedAt?:measured)
   val pumpStatus=values["pumpStatus"] as? String
