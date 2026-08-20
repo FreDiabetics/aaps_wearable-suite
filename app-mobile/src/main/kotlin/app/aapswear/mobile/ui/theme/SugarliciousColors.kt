@@ -50,13 +50,14 @@ enum class SugarliciousColorRole(
     CGM_DOT_LOW("cgm_dot_low", "CGM-Punkte · tief", SugarliciousColorGroup.GLUCOSE, 0xFFFF5C69.toInt(), configurable = true),
     CGM_DOT_IN_RANGE("cgm_dot_in_range", "CGM-Punkte · im Ziel", SugarliciousColorGroup.GLUCOSE, 0xFF54DF30.toInt(), 0xFF2E9C45.toInt(), true),
     CGM_DOT_HIGH("cgm_dot_high", "CGM-Punkte · hoch", SugarliciousColorGroup.GLUCOSE, 0xFFFFD040.toInt(), 0xFFD47D00.toInt(), true),
+    /** Legacy role retained so existing saved settings remain readable. The graph now uses RANGE_IN_RANGE. */
     TARGET_BAND(
         "target_band",
-        "Zielbereich im Graph",
+        "Zielbereich im Graph (Legacy)",
         SugarliciousColorGroup.GLUCOSE,
         0xFF0A391C.toInt(),
         0xFFB9EFC7.toInt(),
-        true,
+        false,
     ),
 
     GREEN("green", "Grün / Status", SugarliciousColorGroup.THERAPY, 0xFF54DF30.toInt()),
@@ -77,6 +78,7 @@ enum class SugarliciousColorRole(
     GRAPH_LABEL("graph_label", "Achsenbeschriftung", SugarliciousColorGroup.GRAPH, 0xFFD2D2D2.toInt(), 0xFF575757.toInt()),
     GRAPH_MUTED("graph_muted", "Graph-Hinweise / Trennlinie", SugarliciousColorGroup.GRAPH, 0xFF969696.toInt(), 0xFF777777.toInt()),
     GRAPH_DIVIDER("graph_divider", "Trennlinie", SugarliciousColorGroup.GRAPH, 0xFF969696.toInt(), 0xFF747474.toInt(), true),
+    GRAPH_SIGNAL_LOSS("graph_signal_loss", "Signalverlust", SugarliciousColorGroup.GRAPH, 0x46FF5C69, 0x38D11A2A, true),
     GRAPH_CURRENT_OUTLINE("graph_current_outline", "Aktueller Punkt · Kontur", SugarliciousColorGroup.GRAPH, 0xFF000000.toInt()),
 }
 
@@ -255,7 +257,7 @@ object SugarliciousColors {
     val GlucoseLow get() = color(SugarliciousColorRole.GLUCOSE_LOW)
     val GlucoseInRange get() = color(SugarliciousColorRole.GLUCOSE_IN_RANGE)
     val GlucoseHigh get() = color(SugarliciousColorRole.GLUCOSE_HIGH)
-    val TargetBand get() = color(SugarliciousColorRole.TARGET_BAND)
+    val TargetBand get() = color(SugarliciousColorRole.RANGE_IN_RANGE)
 
     val Green get() = color(SugarliciousColorRole.GREEN)
     val Blue get() = color(SugarliciousColorRole.BLUE)
