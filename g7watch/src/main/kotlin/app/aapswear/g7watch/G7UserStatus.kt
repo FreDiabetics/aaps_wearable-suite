@@ -124,13 +124,14 @@ internal fun deriveG7UserStatus(
         )
 
         G7ProtocolState.ERROR -> {
-            if (state.lastError?.recoverable == true && (ageMs == null || ageMs < G7_SIGNAL_LOSS_AFTER_MS)) {
+            val error = state.lastError
+            if (error?.recoverable == true && (ageMs == null || ageMs < G7_SIGNAL_LOSS_AFTER_MS)) {
                 G7UserStatus(
                     G7UserStatusLevel.WORKING,
                     "Automatische Wiederverbindung",
                     "Recovery",
                     "Aktiv · kein Benutzereingriff nötig",
-                    state.lastError.safeMessage,
+                    error.safeMessage,
                     "Sugarlicious automatisch weiterarbeiten lassen. Bond, Shared Key und Sensorcode nicht löschen.",
                 )
             } else {
