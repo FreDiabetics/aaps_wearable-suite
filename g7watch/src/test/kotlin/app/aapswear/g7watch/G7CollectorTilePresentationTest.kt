@@ -55,24 +55,47 @@ class G7CollectorTilePresentationTest {
     }
 
     @Test
-    fun `normal tile shows vector trend delta and age without glucose unit text`() {
+    fun `tile shows vector trend delta and age without glucose unit text`() {
         val presentation = g7TilePresentation(
             reading(123.0, now - 2 * 60_000L, delta = 5.0, trend = Trend.FORTY_FIVE_UP),
             colors,
             now,
         )
 
-        assertEquals("123", presentation.value)
+        assertEquals("123", presentation.tileValue)
         assertEquals(Trend.FORTY_FIVE_UP, presentation.trend)
-        assertTrue(presentation.meta.contains("+5"))
-        assertTrue(presentation.meta.contains("vor 2 min"))
-        assertFalse(presentation.meta.contains("mg/dL"))
+        assertTrue(presentation.tileMeta.contains("+5"))
+        assertTrue(presentation.tileMeta.contains("vor 2 min"))
+        assertFalse(presentation.tileMeta.contains("mg/dL"))
     }
 
     @Test
-    fun `unknown trend never invents a tile arrow`() {
+    fun `collector app value shows the same validated trend beside glucose`() {
+        val up = g7TilePresentation(
+            reading(123.0, delta = 5.0, trend = Trend.FORTY_FIVE_UP),
+            colors,
+            now,
+        )
+        val doubleDown = g7TilePresentation(
+            reading(98.0, delta = -9.0, trend = Trend.DOUBLE_DOWN),
+            colors,
+            now,
+        )
+
+        assertEquals("123 ↗", up.value)
+        assertEquals("98 ⇊", doubleDown.value)
+        assertEquals("Δ +5", up.meta)
+        assertEquals("gerade", up.age)
+        assertEquals(up.cardBackground, up.background)
+        assertEquals(up.cardForeground, up.foreground)
+    }
+
+    @Test
+    fun `unknown trend never invents a tile or in-app arrow`() {
         val presentation = g7TilePresentation(reading(123.0, trend = Trend.UNKNOWN), colors, now)
         assertNull(presentation.trend)
+        assertEquals("123", presentation.value)
+        assertEquals("123", presentation.tileValue)
     }
 
     @Test
