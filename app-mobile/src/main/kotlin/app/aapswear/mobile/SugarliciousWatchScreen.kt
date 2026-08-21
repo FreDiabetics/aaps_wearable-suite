@@ -13,13 +13,9 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
@@ -128,7 +124,6 @@ internal fun SugarliciousWatchScreen(
 ) {
     val context = LocalContext.current
     val appContext = context.applicationContext
-    val scope = rememberCoroutineScope()
     val savedFaceIndex = SugarliciousWatchFaceSelectionStore.read(appContext, preferences.watchFaceIndex)
     val g6StyleRelevant =
         SugarliciousWatchFaceSelectionStore.isG6StyleRelevant(appContext, state, preferences)
@@ -140,7 +135,6 @@ internal fun SugarliciousWatchScreen(
         mutableStateOf(runtimeStatus.activeSugarliciousFaceIndex ?: savedFaceIndex)
     }
     var facePresets by remember { mutableStateOf(WatchFacePresetStore.readAll(appContext)) }
-    var showLegacyFaces by remember { mutableStateOf(false) }
 
     DisposableEffect(appContext) {
         val listener = SharedPreferences.OnSharedPreferenceChangeListener { _, _ ->
@@ -217,11 +211,6 @@ internal fun SugarliciousWatchScreen(
             }
         }
 
-        TextButton(
-            onClick = { showLegacyFaces = true },
-            modifier = Modifier.fillMaxWidth(),
-        ) { Text("Alte AAPS-Watchfaces anzeigen") }
-
         Text(
             text = "Complications",
             modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
@@ -266,48 +255,6 @@ internal fun SugarliciousWatchScreen(
         }
     }
 
-    if (showLegacyFaces) {
-        AlertDialog(
-            onDismissRequest = { showLegacyFaces = false },
-            title = { Text("Alte AAPS-Watchfaces") },
-            text = {
-                LazyColumn(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    itemsIndexed(legacyWatchFaceCards) { index, face ->
-                        Surface(
-                            modifier = Modifier.fillMaxWidth().clickable {
-                                scope.launch {
-                                    val nodes = runCatching {
-                                        requestWatchFaceApply(appContext, sugarliciousWatchFaceCards.size + index)
-                                    }.getOrDefault(0)
-                                    Toast.makeText(
-                                        context,
-                                        if (nodes > 0) "${face.name} wird an die Watch gesendet" else "Watch nicht erreichbar",
-                                        Toast.LENGTH_SHORT,
-                                    ).show()
-                                }
-                            },
-                            color = SugarliciousColors.SurfaceHigh,
-                            shape = RoundedCornerShape(14.dp),
-                        ) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth().padding(10.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                            ) {
-                                Image(
-                                    painter = painterResource(face.previewRes),
-                                    contentDescription = null,
-                                    modifier = Modifier.size(58.dp),
-                                )
-                                Text(face.name, color = SugarliciousColors.TextPrimary)
-                            }
-                        }
-                    }
-                }
-            },
-            confirmButton = { TextButton(onClick = { showLegacyFaces = false }) { Text("Schließen") } },
-        )
-    }
 }
 
 @Composable
