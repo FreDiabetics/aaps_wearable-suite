@@ -243,6 +243,7 @@ internal class GlucoseDashboardChart @JvmOverloads constructor(
                 add(it.glucoseHistory)
                 add(it.glucosePredictions)
                 add(it.target)
+                add(it.targetHistory)
                 if (showBasal || showActivity) add(it.therapyHistory)
             }
         }

@@ -538,39 +538,33 @@ private fun GlucoseGraphSurface(
             )
         },
         update = {
-            it.bind(
-                state = state,
-                unit =
-                    preferences.unitFor(
-                        state,
-                    ),
-                showPredictions =
-                    preferences.anyCgmPredictionEnabled,
-                durationHours =
-                    preferences.graphHours,
-                showTargetRange =
-                    preferences.showCgmTargetRange,
-                showBasal =
-                    preferences.showCgmBasal,
-                showActivity =
-                    preferences.showCgmActivity,
-                showPredictionIob =
-                    preferences.showCgmPredictionIob,
-                showPredictionCob =
-                    preferences.showCgmPredictionCob,
-                showPredictionUam =
-                    preferences.showCgmPredictionUam,
-                showPredictionZeroTemp =
-                    preferences.showCgmPredictionZeroTemp,
-                cgmDotRadiusDp =
-                    preferences.cgmDotRadiusDp,
-                cgmDotOutlineEnabled =
-                    preferences.cgmDotOutlineEnabled,
-                cgmDotOutlineWidthDp =
-                    preferences.cgmDotOutlineWidthDp,
-                clockEpochMs = now,
-            )
+            it.bindOverview(state, preferences, now)
         },
+    )
+}
+
+internal fun GlucoseDashboardChart.bindOverview(
+    state: TherapyDisplayState?,
+    preferences: DashboardUiPreferences,
+    nowEpochMs: Long,
+) {
+    bind(
+        state = state,
+        unit = preferences.unitFor(state),
+        showPredictions = preferences.anyCgmPredictionEnabled,
+        durationHours = preferences.graphHours,
+        showTargetRange = preferences.showCgmTargetRange,
+        showTargetValue = preferences.showCgmTargetValue,
+        showBasal = preferences.showCgmBasal,
+        showActivity = preferences.showCgmActivity,
+        showPredictionIob = preferences.showCgmPredictionIob,
+        showPredictionCob = preferences.showCgmPredictionCob,
+        showPredictionUam = preferences.showCgmPredictionUam,
+        showPredictionZeroTemp = preferences.showCgmPredictionZeroTemp,
+        cgmDotRadiusDp = preferences.cgmDotRadiusDp,
+        cgmDotOutlineEnabled = preferences.cgmDotOutlineEnabled,
+        cgmDotOutlineWidthDp = preferences.cgmDotOutlineWidthDp,
+        clockEpochMs = nowEpochMs,
     )
 }
 
