@@ -88,6 +88,9 @@ enum class G7SessionState {
 enum class CollectorDiagnosticStage {
     IDLE,
     WAITING_FOR_WINDOW,
+    ALARM_RECEIVED,
+    SERVICE_START,
+    WAKE_LOCK,
     SCAN_START,
     SCANNING,
     ADVERTISEMENT_FOUND,
@@ -123,6 +126,68 @@ enum class CollectorDiagnosticResult {
 }
 
 @Serializable
+enum class CollectorAlarmKind { EXACT, INEXACT, NONE }
+
+@Serializable
+enum class CollectorCycleClassification {
+    SUCCESS_FRESH,
+    SUCCESS_AGED,
+    ALARM_LATE,
+    SERVICE_START_FAILED,
+    SCAN_STARTED_LATE,
+    NO_ADVERTISEMENT,
+    GATT_CONNECT_FAILED,
+    AUTH_FAILED,
+    GLUCOSE_TIMEOUT,
+    INVALID_PACKET,
+    STORE_FAILED,
+    CANCELLED,
+}
+
+@Serializable
+data class CollectorCycleTiming(
+    val expectedReadingEpoch: Long? = null,
+    val requestedReconnectEpoch: Long? = null,
+    val alarmKind: CollectorAlarmKind = CollectorAlarmKind.NONE,
+    val canScheduleExactAlarms: Boolean? = null,
+    val batteryUnrestricted: Boolean? = null,
+    val deviceIdleMode: Boolean? = null,
+    val isInteractive: Boolean? = null,
+    val charging: Boolean? = null,
+    val alarmTriggeredAt: Long? = null,
+    val receiverReceivedAt: Long? = null,
+    val serviceOnStartCommandAt: Long? = null,
+    val wakeLockAcquiredAt: Long? = null,
+    val scanStartedAt: Long? = null,
+    val advertisementFoundAt: Long? = null,
+    val advertisementRssi: Int? = null,
+    val connectGattStartedAt: Long? = null,
+    val gattConnectedAt: Long? = null,
+    val serviceDiscoveryAt: Long? = null,
+    val authStartedAt: Long? = null,
+    val authSucceededAt: Long? = null,
+    val glucosePacketReceivedAt: Long? = null,
+    val sensorAgeSeconds: Long? = null,
+    val measurementTimestamp: Long? = null,
+    val sequenceNumber: Long? = null,
+    val storeCompletedAt: Long? = null,
+    val cycleEndedAt: Long? = null,
+) {
+    val alarmLatenessMs: Long?
+        get() = receiverReceivedAt?.let { received -> requestedReconnectEpoch?.let { received - it } }
+    val serviceStartLatenessMs: Long?
+        get() = serviceOnStartCommandAt?.let { started -> receiverReceivedAt?.let { started - it } }
+    val scanStartLatenessMs: Long?
+        get() = scanStartedAt?.let { scan -> requestedReconnectEpoch?.let { scan - it } }
+    val advertisementLatencyMs: Long?
+        get() = advertisementFoundAt?.let { found -> scanStartedAt?.let { found - it } }
+    val gattLatencyMs: Long?
+        get() = gattConnectedAt?.let { connected -> connectGattStartedAt?.let { connected - it } }
+    val totalCycleLatencyMs: Long?
+        get() = cycleEndedAt?.let { ended -> receiverReceivedAt?.let { ended - it } }
+}
+
+@Serializable
 data class CollectorDiagnosticEvent(
     val timestampEpochMs: Long,
     val attemptId: Long,
@@ -145,6 +210,8 @@ data class CollectorDiagnosticAttempt(
     val result: CollectorDiagnosticResult = CollectorDiagnosticResult.STARTED,
     val summary: String = "Collection-Versuch läuft",
     val events: List<CollectorDiagnosticEvent> = emptyList(),
+    val cycle: CollectorCycleTiming? = null,
+    val classification: CollectorCycleClassification? = null,
 )
 
 @Serializable
