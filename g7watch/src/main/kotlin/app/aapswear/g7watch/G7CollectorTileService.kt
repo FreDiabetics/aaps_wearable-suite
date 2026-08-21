@@ -36,6 +36,7 @@ import app.aapswear.g7.CgmReadingStatus
 import app.aapswear.model.ArgbContrast
 import app.aapswear.model.Freshness
 import app.aapswear.model.FreshnessPolicy
+import app.aapswear.model.TherapyDisplayFormatter
 import app.aapswear.model.Trend
 import app.aapswear.model.TrendVisuals
 import com.google.common.util.concurrent.Futures
@@ -44,12 +45,33 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 
 internal data class G7TilePresentation(
-    val value: String,
+    val glucoseValue: String,
     val meta: String,
+    val age: String,
     val cardBackground: Int,
     val cardForeground: Int,
     val trend: Trend? = null,
-)
+) {
+    val value: String
+        get() {
+            val arrow = trend?.let(TherapyDisplayFormatter::trendArrow).orEmpty()
+            return listOf(glucoseValue, arrow).filter(String::isNotBlank).joinToString(" ")
+        }
+
+    val tileValue: String
+        get() = glucoseValue
+
+    val tileMeta: String
+        get() = listOf(meta, age).filter(String::isNotBlank).joinToString("  ·  ")
+
+    // Compatibility properties keep the in-app glucose card on the same validated presentation
+    // without duplicating source, freshness or range logic in G7WatchActivity.
+    val background: Int
+        get() = cardBackground
+
+    val foreground: Int
+        get() = cardForeground
+}
 
 internal data class G7TileStatusPresentation(
     val label: String,
@@ -63,18 +85,21 @@ internal fun g7TilePresentation(
 ): G7TilePresentation {
     if (reading == null) {
         return G7TilePresentation(
-            value = "—",
+            glucoseValue = "—",
             meta = "Noch kein lokaler Wert",
+            age = "",
             cardBackground = G7_TILE_CARD_BACKGROUND,
             cardForeground = G7_TILE_TEXT_PRIMARY,
         )
     }
     val ageMs = (nowEpochMs - reading.timestampEpochMs).coerceAtLeast(0L)
     val ageMinutes = ageMs / 60_000L
+    val age = if (ageMinutes == 0L) "gerade" else "vor $ageMinutes min"
     if (reading.status == CgmReadingStatus.SENSOR_ERROR) {
         return G7TilePresentation(
-            value = "—",
-            meta = "Sensorfehler · vor $ageMinutes min",
+            glucoseValue = "—",
+            meta = "Sensorfehler",
+            age = age,
             cardBackground = G7_TILE_CARD_BACKGROUND,
             cardForeground = G7_TILE_TEXT_PRIMARY,
         )
@@ -85,8 +110,9 @@ internal fun g7TilePresentation(
         reading.glucoseMgDl !in 20.0..1_000.0
     ) {
         return G7TilePresentation(
-            value = "—",
+            glucoseValue = "—",
             meta = "Ungültiger Sensorwert",
+            age = "",
             cardBackground = G7_TILE_CARD_BACKGROUND,
             cardForeground = G7_TILE_TEXT_PRIMARY,
         )
@@ -95,8 +121,9 @@ internal fun g7TilePresentation(
     if (freshness !in setOf(Freshness.CURRENT, Freshness.DELAYED)) {
         val label = if (freshness == Freshness.STALE) "Veraltet" else "Keine Daten"
         return G7TilePresentation(
-            value = "—",
-            meta = "$label · vor $ageMinutes min",
+            glucoseValue = "—",
+            meta = label,
+            age = age,
             cardBackground = G7_TILE_CARD_BACKGROUND,
             cardForeground = G7_TILE_TEXT_PRIMARY,
         )
@@ -109,10 +136,10 @@ internal fun g7TilePresentation(
         else -> G7_TILE_CARD_BACKGROUND
     }
     val delta = reading.deltaMgDl?.let { String.format(Locale.US, "%+.0f", it) } ?: "—"
-    val age = if (ageMinutes == 0L) "gerade" else "vor $ageMinutes min"
     return G7TilePresentation(
-        value = value.toInt().toString(),
-        meta = "Δ $delta  ·  $age",
+        glucoseValue = value.toInt().toString(),
+        meta = "Δ $delta",
+        age = age,
         cardBackground = cardBackground,
         cardForeground = tileForegroundFor(cardBackground),
         trend = reading.trend.takeUnless { it == Trend.UNKNOWN },
@@ -189,7 +216,7 @@ class G7CollectorTileService : TileService() {
         val primaryRow =
             Row.Builder()
                 .setVerticalAlignment(LayoutElementBuilders.VERTICAL_ALIGN_CENTER)
-                .addContent(text(presentation.value, 38f, presentation.cardForeground, bold = true))
+                .addContent(text(presentation.tileValue, 38f, presentation.cardForeground, bold = true))
                 .apply {
                     val spec = presentation.trend?.let(TrendVisuals::spec)
                     if (spec != null) {
@@ -247,7 +274,7 @@ class G7CollectorTileService : TileService() {
                 .addContent(Spacer.Builder().setHeight(dp(5f)).build())
                 .addContent(valueCard)
                 .addContent(Spacer.Builder().setHeight(dp(6f)).build())
-                .addContent(text(presentation.meta, 14f, G7_TILE_TEXT_PRIMARY, bold = true))
+                .addContent(text(presentation.tileMeta, 14f, G7_TILE_TEXT_PRIMARY, bold = true))
                 .addContent(Spacer.Builder().setHeight(dp(5f)).build())
                 .addContent(statusPill(statusPresentation))
                 .build()
@@ -339,7 +366,7 @@ class G7CollectorTileService : TileService() {
             .build()
 
     companion object {
-        private const val RESOURCES_VERSION = "g7-collector-3"
+        private const val RESOURCES_VERSION = "g7-collector-4"
         private const val TREND_RESOURCE_ID = "ic_trend"
         private const val HEADER_RESOURCE_ID = "ic_g7_sensor"
         private const val OPEN_COLLECTOR_CLICK_ID = "open_g7_watch_collector"
