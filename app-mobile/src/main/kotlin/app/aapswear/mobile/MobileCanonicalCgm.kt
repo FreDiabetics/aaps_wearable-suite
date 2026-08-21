@@ -1,7 +1,6 @@
 package app.aapswear.mobile
 
 import android.content.Context
-import androidx.datastore.preferences.core.clear
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.preferencesDataStore
 import app.aapswear.g7.CgmReading
