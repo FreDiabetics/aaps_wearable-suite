@@ -4,6 +4,9 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.os.PowerManager
+import app.aapswear.g7.CollectorCycleClassification
+import app.aapswear.g7.CollectorDiagnosticResult
+import app.aapswear.g7.CollectorDiagnosticStage
 
 internal fun shouldRestoreG7Collector(action: String?, collectorEnabled: Boolean): Boolean =
     collectorEnabled &&
@@ -56,9 +59,26 @@ class G7ReconnectReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         if (!G7SensorStateStore(context).read().collectorEnabled) return
         val now = System.currentTimeMillis()
-        G7CollectorDiagnosticStore(context).markScheduledAlarmReceived(now)
+        val diagnosticStore = G7CollectorDiagnosticStore(context)
+        val scheduled = diagnosticStore.markScheduledAlarmReceived(now)
         G7WakeHandoff.acquire(context)
         runCatching { G7CollectorService.startScheduledReconnect(context) }
-            .onFailure { G7WakeHandoff.release() }
+            .onFailure { error ->
+                G7WakeHandoff.release()
+                val attempt = diagnosticStore.begin(
+                    manual = false,
+                    restart = false,
+                    cycle = scheduled?.copy(cycleEndedAt = System.currentTimeMillis()),
+                    nowEpochMs = now,
+                )
+                diagnosticStore.setClassification(attempt.attemptId, CollectorCycleClassification.SERVICE_START_FAILED)
+                diagnosticStore.record(
+                    attempt.attemptId,
+                    CollectorDiagnosticStage.ERROR,
+                    CollectorDiagnosticResult.RECOVERABLE_ERROR,
+                    "SERVICE_START_FAILED · Foreground-Service konnte aus dem Sensorfenster-Alarm nicht gestartet werden (${error.javaClass.simpleName})",
+                    nowEpochMs = System.currentTimeMillis(),
+                )
+            }
     }
 }
