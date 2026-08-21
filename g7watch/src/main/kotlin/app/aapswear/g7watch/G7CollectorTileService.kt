@@ -1,9 +1,11 @@
 package app.aapswear.g7watch
 
+import android.content.ComponentName
 import android.content.Context
+import androidx.wear.protolayout.ActionBuilders
 import androidx.wear.protolayout.ColorBuilders.argb
-import androidx.wear.protolayout.DimensionBuilders.dp
 import androidx.wear.protolayout.DimensionBuilders.degrees
+import androidx.wear.protolayout.DimensionBuilders.dp
 import androidx.wear.protolayout.DimensionBuilders.expand
 import androidx.wear.protolayout.DimensionBuilders.sp
 import androidx.wear.protolayout.LayoutElementBuilders
@@ -16,6 +18,8 @@ import androidx.wear.protolayout.LayoutElementBuilders.Row
 import androidx.wear.protolayout.LayoutElementBuilders.Spacer
 import androidx.wear.protolayout.LayoutElementBuilders.Text
 import androidx.wear.protolayout.ModifiersBuilders.Background
+import androidx.wear.protolayout.ModifiersBuilders.Border
+import androidx.wear.protolayout.ModifiersBuilders.Clickable
 import androidx.wear.protolayout.ModifiersBuilders.Corner
 import androidx.wear.protolayout.ModifiersBuilders.Modifiers
 import androidx.wear.protolayout.ModifiersBuilders.Padding
@@ -29,9 +33,9 @@ import androidx.wear.tiles.TileBuilders.Tile
 import androidx.wear.tiles.TileService
 import app.aapswear.g7.CgmReading
 import app.aapswear.g7.CgmReadingStatus
+import app.aapswear.model.ArgbContrast
 import app.aapswear.model.Freshness
 import app.aapswear.model.FreshnessPolicy
-import app.aapswear.model.ArgbContrast
 import app.aapswear.model.Trend
 import app.aapswear.model.TrendVisuals
 import com.google.common.util.concurrent.Futures
@@ -42,10 +46,14 @@ import kotlinx.coroutines.runBlocking
 internal data class G7TilePresentation(
     val value: String,
     val meta: String,
-    val age: String,
-    val background: Int,
-    val foreground: Int,
+    val cardBackground: Int,
+    val cardForeground: Int,
     val trend: Trend? = null,
+)
+
+internal data class G7TileStatusPresentation(
+    val label: String,
+    val color: Int,
 )
 
 internal fun g7TilePresentation(
@@ -55,56 +63,74 @@ internal fun g7TilePresentation(
 ): G7TilePresentation {
     if (reading == null) {
         return G7TilePresentation(
-            "—",
-            "NO_DATA",
-            "Noch kein lokaler Wert",
-            colors.graphBackground,
-            tileForegroundFor(colors.graphBackground),
+            value = "—",
+            meta = "Noch kein lokaler Wert",
+            cardBackground = G7_TILE_CARD_BACKGROUND,
+            cardForeground = G7_TILE_TEXT_PRIMARY,
         )
     }
     val ageMs = (nowEpochMs - reading.timestampEpochMs).coerceAtLeast(0L)
     val ageMinutes = ageMs / 60_000L
     if (reading.status == CgmReadingStatus.SENSOR_ERROR) {
-        return G7TilePresentation("—", "SENSORFEHLER", "vor $ageMinutes min", colors.graphBackground, colors.cgmLow)
+        return G7TilePresentation(
+            value = "—",
+            meta = "Sensorfehler · vor $ageMinutes min",
+            cardBackground = G7_TILE_CARD_BACKGROUND,
+            cardForeground = G7_TILE_TEXT_PRIMARY,
+        )
     }
     if (
         reading.status != CgmReadingStatus.VALID ||
         !reading.glucoseMgDl.isFinite() ||
         reading.glucoseMgDl !in 20.0..1_000.0
     ) {
-        return G7TilePresentation("—", "NO_DATA", "Ungültiger Sensorwert", colors.graphBackground, colors.cgmLow)
+        return G7TilePresentation(
+            value = "—",
+            meta = "Ungültiger Sensorwert",
+            cardBackground = G7_TILE_CARD_BACKGROUND,
+            cardForeground = G7_TILE_TEXT_PRIMARY,
+        )
     }
     val freshness = FreshnessPolicy.classify(reading.timestampEpochMs, nowEpochMs)
     if (freshness !in setOf(Freshness.CURRENT, Freshness.DELAYED)) {
-        val label = if (freshness == Freshness.STALE) "STALE" else "NO_DATA"
-        return G7TilePresentation("—", label, "vor $ageMinutes min", colors.graphBackground, colors.cgmLow)
+        val label = if (freshness == Freshness.STALE) "Veraltet" else "Keine Daten"
+        return G7TilePresentation(
+            value = "—",
+            meta = "$label · vor $ageMinutes min",
+            cardBackground = G7_TILE_CARD_BACKGROUND,
+            cardForeground = G7_TILE_TEXT_PRIMARY,
+        )
     }
+
     val value = reading.glucoseMgDl
-    val extremeLow = value <= 40.0
-    val extremeHigh = value >= 400.0
-    val primary = when {
-        extremeLow -> "NIEDRIG"
-        extremeHigh -> "HOCH"
-        else -> value.toInt().toString()
+    val cardBackground = when {
+        value < G7_TILE_TARGET_LOW_MG_DL -> colors.cgmLow
+        value > G7_TILE_TARGET_HIGH_MG_DL -> colors.cgmHigh
+        else -> G7_TILE_CARD_BACKGROUND
     }
     val delta = reading.deltaMgDl?.let { String.format(Locale.US, "%+.0f", it) } ?: "—"
-    val resolvedBackground = when {
-        extremeLow -> EXTREME_LOW_BACKGROUND
-        extremeHigh -> EXTREME_HIGH_BACKGROUND
-        else -> colors.graphBackground
-    }
+    val age = if (ageMinutes == 0L) "gerade" else "vor $ageMinutes min"
     return G7TilePresentation(
-        value = primary,
-        meta = "Δ  $delta   mg/dL",
-        age = if (ageMinutes == 0L) "gerade empfangen" else "vor $ageMinutes min",
-        background = resolvedBackground,
-        foreground = tileForegroundFor(resolvedBackground),
+        value = value.toInt().toString(),
+        meta = "Δ $delta  ·  $age",
+        cardBackground = cardBackground,
+        cardForeground = tileForegroundFor(cardBackground),
         trend = reading.trend.takeUnless { it == Trend.UNKNOWN },
     )
 }
 
+internal fun g7TileStatusPresentation(status: G7UserStatus): G7TileStatusPresentation {
+    val color = when (status.level) {
+        G7UserStatusLevel.OK, G7UserStatusLevel.WORKING -> G7_TILE_ACCENT
+        G7UserStatusLevel.ATTENTION -> G7_TILE_WARNING
+        G7UserStatusLevel.ERROR -> G7_TILE_ERROR
+        G7UserStatusLevel.OFF -> G7_TILE_TEXT_SECONDARY
+    }
+    return G7TileStatusPresentation(status.title.uppercase(Locale.GERMANY), color)
+}
+
 internal fun tileForegroundFor(backgroundArgb: Int): Int =
-    if (ArgbContrast.isLight(backgroundArgb, threshold = 0.50)) 0xFF181818.toInt() else 0xFFF5F5F5.toInt()
+    if (ArgbContrast.isLight(backgroundArgb, threshold = 0.50)) G7_TILE_TEXT_DARK else G7_TILE_TEXT_PRIMARY
 
 class G7CollectorTileService : TileService() {
     override fun onTileRequest(requestParams: RequestBuilders.TileRequest) =
@@ -130,6 +156,16 @@ class G7CollectorTileService : TileService() {
                         )
                         .build(),
                 )
+                .addIdToImageMapping(
+                    HEADER_RESOURCE_ID,
+                    ImageResource.Builder()
+                        .setAndroidResourceByResId(
+                            AndroidImageResourceByResId.Builder()
+                                .setResourceId(R.drawable.ic_g7_sensor)
+                                .build(),
+                        )
+                        .build(),
+                )
                 .build(),
         )
 
@@ -144,22 +180,28 @@ class G7CollectorTileService : TileService() {
                     }
                 }
             }
+        val persistedState = G7SensorStateStore(this).read()
+        val credentialsPresent = G7CredentialStore(this).read() != null
+        val userStatus = deriveG7UserStatus(persistedState, credentialsPresent)
         val presentation = g7TilePresentation(reading, G7GraphColorStore(this).read(), System.currentTimeMillis())
+        val statusPresentation = g7TileStatusPresentation(userStatus)
+
         val primaryRow =
             Row.Builder()
                 .setVerticalAlignment(LayoutElementBuilders.VERTICAL_ALIGN_CENTER)
-                .addContent(text(presentation.value, 38f, presentation.foreground, bold = true))
+                .addContent(text(presentation.value, 38f, presentation.cardForeground, bold = true))
                 .apply {
                     val spec = presentation.trend?.let(TrendVisuals::spec)
                     if (spec != null) {
                         addContent(Spacer.Builder().setWidth(dp(8f)).build())
                         repeat(spec.arrowCount) { index ->
                             if (index > 0) addContent(Spacer.Builder().setWidth(dp(2f)).build())
-                            addContent(trendImage(spec.rotationDegrees, presentation.foreground))
+                            addContent(trendImage(spec.rotationDegrees, presentation.cardForeground))
                         }
                     }
                 }
                 .build()
+
         val valueCard =
             Box.Builder()
                 .setWidth(expand())
@@ -168,8 +210,14 @@ class G7CollectorTileService : TileService() {
                     Modifiers.Builder()
                         .setBackground(
                             Background.Builder()
-                                .setColor(argb(0x26000000))
+                                .setColor(argb(presentation.cardBackground))
                                 .setCorner(Corner.Builder().setRadius(dp(24f)).build())
+                                .build(),
+                        )
+                        .setBorder(
+                            Border.Builder()
+                                .setColor(argb(G7_TILE_CARD_BORDER))
+                                .setWidth(dp(1f))
                                 .build(),
                         )
                         .setPadding(Padding.Builder().setAll(dp(12f)).build())
@@ -177,30 +225,88 @@ class G7CollectorTileService : TileService() {
                 )
                 .addContent(primaryRow)
                 .build()
-        val content =
+
+        val header =
             Column.Builder()
                 .setHorizontalAlignment(LayoutElementBuilders.HORIZONTAL_ALIGN_CENTER)
-                .addContent(text("G7  ·  WATCH DIRECT", 12f, presentation.foreground, bold = true))
-                .addContent(Spacer.Builder().setHeight(dp(8f)).build())
-                .addContent(valueCard)
-                .addContent(Spacer.Builder().setHeight(dp(4f)).build())
-                .addContent(text(presentation.meta, 17f, presentation.foreground, bold = true))
-                .addContent(Spacer.Builder().setHeight(dp(4f)).build())
-                .addContent(text(presentation.age, 13f, presentation.foreground, bold = false))
+                .addContent(
+                    Image.Builder()
+                        .setResourceId(HEADER_RESOURCE_ID)
+                        .setWidth(dp(34f))
+                        .setHeight(dp(34f))
+                        .build(),
+                )
+                .addContent(text("Direct To Watch", 11f, G7_TILE_TEXT_SECONDARY, bold = true))
                 .build()
+
+        val content =
+            Column.Builder()
+                .setWidth(expand())
+                .setHorizontalAlignment(LayoutElementBuilders.HORIZONTAL_ALIGN_CENTER)
+                .addContent(header)
+                .addContent(Spacer.Builder().setHeight(dp(5f)).build())
+                .addContent(valueCard)
+                .addContent(Spacer.Builder().setHeight(dp(6f)).build())
+                .addContent(text(presentation.meta, 14f, G7_TILE_TEXT_PRIMARY, bold = true))
+                .addContent(Spacer.Builder().setHeight(dp(5f)).build())
+                .addContent(statusPill(statusPresentation))
+                .build()
+
         return Box.Builder()
             .setWidth(expand())
             .setHeight(expand())
-            .setVerticalAlignment(LayoutElementBuilders.VERTICAL_ALIGN_CENTER)
+            .setVerticalAlignment(LayoutElementBuilders.VERTICAL_ALIGN_TOP)
+            .setHorizontalAlignment(LayoutElementBuilders.HORIZONTAL_ALIGN_CENTER)
             .setModifiers(
                 Modifiers.Builder()
-                    .setBackground(Background.Builder().setColor(argb(presentation.background)).build())
-                    .setPadding(Padding.Builder().setAll(dp(18f)).build())
+                    .setBackground(Background.Builder().setColor(argb(G7_TILE_BACKGROUND)).build())
+                    .setPadding(Padding.Builder().setAll(dp(12f)).build())
+                    .setClickable(
+                        Clickable.Builder()
+                            .setId(OPEN_COLLECTOR_CLICK_ID)
+                            .setOnClick(
+                                ActionBuilders.launchAction(
+                                    ComponentName(this, G7WatchActivity::class.java),
+                                ),
+                            )
+                            .build(),
+                    )
                     .build(),
             )
             .addContent(content)
             .build()
     }
+
+    private fun statusPill(presentation: G7TileStatusPresentation): Box =
+        Box.Builder()
+            .setHorizontalAlignment(LayoutElementBuilders.HORIZONTAL_ALIGN_CENTER)
+            .setVerticalAlignment(LayoutElementBuilders.VERTICAL_ALIGN_CENTER)
+            .setModifiers(
+                Modifiers.Builder()
+                    .setBackground(
+                        Background.Builder()
+                            .setColor(argb(withTileAlpha(presentation.color, 36)))
+                            .setCorner(Corner.Builder().setRadius(dp(18f)).build())
+                            .build(),
+                    )
+                    .setBorder(
+                        Border.Builder()
+                            .setColor(argb(presentation.color))
+                            .setWidth(dp(1f))
+                            .build(),
+                    )
+                    .setPadding(
+                        Padding.Builder()
+                            .setStart(dp(12f))
+                            .setEnd(dp(12f))
+                            .setTop(dp(4f))
+                            .setBottom(dp(4f))
+                            .build(),
+                    )
+                    .build(),
+            )
+            .addContent(text("●  ${presentation.label}", 10f, presentation.color, bold = true))
+            .build()
 
     private fun trendImage(rotationDegrees: Float, color: Int): Image =
         Image.Builder()
@@ -233,8 +339,10 @@ class G7CollectorTileService : TileService() {
             .build()
 
     companion object {
-        private const val RESOURCES_VERSION = "g7-collector-2"
+        private const val RESOURCES_VERSION = "g7-collector-3"
         private const val TREND_RESOURCE_ID = "ic_trend"
+        private const val HEADER_RESOURCE_ID = "ic_g7_sensor"
+        private const val OPEN_COLLECTOR_CLICK_ID = "open_g7_watch_collector"
 
         fun requestUpdate(context: Context) {
             TileService.getUpdater(context).requestUpdate(G7CollectorTileService::class.java)
@@ -242,5 +350,17 @@ class G7CollectorTileService : TileService() {
     }
 }
 
-internal const val EXTREME_LOW_BACKGROUND = 0xFFFF1744.toInt()
-internal const val EXTREME_HIGH_BACKGROUND = 0xFFFFD040.toInt()
+internal fun withTileAlpha(color: Int, alpha: Int): Int =
+    (alpha.coerceIn(0, 255) shl 24) or (color and 0x00FFFFFF)
+
+internal const val G7_TILE_BACKGROUND = 0xFF181818.toInt()
+internal const val G7_TILE_CARD_BACKGROUND = 0xFF242424.toInt()
+internal const val G7_TILE_CARD_BORDER = 0xFF404040.toInt()
+internal const val G7_TILE_TEXT_PRIMARY = 0xFFF5F5F5.toInt()
+internal const val G7_TILE_TEXT_SECONDARY = 0xFFB5B5B5.toInt()
+internal const val G7_TILE_TEXT_DARK = 0xFF181818.toInt()
+internal const val G7_TILE_ACCENT = 0xFF6DE892.toInt()
+internal const val G7_TILE_WARNING = 0xFFFFC107.toInt()
+internal const val G7_TILE_ERROR = 0xFFFF5C69.toInt()
+internal const val G7_TILE_TARGET_LOW_MG_DL = 80.0
+internal const val G7_TILE_TARGET_HIGH_MG_DL = 160.0
