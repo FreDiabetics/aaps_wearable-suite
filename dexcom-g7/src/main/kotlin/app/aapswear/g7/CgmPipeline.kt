@@ -38,6 +38,16 @@ object CgmDeltaCalculator {
     }
 }
 
+object CgmTrendRateCalculator {
+    fun calculate(current: CgmReading, previous: CgmReading?): Double? {
+        val delta = CgmDeltaCalculator.calculate(current, previous) ?: return null
+        val previousReading = previous ?: return null
+        val intervalMinutes = (current.timestampEpochMs - previousReading.timestampEpochMs) / 60_000.0
+        if (!intervalMinutes.isFinite() || intervalMinutes <= 0.0) return null
+        return delta / intervalMinutes
+    }
+}
+
 object CgmTrendMapper {
     fun fromRate(rateMgDlPerMinute: Double?): Trend = when {
         rateMgDlPerMinute == null -> Trend.UNKNOWN
@@ -119,9 +129,12 @@ fun G7Reading.toCgm(previous: CgmReading? = null): CgmReading {
         calibrationStateCode = calibrationStateCode,
         reservedField = reservedField,
     )
+    val delta = CgmDeltaCalculator.calculate(base, previous)
+    val resolvedTrendRate = trendRateMgDlPerMinute ?: CgmTrendRateCalculator.calculate(base, previous)
     return base.copy(
-        deltaMgDl = CgmDeltaCalculator.calculate(base, previous),
-        trend = CgmTrendMapper.fromRate(trendRateMgDlPerMinute),
+        deltaMgDl = delta,
+        trendRateMgDlPerMinute = resolvedTrendRate,
+        trend = CgmTrendMapper.fromRate(resolvedTrendRate),
     )
 }
 
