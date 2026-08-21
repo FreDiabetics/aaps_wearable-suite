@@ -17,7 +17,7 @@ import kotlinx.coroutines.launch
 
 internal fun g7ReadingUpdateApplicationContext(context: Context): Context = context.applicationContext
 
-/** Refreshes local CGM consumers immediately after the standalone G7 app stores a reading. */
+/** Refreshes local Watch CGM consumers immediately after the standalone G7 app stores a reading. */
 class G7ReadingUpdateReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action != ACTION_G7_READING_UPDATED) return
@@ -55,9 +55,9 @@ class G7ReadingUpdateReceiver : BroadcastReceiver() {
                         )
                     }
 
-                // TherapyStateStore deliberately remains the phone-fed source store. Do not replace
-                // it with a direct G7 reading: the canonical source resolver needs both independent
-                // inputs in order to apply timeout, ordering and Mobile-recovery hysteresis.
+                // TherapyStateStore remains the phone-fed source store. The direct G7 DB is a
+                // separate Watch-local input to the canonical resolver; it is never copied into
+                // Mobile CGM history.
                 val phoneState = TherapyStateStore(appContext).state.first()
                 val source = WearDisplayPreferences.read(appContext).dataSource
                 val resolved =
@@ -71,34 +71,14 @@ class G7ReadingUpdateReceiver : BroadcastReceiver() {
                 appContext.recordWatchDiagnostic(
                     module = "SOURCE",
                     code = "SRC-RESOLVE-200",
-                    message = "Canonical CGM source resolved after direct G7 reading",
+                    message = "Canonical Watch CGM source resolved after local direct G7 reading",
                     metadata =
                         mapOf(
                             "state" to sourceState?.name,
                             "canonicalSource" to resolved?.source?.name,
+                            "mobileBackfill" to false,
                         ),
                 )
-
-                runCatching { G7BackfillSync.sendPending(appContext) }
-                    .onSuccess { dispatch ->
-                        appContext.recordWatchDiagnostic(
-                            module = "G7-SYNC",
-                            code = if (dispatch == null) "G7-SYNC-204" else "G7-SYNC-100",
-                            message = if (dispatch == null) "No pending G7 history" else "G7 history batch sent to Mobile",
-                            metadata = mapOf(
-                                "batchId" to dispatch?.batchId,
-                                "readingCount" to dispatch?.readingIds?.size,
-                            ),
-                        )
-                    }
-                    .onFailure { error ->
-                        appContext.recordWatchDiagnostic(
-                            module = "G7-SYNC",
-                            code = "G7-SYNC-503",
-                            message = "G7 history remains pending until Mobile reconnects",
-                            metadata = mapOf("error" to error.javaClass.simpleName),
-                        )
-                    }
             } finally {
                 pending.finish()
             }
