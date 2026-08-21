@@ -54,4 +54,22 @@ class SugarliciousColorStoreTest {
             SugarliciousColorStore.load(preferences).argb(SugarliciousColorRole.TARGET_VALUE),
         )
     }
+
+    @Test
+    fun `explicit user color survives light and dark theme changes`() {
+        val preferences = context.getSharedPreferences("theme_independent_user_override", Context.MODE_PRIVATE)
+        val chosen = Color.argb(144, 7, 91, 203)
+        preferences.edit().clear().putString("themeMode", "DARK").commit()
+        SugarliciousColorStore.save(preferences, SugarliciousColorRole.RANGE_HIGH, chosen)
+
+        assertEquals(chosen, SugarliciousColorStore.load(preferences).argb(SugarliciousColorRole.RANGE_HIGH))
+        preferences.edit().putString("themeMode", "LIGHT").commit()
+        assertEquals(chosen, SugarliciousColorStore.load(preferences).argb(SugarliciousColorRole.RANGE_HIGH))
+
+        SugarliciousColorStore.reset(preferences, SugarliciousColorRole.RANGE_HIGH)
+        assertEquals(
+            SugarliciousColorRole.RANGE_HIGH.lightArgb,
+            SugarliciousColorStore.load(preferences).argb(SugarliciousColorRole.RANGE_HIGH),
+        )
+    }
 }

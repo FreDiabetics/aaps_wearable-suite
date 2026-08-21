@@ -85,6 +85,69 @@ enum class G7SessionState {
 @Serializable enum class G7RecoveryStep { NORMAL_RECONNECT, AUTH_RETRY, SHORT_RETRY, BLE_RESCAN, DEVICE_ADDRESS_REFRESH, SESSION_REAUTH, SESSION_RESET, REBOND, FULL_HANDSHAKE, USER_INTERVENTION_REQUIRED }
 
 @Serializable
+enum class CollectorDiagnosticStage {
+    IDLE,
+    WAITING_FOR_WINDOW,
+    SCAN_START,
+    SCANNING,
+    ADVERTISEMENT_FOUND,
+    CONNECT_REQUEST,
+    GATT_CONNECTED,
+    SERVICE_DISCOVERY,
+    SERVICE_READY,
+    AUTH_START,
+    AUTH_CHALLENGE,
+    AUTH_RESPONSE,
+    AUTH_SUCCESS,
+    AUTH_FAILURE,
+    GLUCOSE_REQUEST,
+    GLUCOSE_RECEIVED,
+    VALIDATION,
+    STORE,
+    SYNC,
+    GATT_CLOSE,
+    RETRY,
+    RECOVERY,
+    COMPLETE,
+    ERROR,
+}
+
+@Serializable
+enum class CollectorDiagnosticResult {
+    STARTED,
+    INFO,
+    SUCCESS,
+    RECOVERABLE_ERROR,
+    FATAL_ERROR,
+    CANCELLED,
+}
+
+@Serializable
+data class CollectorDiagnosticEvent(
+    val timestampEpochMs: Long,
+    val attemptId: Long,
+    val stage: CollectorDiagnosticStage,
+    val result: CollectorDiagnosticResult,
+    val message: String,
+    val errorCode: String? = null,
+    val sensorId: String? = null,
+    val sequence: Long? = null,
+    val durationMs: Long? = null,
+)
+
+@Serializable
+data class CollectorDiagnosticAttempt(
+    val attemptId: Long,
+    val startedAtEpochMs: Long,
+    val manual: Boolean = false,
+    val restart: Boolean = false,
+    val completedAtEpochMs: Long? = null,
+    val result: CollectorDiagnosticResult = CollectorDiagnosticResult.STARTED,
+    val summary: String = "Collection-Versuch läuft",
+    val events: List<CollectorDiagnosticEvent> = emptyList(),
+)
+
+@Serializable
 data class G7Sensor(
     val sensorId: String,
     val sessionId: String? = null,
@@ -140,4 +203,9 @@ data class G7PersistedState(
     val nextReconnectEpochMs: Long? = null,
     val retryCount: Int = 0,
     val lastError: G7CollectorError? = null,
+    val activeAttemptId: Long? = null,
+    val scanStartedAtEpochMs: Long? = null,
+    val scanTimeoutAtEpochMs: Long? = null,
+    val lastScanAtEpochMs: Long? = null,
+    val lastAttemptCompletedAtEpochMs: Long? = null,
 )

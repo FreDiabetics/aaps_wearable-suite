@@ -12,7 +12,10 @@ import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
 import android.os.PowerManager
+import app.aapswear.g7.CgmReadingStatus
 import app.aapswear.g7.G7CollectorError
+import app.aapswear.g7.CollectorDiagnosticResult
+import app.aapswear.g7.CollectorDiagnosticStage
 import app.aapswear.g7.G7ConnectionState
 import app.aapswear.g7.G7PersistedState
 import app.aapswear.g7.G7ProtocolState
@@ -27,21 +30,38 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.launch
 
 internal fun shouldKeepG7RuntimeForeground(collectorEnabled: Boolean): Boolean = collectorEnabled
 
+internal fun resetG7RuntimeForRestart(state: G7PersistedState): G7PersistedState =
+    state.copy(
+        connectionState = G7ConnectionState.DISCONNECTED,
+        protocolState = G7ProtocolState.UNINITIALIZED,
+        authenticationState = app.aapswear.g7.G7AuthenticationState.UNKNOWN,
+        retryCount = 0,
+        nextReconnectEpochMs = null,
+        lastError = null,
+        activeAttemptId = null,
+        scanStartedAtEpochMs = null,
+        scanTimeoutAtEpochMs = null,
+    )
+
 class G7CollectorService : Service() {
     private lateinit var store: G7SensorStateStore
     private lateinit var credentials: G7CredentialStore
+    private lateinit var attemptStore: G7CollectorDiagnosticStore
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var collectionJob: Job? = null
     private var cycleWakeLock: PowerManager.WakeLock? = null
+    private var cycleToken: Long = 0L
 
     override fun onCreate() {
         super.onCreate()
         store = G7SensorStateStore(this)
         credentials = G7CredentialStore(this)
+        attemptStore = G7CollectorDiagnosticStore(this)
         getSystemService(NotificationManager::class.java).createNotificationChannel(
             NotificationChannel(CHANNEL, "G7 Direct to Watch", NotificationManager.IMPORTANCE_LOW).apply {
                 description = "Permanenter Dexcom G7 Watch Collector"
@@ -51,6 +71,7 @@ class G7CollectorService : Service() {
             },
         )
         G7ErrorNotifier.ensureChannel(this)
+        G7CgmAlarmCoordinator.restore(this)
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -60,6 +81,7 @@ class G7CollectorService : Service() {
             cancelScheduledReconnect(this)
             G7SignalLossMonitor.cancel(this)
             G7ErrorNotifier.clearActive(this)
+            G7CgmAlarmCoordinator.clearSuppressed(this)
             stopRuntimeForeground()
             return START_NOT_STICKY
         }
@@ -76,27 +98,69 @@ class G7CollectorService : Service() {
         startForegroundCollector(
             if (collectionJob?.isActive == true) "Collector aktiv" else "Dauerbetrieb aktiv",
         )
-        if (collectionJob?.isActive == true) return START_STICKY
-
-        acquireCycleWakeLock()
-        scope.launch { applicationContext.recordG7Diagnostic("G7-COLLECT-100", "Collector cycle started") }
-        collectionJob = scope.launch { collectOnce() }
+        val request = when (intent?.action) {
+            ACTION_RESTART -> CycleRequest.RESTART
+            ACTION_MANUAL_SCAN -> CycleRequest.MANUAL
+            else -> CycleRequest.AUTOMATIC
+        }
+        if (request == CycleRequest.AUTOMATIC && collectionJob?.isActive == true) return START_STICKY
+        launchCycle(request)
         return START_STICKY
     }
 
-    private suspend fun collectOnce() {
-        val persisted = store.read()
+    private fun launchCycle(request: CycleRequest) {
+        if (request != CycleRequest.AUTOMATIC) cancelScheduledReconnect(this)
+        val previous = collectionJob
+        val token = ++cycleToken
+        collectionJob = scope.launch {
+            previous?.cancelAndJoin()
+            if (token != cycleToken) return@launch
+            acquireCycleWakeLock()
+            applicationContext.recordG7Diagnostic(
+                "G7-COLLECT-100",
+                when (request) {
+                    CycleRequest.AUTOMATIC -> "Automatic collector cycle started"
+                    CycleRequest.MANUAL -> "Bounded manual sensor scan started"
+                    CycleRequest.RESTART -> "Collector runtime restarted with retained sensor/session state"
+                },
+            )
+            collectOnce(token, request)
+        }
+    }
+
+    private suspend fun collectOnce(token: Long, request: CycleRequest) {
+        val startedAt = System.currentTimeMillis()
+        val attempt = attemptStore.begin(
+            manual = request == CycleRequest.MANUAL,
+            restart = request == CycleRequest.RESTART,
+            nowEpochMs = startedAt,
+        )
+        val attemptId = attempt.attemptId
+        val persisted =
+            store.read().let { state ->
+                if (request == CycleRequest.RESTART) resetG7RuntimeForRestart(state) else state
+            }
+        store.save(persisted.copy(activeAttemptId = attemptId))
         val configuredSensor = persisted.sensor
         if (!persisted.collectorEnabled) {
-            finishCycle()
+            attemptStore.record(
+                attemptId,
+                CollectorDiagnosticStage.COMPLETE,
+                CollectorDiagnosticResult.CANCELLED,
+                "Collector ist deaktiviert",
+            )
+            store.save(store.read().copy(activeAttemptId = null, lastAttemptCompletedAtEpochMs = System.currentTimeMillis()))
+            finishCycle(token)
             return
         }
         if (configuredSensor == null) {
             fail(
                 persisted,
                 G7CollectorError("G7-SETUP-001", false, System.currentTimeMillis(), "Sensor muss zuerst eingerichtet und der Collector gestartet werden"),
+                attemptId,
+                startedAt,
             )
-            finishCycle()
+            finishCycle(token)
             return
         }
         val storedCredentials = credentials.read()
@@ -104,26 +168,42 @@ class G7CollectorService : Service() {
             fail(
                 persisted,
                 G7CollectorError("G7-SETUP-002", false, System.currentTimeMillis(), "Sensorcode fehlt oder ist nicht mehr lesbar"),
+                attemptId,
+                startedAt,
             )
-            finishCycle()
+            finishCycle(token)
             return
         }
 
         try {
             val collector = AndroidG7Collector(this)
+            val boundedScanTimeout =
+                if (request == CycleRequest.AUTOMATIC) null else G7_RECONNECT_SCAN_TIMEOUT_MS
             val result = collector.collect(
                 initialSensor = configuredSensor,
                 credentials = storedCredentials,
                 onState = { protocolState ->
                     val current = store.read()
+                    val now = System.currentTimeMillis()
                     val next = current.copy(
                         protocolState = protocolState,
                         connectionState = protocolState.toConnectionState(),
                         sessionState = protocolState.toSessionState(),
                         lastError = null,
+                        scanStartedAtEpochMs =
+                            if (protocolState == G7ProtocolState.SCANNING) now else current.scanStartedAtEpochMs,
+                        scanTimeoutAtEpochMs =
+                            if (protocolState == G7ProtocolState.SCANNING) {
+                                now + (boundedScanTimeout ?: g7ScanTimeoutMs(configuredSensor))
+                            } else {
+                                current.scanTimeoutAtEpochMs
+                            },
+                        lastScanAtEpochMs =
+                            if (protocolState == G7ProtocolState.SCANNING) now else current.lastScanAtEpochMs,
                     )
                     store.save(next)
                     updateForeground(protocolState.label())
+                    recordAttemptProtocolState(attemptId, protocolState, configuredSensor.sensorId)
                     scope.launch {
                         applicationContext.recordG7Diagnostic(
                             protocolState.diagnosticCode(),
@@ -133,11 +213,52 @@ class G7CollectorService : Service() {
                     }
                 },
                 onSharedKey = credentials::saveSharedKey,
+                scanTimeoutMsOverride = boundedScanTimeout,
+            )
+            attemptStore.record(
+                attemptId,
+                CollectorDiagnosticStage.GATT_CLOSE,
+                CollectorDiagnosticResult.SUCCESS,
+                "GATT-Verbindung sauber geschlossen",
+                sensorId = result.sensor.sensorId,
             )
             result.sharedKey?.let { key -> result.sensor.deviceAddress?.let { credentials.saveSharedKey(it, key) } }
-            val database = G7ReadingDatabase(this)
-            val reading = result.reading.toCgm(database.getLatest())
-            database.insertOrIgnore(reading)
+            val (reading, inserted) = G7ReadingDatabase(this).let { database ->
+                try {
+                    val converted = result.reading.toCgm(database.getLatestValid())
+                    attemptStore.record(
+                        attemptId,
+                        CollectorDiagnosticStage.VALIDATION,
+                        if (converted.status == CgmReadingStatus.INVALID) {
+                            CollectorDiagnosticResult.RECOVERABLE_ERROR
+                        } else {
+                            CollectorDiagnosticResult.SUCCESS
+                        },
+                        when (converted.status) {
+                            CgmReadingStatus.VALID -> "Glukosewert validiert"
+                            CgmReadingStatus.SENSOR_ERROR -> "Sensorfehlerstatus validiert"
+                            CgmReadingStatus.INVALID -> "Ungültiger Glukosewert verworfen"
+                        },
+                        sensorId = converted.sensorId,
+                        sequence = converted.sequenceNumber,
+                    )
+                    converted to database.insertOrIgnore(converted)
+                } finally {
+                    database.close()
+                }
+            }
+            attemptStore.record(
+                attemptId,
+                CollectorDiagnosticStage.STORE,
+                CollectorDiagnosticResult.SUCCESS,
+                when {
+                    !inserted -> "Bereits gespeichertes Collector-Ereignis dedupliziert"
+                    reading.status == CgmReadingStatus.VALID -> "Glukosewert gespeichert"
+                    else -> "Collector-Status zur Diagnose gespeichert"
+                },
+                sensorId = reading.sensorId,
+                sequence = reading.sequenceNumber,
+            )
             val documentedSensor = result.sensor.copy(
                 sensorStartEpochMs = result.reading.sensorStartEpochMs,
                 sensorEndEpochMs = result.reading.sensorEndEpochMs,
@@ -150,11 +271,29 @@ class G7CollectorService : Service() {
                 connectionState = G7ConnectionState.DISCONNECTED,
                 protocolState = G7ProtocolState.WAITING_FOR_NEXT_READING,
                 lastSuccessfulConnectionEpochMs = System.currentTimeMillis(),
+                activeAttemptId = null,
+                lastAttemptCompletedAtEpochMs = System.currentTimeMillis(),
             )
             store.save(next)
+            attemptStore.record(
+                attemptId,
+                CollectorDiagnosticStage.SYNC,
+                if (reading.status == CgmReadingStatus.VALID) CollectorDiagnosticResult.SUCCESS else CollectorDiagnosticResult.INFO,
+                if (reading.status == CgmReadingStatus.VALID) {
+                    "Mobile-Synchronisation ausgelöst"
+                } else {
+                    "Keine Mobile-Synchronisation für nicht validen CGM-Wert"
+                },
+                sensorId = reading.sensorId,
+                sequence = reading.sequenceNumber,
+            )
             applicationContext.recordG7Diagnostic(
                 "G7-DATA-200",
-                "Validated G7 reading stored",
+                when (reading.status) {
+                    CgmReadingStatus.VALID -> "Validated G7 reading stored"
+                    CgmReadingStatus.SENSOR_ERROR -> "Validated G7 sensor-error status stored"
+                    CgmReadingStatus.INVALID -> "Invalid G7 glucose stored for diagnostics only"
+                },
                 metadata = mapOf(
                     "sequence" to reading.sequenceNumber,
                     "sensorState" to result.reading.sensorState,
@@ -163,33 +302,92 @@ class G7CollectorService : Service() {
                 ),
             )
             G7ErrorNotifier.markRecovered(this)
+            G7CgmAlarmCoordinator.onReading(this, reading)
             G7SignalLossMonitor.scheduleFromState(this, next)
             scheduleReconnect(next)
-            updateForeground("${reading.glucoseMgDl.toInt()} mg/dL · Normalbetrieb")
+            next.nextReconnectEpochMs?.let { reconnectAt ->
+                attemptStore.record(
+                    attemptId,
+                    CollectorDiagnosticStage.WAITING_FOR_WINDOW,
+                    CollectorDiagnosticResult.INFO,
+                    "Nächstes Sensorfenster geplant",
+                    durationMs = (reconnectAt - System.currentTimeMillis()).coerceAtLeast(0L),
+                )
+            }
+            attemptStore.record(
+                attemptId,
+                CollectorDiagnosticStage.COMPLETE,
+                if (reading.status == CgmReadingStatus.VALID) {
+                    CollectorDiagnosticResult.SUCCESS
+                } else {
+                    CollectorDiagnosticResult.RECOVERABLE_ERROR
+                },
+                when (reading.status) {
+                    CgmReadingStatus.VALID -> "Erfolgreich · ${reading.glucoseMgDl.toInt()} mg/dL"
+                    CgmReadingStatus.SENSOR_ERROR -> "Sensorfehlerstatus empfangen"
+                    CgmReadingStatus.INVALID -> "Ungültiger Glukosewert verworfen"
+                },
+                sensorId = reading.sensorId,
+                sequence = reading.sequenceNumber,
+                durationMs = System.currentTimeMillis() - startedAt,
+            )
+            updateForeground(
+                when (reading.status) {
+                    CgmReadingStatus.VALID -> "${reading.glucoseMgDl.toInt()} mg/dL · Verbunden"
+                    CgmReadingStatus.SENSOR_ERROR -> "Sensorfehler · letzter gültiger Wert bleibt erhalten"
+                    CgmReadingStatus.INVALID -> "Ungültiger Sensorwert · letzter gültiger Wert bleibt erhalten"
+                },
+            )
         } catch (error: G7BleException) {
-            fail(store.read(), G7CollectorError(error.errorCode, error.recoverable, System.currentTimeMillis(), error.message))
+            attemptStore.record(attemptId, CollectorDiagnosticStage.GATT_CLOSE, CollectorDiagnosticResult.INFO, "BLE-/GATT-Ressourcen geschlossen")
+            fail(store.read(), G7CollectorError(error.errorCode, error.recoverable, System.currentTimeMillis(), error.message), attemptId, startedAt)
         } catch (_: TimeoutCancellationException) {
-            fail(store.read(), G7CollectorError("G7-BLE-111", true, System.currentTimeMillis(), "Zeitüberschreitung bei der Sensorverbindung"))
+            attemptStore.record(attemptId, CollectorDiagnosticStage.GATT_CLOSE, CollectorDiagnosticResult.INFO, "Scan-/GATT-Zeitfenster beendet")
+            fail(store.read(), G7CollectorError("G7-BLE-111", true, System.currentTimeMillis(), "Sensor aktuell nicht erreichbar – nächster automatischer Versuch folgt"), attemptId, startedAt)
         } catch (_: CancellationException) {
-            // Explicit stop or service teardown is not a collector failure.
+            attemptStore.record(
+                attemptId,
+                CollectorDiagnosticStage.COMPLETE,
+                CollectorDiagnosticResult.CANCELLED,
+                "Collection-Versuch kontrolliert beendet",
+                durationMs = System.currentTimeMillis() - startedAt,
+            )
+            store.save(store.read().copy(activeAttemptId = null, lastAttemptCompletedAtEpochMs = System.currentTimeMillis()))
         } catch (_: SecurityException) {
-            fail(store.read(), G7CollectorError("G7-PERM-401", false, System.currentTimeMillis(), "Bluetooth-Berechtigung fehlt"))
+            fail(store.read(), G7CollectorError("G7-PERM-401", false, System.currentTimeMillis(), "Bluetooth-Berechtigung fehlt"), attemptId, startedAt)
         } catch (_: Throwable) {
-            fail(store.read(), G7CollectorError("G7-INT-500", true, System.currentTimeMillis(), "Unerwarteter Collector-Fehler"))
+            fail(store.read(), G7CollectorError("G7-INT-500", true, System.currentTimeMillis(), "Unerwarteter Collector-Fehler"), attemptId, startedAt)
         } finally {
-            finishCycle()
+            finishCycle(token)
         }
     }
 
-    private fun fail(state: G7PersistedState, error: G7CollectorError) {
+    private fun fail(
+        state: G7PersistedState,
+        error: G7CollectorError,
+        attemptId: Long,
+        startedAtEpochMs: Long,
+    ) {
         val managed = G7SessionManager(state).failure(error)
         val softWindowFailure = error.recoverable && error.code in SOFT_WINDOW_ERRORS
         val next = managed.copy(
             connectionState = G7ConnectionState.DISCONNECTED,
             protocolState = if (softWindowFailure) G7ProtocolState.RECOVERING else G7ProtocolState.ERROR,
+            activeAttemptId = null,
+            lastAttemptCompletedAtEpochMs = System.currentTimeMillis(),
         )
         store.save(next)
         scheduleReconnect(next)
+        next.nextReconnectEpochMs?.let { reconnectAt ->
+            attemptStore.record(
+                attemptId,
+                CollectorDiagnosticStage.WAITING_FOR_WINDOW,
+                CollectorDiagnosticResult.INFO,
+                "Nächstes Sensorfenster geplant",
+                errorCode = error.code,
+                durationMs = (reconnectAt - System.currentTimeMillis()).coerceAtLeast(0L),
+            )
+        }
         G7SignalLossMonitor.scheduleFromState(this, next)
         updateForeground(
             if (softWindowFailure) {
@@ -198,9 +396,18 @@ class G7CollectorService : Service() {
                 "${error.code}: ${error.safeMessage}"
             },
         )
+        attemptStore.record(
+            attemptId,
+            CollectorDiagnosticStage.ERROR,
+            if (error.recoverable) CollectorDiagnosticResult.RECOVERABLE_ERROR else CollectorDiagnosticResult.FATAL_ERROR,
+            error.safeMessage,
+            errorCode = error.code,
+            sensorId = next.sensor?.sensorId,
+            durationMs = System.currentTimeMillis() - startedAtEpochMs,
+        )
 
-        val watchOnly = G7AlertPolicyStore.isWatchOnly(this)
-        if (shouldPostImmediateCollectorAlert(watchOnly, error, next.sessionState)) {
+        val alarmsEnabled = G7AlertPolicyStore.alarmsEnabled(this)
+        if (shouldPostImmediateCollectorAlert(alarmsEnabled, error, next.sessionState)) {
             G7ErrorNotifier.show(this, error)
         }
         scope.launch {
@@ -210,8 +417,8 @@ class G7CollectorService : Service() {
                 if (error.recoverable) DiagnosticSeverity.WARNING else DiagnosticSeverity.ERROR,
                 mapOf(
                     "recoverable" to error.recoverable,
-                    "watchOnlyAlerts" to watchOnly,
-                    "userAlertPosted" to shouldPostImmediateCollectorAlert(watchOnly, error, next.sessionState),
+                    "canonicalWatchAlerts" to alarmsEnabled,
+                    "userAlertPosted" to shouldPostImmediateCollectorAlert(alarmsEnabled, error, next.sessionState),
                     "retryCount" to next.retryCount,
                     "nextReconnectEpochMs" to next.nextReconnectEpochMs,
                     "sessionState" to next.sessionState.name,
@@ -308,13 +515,13 @@ class G7CollectorService : Service() {
         cycleWakeLock = null
     }
 
-    private fun finishCycle() {
+    private fun finishCycle(token: Long) {
         releaseCycleWakeLock()
-        collectionJob = null
+        if (token == cycleToken) collectionJob = null
         val current = store.read()
         if (shouldKeepG7RuntimeForeground(current.collectorEnabled)) {
             val message = when (current.protocolState) {
-                G7ProtocolState.WAITING_FOR_NEXT_READING -> "Dauerbetrieb aktiv · Normalbetrieb"
+                G7ProtocolState.WAITING_FOR_NEXT_READING -> "Dauerbetrieb aktiv · Verbunden"
                 G7ProtocolState.RECOVERING -> "Dauerbetrieb aktiv · automatische Wiederverbindung"
                 G7ProtocolState.ERROR -> current.lastError?.let { "${it.code}: ${it.safeMessage}" } ?: "Collector prüfen"
                 else -> "Dauerbetrieb aktiv"
@@ -342,6 +549,8 @@ class G7CollectorService : Service() {
     companion object {
         const val ACTION_START = "app.aapswear.g7watch.START"
         const val ACTION_STOP = "app.aapswear.g7watch.STOP"
+        const val ACTION_RESTART = "app.aapswear.g7watch.RESTART"
+        const val ACTION_MANUAL_SCAN = "app.aapswear.g7watch.MANUAL_SCAN"
         internal const val CHANNEL = "g7_collector"
         internal const val NOTIFICATION_ID = 7001
         private const val COLLECTION_WAKE_LOCK_TIMEOUT_MS = 35L * 60L * 1000L
@@ -369,8 +578,23 @@ class G7CollectorService : Service() {
             cancelScheduledReconnect(app)
             G7SignalLossMonitor.cancel(app)
             G7ErrorNotifier.clearActive(app)
+            G7CgmAlarmCoordinator.clearSuppressed(app)
             app.stopService(Intent(app, G7CollectorService::class.java))
             app.getSystemService(NotificationManager::class.java).cancel(NOTIFICATION_ID)
+        }
+
+        fun restart(context: Context) {
+            val app = context.applicationContext
+            val current = G7SensorStateStore(app).read()
+            if (!current.collectorEnabled || current.sensor == null || G7CredentialStore(app).read() == null) return
+            app.startForegroundService(Intent(app, G7CollectorService::class.java).setAction(ACTION_RESTART))
+        }
+
+        fun scanNow(context: Context) {
+            val app = context.applicationContext
+            val current = G7SensorStateStore(app).read()
+            if (!current.collectorEnabled || current.sensor == null || G7CredentialStore(app).read() == null) return
+            app.startForegroundService(Intent(app, G7CollectorService::class.java).setAction(ACTION_MANUAL_SCAN))
         }
 
         private fun reconnectPendingIntent(context: Context): PendingIntent =
@@ -386,6 +610,55 @@ class G7CollectorService : Service() {
             context.getSystemService(AlarmManager::class.java).cancel(pending)
             pending.cancel()
         }
+    }
+}
+
+private enum class CycleRequest { AUTOMATIC, MANUAL, RESTART }
+
+private fun G7CollectorService.recordAttemptProtocolState(
+    attemptId: Long,
+    state: G7ProtocolState,
+    sensorId: String,
+) {
+    val store = G7CollectorDiagnosticStore(this)
+    fun record(
+        stage: CollectorDiagnosticStage,
+        result: CollectorDiagnosticResult,
+        message: String,
+    ) = store.record(attemptId, stage, result, message, sensorId = sensorId)
+
+    when (state) {
+        G7ProtocolState.SCANNING -> {
+            record(CollectorDiagnosticStage.SCAN_START, CollectorDiagnosticResult.STARTED, "Scan gestartet")
+            record(CollectorDiagnosticStage.SCANNING, CollectorDiagnosticResult.INFO, "Suche nach Sensor")
+        }
+        G7ProtocolState.SENSOR_FOUND ->
+            record(CollectorDiagnosticStage.ADVERTISEMENT_FOUND, CollectorDiagnosticResult.SUCCESS, "G7 Advertisement erkannt · connectable=true")
+        G7ProtocolState.CONNECTING ->
+            record(CollectorDiagnosticStage.CONNECT_REQUEST, CollectorDiagnosticResult.STARTED, "GATT-Verbindung angefordert")
+        G7ProtocolState.DISCOVERING_SERVICES -> {
+            record(CollectorDiagnosticStage.GATT_CONNECTED, CollectorDiagnosticResult.SUCCESS, "GATT verbunden")
+            record(CollectorDiagnosticStage.SERVICE_DISCOVERY, CollectorDiagnosticResult.STARTED, "Service Discovery")
+        }
+        G7ProtocolState.ENABLING_NOTIFICATIONS ->
+            record(CollectorDiagnosticStage.SERVICE_READY, CollectorDiagnosticResult.SUCCESS, "Dexcom Service gefunden")
+        G7ProtocolState.AUTHENTICATION_START ->
+            record(CollectorDiagnosticStage.AUTH_START, CollectorDiagnosticResult.STARTED, "Authentifizierung gestartet")
+        G7ProtocolState.AUTHENTICATING -> {
+            record(CollectorDiagnosticStage.AUTH_CHALLENGE, CollectorDiagnosticResult.INFO, "Authentifizierungs-Challenge empfangen")
+            record(CollectorDiagnosticStage.AUTH_RESPONSE, CollectorDiagnosticResult.INFO, "Authentifizierungs-Response gesendet")
+        }
+        G7ProtocolState.AUTHENTICATED ->
+            record(CollectorDiagnosticStage.AUTH_SUCCESS, CollectorDiagnosticResult.SUCCESS, "Authentifizierung erfolgreich")
+        G7ProtocolState.REQUESTING_GLUCOSE ->
+            record(CollectorDiagnosticStage.GLUCOSE_REQUEST, CollectorDiagnosticResult.STARTED, "Glukose Request")
+        G7ProtocolState.RECEIVING_GLUCOSE ->
+            record(CollectorDiagnosticStage.GLUCOSE_RECEIVED, CollectorDiagnosticResult.SUCCESS, "Glukose Packet empfangen")
+        G7ProtocolState.RECOVERING -> {
+            record(CollectorDiagnosticStage.RETRY, CollectorDiagnosticResult.RECOVERABLE_ERROR, "Begrenzter Retry")
+            record(CollectorDiagnosticStage.RECOVERY, CollectorDiagnosticResult.INFO, "Recovery aktiv")
+        }
+        else -> Unit
     }
 }
 

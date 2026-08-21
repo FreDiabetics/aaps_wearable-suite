@@ -13,6 +13,7 @@ class G7BootReceiver : BroadcastReceiver() {
         val state = G7SensorStateStore(context).read()
         if (!shouldRestoreG7Collector(intent.action, state.collectorEnabled)) return
 
+        G7CgmAlarmCoordinator.restore(context)
         // Lifecycle recovery must never rewrite the user's persisted enable/disable decision.
         // If Android temporarily refuses the FGS launch, keep collectorEnabled=true so a later
         // reconnect/user-visible start can recover without re-pairing or losing session state.

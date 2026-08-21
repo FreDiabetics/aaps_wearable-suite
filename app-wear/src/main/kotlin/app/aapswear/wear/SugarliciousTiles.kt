@@ -96,6 +96,7 @@ class GlucoseTileService : SugarliciousTileService() {
         if (!TherapyDisplayFormatter.isGlucoseDisplayable(state, now) || glucose == null) {
             return when (freshness) {
                 Freshness.STALE -> "Keine aktuellen CGM-Daten"
+                Freshness.ERROR -> "G7 Sensorfehler"
                 Freshness.NO_DATA -> "Keine CGM-Daten"
                 else -> TherapyDisplayFormatter.freshnessLabel(freshness)
             }
@@ -140,6 +141,7 @@ class TherapyTileService : SugarliciousTileService() {
         if (!TherapyDisplayFormatter.isGlucoseDisplayable(state, now)) {
             return when (freshness) {
                 Freshness.STALE -> "IOB · COB · Basal ausgeblendet"
+                Freshness.ERROR -> "Sensorfehler · Therapiedaten ausgeblendet"
                 Freshness.NO_DATA -> "Keine aktuellen Therapiedaten"
                 else -> TherapyDisplayFormatter.freshnessLabel(freshness)
             }

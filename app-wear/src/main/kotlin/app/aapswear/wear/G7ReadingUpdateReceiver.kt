@@ -7,16 +7,12 @@ import android.content.Intent
 import androidx.wear.watchface.complications.datasource.ComplicationDataSourceUpdateRequester
 import app.aapswear.complications.ComplicationUpdatePlanner
 import app.aapswear.complications.G7LocalReadingResolver
-import app.aapswear.model.DataSourceId
-import app.aapswear.protocol.WearProtocol
 import app.aapswear.storage.TherapyStateStore
-import com.google.android.gms.wearable.Wearable
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.tasks.await
 
 /** Refreshes local CGM consumers immediately after the standalone G7 app stores a reading. */
 class G7ReadingUpdateReceiver : BroadcastReceiver() {
@@ -45,6 +41,7 @@ class G7ReadingUpdateReceiver : BroadcastReceiver() {
                         dataSource = source,
                     )
                 val sourceState = G7LocalReadingResolver.sourceState(resolved)
+                publishG7AlertMode(context, source, resolved)
                 context.recordWatchDiagnostic(
                     module = "SOURCE",
                     code = "SRC-RESOLVE-200",
@@ -56,28 +53,25 @@ class G7ReadingUpdateReceiver : BroadcastReceiver() {
                         ),
                 )
 
-                // This path is a convenience signal for the phone while Watch Direct is canonical.
-                // Local history itself remains durable in the G7 collector database.
-                val local =
-                    resolved
-                        ?.takeIf { it.source == DataSourceId.DEXCOM_G7_WATCH }
-                        ?: return@launch
-
-                Wearable
-                    .getNodeClient(context)
-                    .connectedNodes
-                    .await()
-                    .forEach { node ->
-                        runCatching {
-                            Wearable
-                                .getMessageClient(context)
-                                .sendMessage(
-                                    node.id,
-                                    WearProtocol.G7_READING_PATH,
-                                    WearProtocol.encode(local),
-                                )
-                                .await()
-                        }
+                runCatching { G7BackfillSync.sendPending(context) }
+                    .onSuccess { dispatch ->
+                        context.recordWatchDiagnostic(
+                            module = "G7-SYNC",
+                            code = if (dispatch == null) "G7-SYNC-204" else "G7-SYNC-100",
+                            message = if (dispatch == null) "No pending G7 history" else "G7 history batch sent to Mobile",
+                            metadata = mapOf(
+                                "batchId" to dispatch?.batchId,
+                                "readingCount" to dispatch?.readingIds?.size,
+                            ),
+                        )
+                    }
+                    .onFailure { error ->
+                        context.recordWatchDiagnostic(
+                            module = "G7-SYNC",
+                            code = "G7-SYNC-503",
+                            message = "G7 history remains pending until Mobile reconnects",
+                            metadata = mapOf("error" to error.javaClass.simpleName),
+                        )
                     }
             } finally {
                 pending.finish()

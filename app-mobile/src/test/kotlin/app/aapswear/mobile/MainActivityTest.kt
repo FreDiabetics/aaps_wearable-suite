@@ -91,7 +91,7 @@ class MainActivityTest {
         val settingsText = textOf(activity.findViewById(R.id.dashboard_content))
         assertTrue(settingsText.contains("Datenquelle"))
         assertTrue(settingsText.contains("AndroidAPS"))
-        assertTrue(settingsText.contains("APP-BETRIEB & SICHERUNG"))
+        assertTrue(settingsText.contains("Datenverwaltung"))
         assertTrue(settingsText.contains("Dauerbetrieb"))
         assertTrue(settingsText.contains("Einstellungen sichern"))
         assertTrue(settingsText.contains("Einstellungen wiederherstellen"))
@@ -256,6 +256,53 @@ class MainActivityTest {
         controller.pause().stop().destroy()
     }
 
+    @Test fun `settings accordion keeps exact order allows multiple sections and resets after leaving`() {
+        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+        context.getSharedPreferences("dashboard_ui", android.content.Context.MODE_PRIVATE).edit().clear().commit()
+        val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
+        val activity = controller.get()
+        activity.findViewById<View>(R.id.top_settings).performClick()
+        shadowOf(android.os.Looper.getMainLooper()).idle()
+
+        fun categories(): List<View> {
+            val root = activity.findViewById<ViewGroup>(R.id.dashboard_content)
+            return (0 until root.childCount)
+                .map(root::getChildAt)
+                .filter { it.tag?.toString()?.startsWith("settings-category-") == true }
+        }
+        fun contentAfter(header: View): View {
+            val root = activity.findViewById<ViewGroup>(R.id.dashboard_content)
+            return root.getChildAt(root.indexOfChild(header) + 1)
+        }
+
+        var headers = categories()
+        assertEquals(
+            listOf("general", "display", "cgm_graph", "notification", "data", "diagnostics"),
+            headers.map { it.tag.toString().removePrefix("settings-category-") },
+        )
+        assertTrue(headers.all { contentAfter(it).visibility == View.GONE })
+        assertNotNull(findImageWithDescription(activity.findViewById(R.id.dashboard_content), "Automatisch"))
+        assertNotNull(findImageWithDescription(activity.findViewById(R.id.dashboard_content), "AndroidAPS"))
+        assertNotNull(findImageWithDescription(activity.findViewById(R.id.dashboard_content), "xDrip+"))
+        assertNotNull(findImageWithDescription(activity.findViewById(R.id.dashboard_content), "Dexcom G7 Watch"))
+
+        headers[0].performClick()
+        headers[1].performClick()
+        assertEquals(View.VISIBLE, contentAfter(headers[0]).visibility)
+        assertEquals(View.VISIBLE, contentAfter(headers[1]).visibility)
+        headers[0].performClick()
+        assertEquals(View.GONE, contentAfter(headers[0]).visibility)
+        assertEquals(View.VISIBLE, contentAfter(headers[1]).visibility)
+
+        activity.findViewById<View>(R.id.top_back).performClick()
+        activity.findViewById<View>(R.id.top_settings).performClick()
+        shadowOf(android.os.Looper.getMainLooper()).idle()
+        headers = categories()
+        assertTrue(headers.all { contentAfter(it).visibility == View.GONE })
+        assertTrue(textOf(activity.findViewById(R.id.dashboard_content)).contains("Über"))
+        controller.pause().stop().destroy()
+    }
+
     @Test fun `overview is fixed and watch menu has only its inline header`() {
         val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
         val activity = controller.get()
@@ -301,5 +348,13 @@ class MainActivityTest {
         is TextView -> view.text.toString()
         is ViewGroup -> (0 until view.childCount).joinToString(" ") { textOf(view.getChildAt(it)) }
         else -> ""
+    }
+
+    private fun findImageWithDescription(view: View, description: String): android.widget.ImageView? = when (view) {
+        is android.widget.ImageView -> view.takeIf { it.contentDescription?.toString() == description }
+        is ViewGroup -> (0 until view.childCount).firstNotNullOfOrNull { index ->
+            findImageWithDescription(view.getChildAt(index), description)
+        }
+        else -> null
     }
 }

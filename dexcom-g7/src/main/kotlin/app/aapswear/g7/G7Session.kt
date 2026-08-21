@@ -106,7 +106,19 @@ class G7SessionManager(initial: G7PersistedState = G7PersistedState()) {
 
     fun readingReceived(reading: CgmReading): G7PersistedState {
         val plan = G7ReconnectScheduler.afterReading(reading.timestampEpochMs)
-        return transition(state.copy(lastReading = reading, sessionState = G7SessionState.WAITING_FOR_NEXT_READING, protocolState = G7ProtocolState.RECEIVING_GLUCOSE, nextReconnectEpochMs = plan.nextReconnectEpochMs, retryCount = 0, lastError = null))
+        return transition(
+            state.copy(
+                // A sensor-error packet proves that the BLE cycle ran, but it must never replace
+                // the last displayable glucose value or postpone signal-loss from that last valid
+                // value. The packet timestamp is still the correct anchor for the next G7 window.
+                lastReading = reading.takeIf { it.status == CgmReadingStatus.VALID } ?: state.lastReading,
+                sessionState = G7SessionState.WAITING_FOR_NEXT_READING,
+                protocolState = G7ProtocolState.RECEIVING_GLUCOSE,
+                nextReconnectEpochMs = plan.nextReconnectEpochMs,
+                retryCount = 0,
+                lastError = null,
+            ),
+        )
     }
 
     fun failure(error: G7CollectorError): G7PersistedState {

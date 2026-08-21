@@ -12,6 +12,7 @@ import app.aapswear.model.GlucoseState
 import app.aapswear.model.GlucoseUnit
 import app.aapswear.model.InsulinState
 import app.aapswear.model.PredictionKind
+import app.aapswear.model.RangeExcursion
 import app.aapswear.model.TargetState
 import app.aapswear.model.TherapyDisplayState
 import app.aapswear.model.TherapyHistorySample
@@ -105,16 +106,16 @@ class DashboardChartsTest {
         SugarliciousColors.apply(SugarliciousPalette.defaults())
     }
 
-    @Test fun `range excursion requires four contiguous values over at least fifteen minutes`() {
+    @Test fun `range excursion requires two consecutive valid values`() {
         val now = 10_000_000L
         fun samples(vararg values: Double) = values.mapIndexed { index, value ->
             GlucoseSample(value, now - (values.lastIndex - index) * 5 * 60_000L)
         }
 
-        assertNull(sustainedRangeExcursion(samples(79.0, 78.0, 70.0), 80.0, 160.0))
-        assertEquals(RangeExcursion.LOW, sustainedRangeExcursion(samples(79.0, 78.0, 76.0, 70.0), 80.0, 160.0))
-        assertEquals(RangeExcursion.HIGH, sustainedRangeExcursion(samples(161.0, 166.0, 170.0, 172.0), 80.0, 160.0))
-        assertNull(sustainedRangeExcursion(samples(161.0, 166.0, 159.0, 172.0), 80.0, 160.0))
+        assertNull(sustainedRangeExcursion(samples(79.0), 80.0, 160.0))
+        assertEquals(RangeExcursion.LOW, sustainedRangeExcursion(samples(79.0, 70.0), 80.0, 160.0))
+        assertEquals(RangeExcursion.HIGH, sustainedRangeExcursion(samples(161.0, 172.0), 80.0, 160.0))
+        assertNull(sustainedRangeExcursion(samples(161.0, 159.0), 80.0, 160.0))
     }
 
     @Test fun `glucose chart marks stale signal period with configured signal loss color`() {

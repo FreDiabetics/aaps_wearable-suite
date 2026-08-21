@@ -22,8 +22,8 @@ import app.aapswear.model.BasalState
 import app.aapswear.model.DataSourceId
 import app.aapswear.model.DiagnosticSeverity
 import app.aapswear.model.Freshness
-import app.aapswear.model.FreshnessPolicy
 import app.aapswear.model.GlucoseUnit
+import app.aapswear.model.TherapyDisplayFormatter
 import app.aapswear.model.TherapyDisplayState
 import app.aapswear.model.TrendVisuals
 import app.aapswear.protocol.WatchGlucoseUnit
@@ -222,10 +222,7 @@ class WearActivity : Activity() {
             applyUiColors(preferences)
         }
 
-        val freshness = FreshnessPolicy.classify(
-            glucoseState?.measuredAtEpochMs ?: state?.receivedAtEpochMs,
-            now,
-        )
+        val freshness = TherapyDisplayFormatter.freshness(state, now)
         val canShowValue = glucoseState != null && freshness in setOf(Freshness.CURRENT, Freshness.DELAYED)
         val targetLow = state?.target?.lowMgDl ?: 80.0
         val targetHigh = state?.target?.highMgDl ?: 160.0
@@ -267,7 +264,7 @@ class WearActivity : Activity() {
             val glucoseBorder = when (freshness) {
                 Freshness.CURRENT -> rangeColor
                 Freshness.DELAYED -> DELAYED_ACCENT
-                Freshness.STALE, Freshness.NO_DATA -> preferences.uiColors.glucoseLow
+                Freshness.STALE, Freshness.ERROR, Freshness.NO_DATA -> preferences.uiColors.glucoseLow
             }
             findViewById<View>(R.id.wear_glucose_card).background =
                 roundedBackground(glucoseFill, glucoseBorder, 26f)
@@ -364,6 +361,7 @@ class WearActivity : Activity() {
             R.id.wear_cob,
             R.id.wear_source,
             R.id.wear_settings_label,
+            R.id.wear_header_title,
         ).forEach { id -> findViewById<TextView>(id).setTextColor(ui.textPrimary) }
 
         listOf(
@@ -385,13 +383,14 @@ class WearActivity : Activity() {
         Freshness.CURRENT -> "AKTUELL"
         Freshness.DELAYED -> "VERZÖGERT"
         Freshness.STALE -> "VERALTET · KEINE AKTUELLEN DATEN"
+        Freshness.ERROR -> "SENSORFEHLER · KEIN GÜLTIGER WERT"
         Freshness.NO_DATA -> "KEINE DATEN"
     }
 
     private fun freshnessColor(freshness: Freshness, preferences: WearDisplayPreferences): Int = when (freshness) {
         Freshness.CURRENT -> preferences.uiColors.accent
         Freshness.DELAYED -> DELAYED_ACCENT
-        Freshness.STALE, Freshness.NO_DATA -> preferences.uiColors.glucoseLow
+        Freshness.STALE, Freshness.ERROR, Freshness.NO_DATA -> preferences.uiColors.glucoseLow
     }
 
     private fun blendArgb(base: Int, overlay: Int, fraction: Float): Int {

@@ -20,11 +20,15 @@ import app.aapswear.mobile.ui.theme.SugarliciousColorRole
 import app.aapswear.mobile.ui.theme.SugarliciousColors
 import app.aapswear.model.Freshness
 import app.aapswear.model.FreshnessPolicy
+import app.aapswear.model.CanonicalCgmHistory
+import app.aapswear.model.CgmGraphPolicy
 import app.aapswear.model.GlucosePrediction
 import app.aapswear.model.GlucoseSample
 import app.aapswear.model.GlucoseUnit
 import app.aapswear.model.PredictionKind
+import app.aapswear.model.RangeExcursion
 import app.aapswear.model.TherapyDisplayState
+import app.aapswear.model.TherapyDisplayFormatter
 import app.aapswear.model.TherapyHistorySample
 import app.aapswear.storage.PredictionDisplayTimeline
 import java.text.SimpleDateFormat
@@ -46,38 +50,11 @@ private const val GLUCOSE_LOW_RATIO = 0.215
 private const val GLUCOSE_TARGET_HIGH_RATIO = 0.515
 private const val GLUCOSE_DISPLAY_MAX = 400.0
 private const val TOOLKIT_ACTIVITY_SCALE_FACTOR = 1.15
-private const val RANGE_EXCURSION_REQUIRED_POINTS = 4
-private const val RANGE_EXCURSION_MIN_SPAN_MS = 15L * 60_000L
-private const val RANGE_EXCURSION_MAX_GAP_MS = 8L * 60_000L
-
-internal enum class RangeExcursion { LOW, HIGH }
-
 internal fun sustainedRangeExcursion(
     samples: List<GlucoseSample>,
     lowMgDl: Double,
     highMgDl: Double,
-): RangeExcursion? {
-    if (!lowMgDl.isFinite() || !highMgDl.isFinite() || lowMgDl >= highMgDl) return null
-
-    val recent =
-        samples
-            .asSequence()
-            .filter { it.valueMgDl.isFinite() && it.valueMgDl in 20.0..1_000.0 }
-            .sortedBy { it.measuredAtEpochMs }
-            .distinctBy { it.measuredAtEpochMs }
-            .toList()
-            .takeLast(RANGE_EXCURSION_REQUIRED_POINTS)
-
-    if (recent.size < RANGE_EXCURSION_REQUIRED_POINTS) return null
-    if (recent.last().measuredAtEpochMs - recent.first().measuredAtEpochMs < RANGE_EXCURSION_MIN_SPAN_MS) return null
-    if (recent.zipWithNext().any { (a, b) -> b.measuredAtEpochMs - a.measuredAtEpochMs !in 1L..RANGE_EXCURSION_MAX_GAP_MS }) return null
-
-    return when {
-        recent.all { it.valueMgDl < lowMgDl } -> RangeExcursion.LOW
-        recent.all { it.valueMgDl > highMgDl } -> RangeExcursion.HIGH
-        else -> null
-    }
-}
+): RangeExcursion? = CgmGraphPolicy.rangeExcursion(samples, lowMgDl, highMgDl)
 
 internal class ChartViewport(initialHours: Int) {
     private val listeners = LinkedHashSet<() -> Unit>()
@@ -331,7 +308,7 @@ internal class GlucoseDashboardChart @JvmOverloads constructor(
             val targetLow = state?.target?.lowMgDl ?: 80.0
             val targetHigh = state?.target?.highMgDl ?: 160.0
             val freshness = FreshnessPolicy.classify(state?.glucose?.measuredAtEpochMs, now)
-            val signalLost = freshness == Freshness.STALE || freshness == Freshness.NO_DATA
+            val signalLost = !TherapyDisplayFormatter.isGlucoseDisplayable(state, now)
             val predictions = if (showPredictions) state?.glucosePredictions.orEmpty().filter { predictionEnabled(it.kind) } else emptyList()
             val liveEdge = when {
                 signalLost -> now
@@ -340,10 +317,27 @@ internal class GlucoseDashboardChart @JvmOverloads constructor(
             }
             val end = viewport.endEpochMs(liveEdge)
             val start = end - (viewport.hours * HOUR_MS).toLong()
-            val allHistory = buildList {
-                addAll(state?.glucoseHistory.orEmpty())
-                state?.glucose?.let { add(GlucoseSample(it.valueMgDl, it.measuredAtEpochMs, state!!.source)) }
-            }.sortedBy { it.measuredAtEpochMs }.distinctBy { it.measuredAtEpochMs to it.source }
+            val allHistory = CanonicalCgmHistory.merge(
+                samples = buildList {
+                    addAll(state?.glucoseHistory.orEmpty())
+                    state?.glucose?.let { glucose ->
+                        add(
+                            GlucoseSample(
+                                valueMgDl = glucose.valueMgDl,
+                                measuredAtEpochMs = glucose.measuredAtEpochMs,
+                                source = glucose.source,
+                                sensorId = glucose.sensorId,
+                                sessionId = glucose.sessionId,
+                                sequenceNumber = glucose.sequenceNumber,
+                                receivedAtEpochMs = glucose.receivedAtEpochMs,
+                                quality = glucose.quality,
+                            ),
+                        )
+                    }
+                },
+                nowEpochMs = now,
+                preferredSource = state?.source,
+            )
             val history = allHistory.filter { it.measuredAtEpochMs in start..min(end, now) }
             val visiblePredictions = PredictionDisplayTimeline.anchor(predictions, now)
                 .map { series -> series.copy(samples = series.samples.filter { it.measuredAtEpochMs in start..end }) }
@@ -386,18 +380,68 @@ internal class GlucoseDashboardChart @JvmOverloads constructor(
             }
 
             if (showTargetValue) {
-                state?.target?.valueMgDl?.takeIf { it.isFinite() && it in 20.0..1_000.0 }?.let { targetValue ->
-                    val targetY = mapGlucoseY(targetValue, plot)
-                    val targetValueColor = SugarliciousColors.argb(SugarliciousColorRole.TARGET_VALUE)
-                    linePaint.color = targetValueColor
-                    linePaint.strokeWidth = 2f.dp
-                    linePaint.pathEffect = DashPathEffect(floatArrayOf(5f.dp, 4f.dp), 0f)
-                    canvas.drawLine(plot.left, targetY, plot.right, targetY, linePaint)
-                    linePaint.pathEffect = null
+                val currentTarget = state?.target?.valueMgDl?.takeIf { it.isFinite() && it in 20.0..1_000.0 }
+                val targetSegments =
+                    state?.targetHistory.orEmpty()
+                        .asSequence()
+                        .filter {
+                            it.valueMgDl.isFinite() &&
+                                it.valueMgDl in 20.0..1_000.0 &&
+                                it.startedAtEpochMs <= end &&
+                                it.endsAtEpochMs >= start
+                        }
+                        .map { sample ->
+                            val isCurrentObservedTarget =
+                                sample == state?.targetHistory?.lastOrNull() &&
+                                    currentTarget == sample.valueMgDl &&
+                                    sample.temporary == (state?.target?.temporary == true) &&
+                                    freshness in setOf(Freshness.CURRENT, Freshness.DELAYED)
+                            val mayExtendToNow =
+                                isCurrentObservedTarget &&
+                                    (!sample.temporary || state?.target?.endsAtEpochMs == null)
+                            sample.copy(
+                                endsAtEpochMs =
+                                    if (mayExtendToNow) maxOf(sample.endsAtEpochMs, now) else sample.endsAtEpochMs,
+                            )
+                        }
+                        .toList()
+                        .ifEmpty {
+                            currentTarget?.let { value ->
+                                val observedAt = state?.glucose?.measuredAtEpochMs ?: state?.receivedAtEpochMs ?: now
+                                val temporary = state?.target?.temporary == true
+                                val explicitEnd = state?.target?.endsAtEpochMs?.takeIf { temporary }
+                                if (explicitEnd != null && explicitEnd <= observedAt) {
+                                    emptyList()
+                                } else {
+                                    listOf(
+                                        app.aapswear.model.TargetSample(
+                                            valueMgDl = value,
+                                            startedAtEpochMs = if (temporary) observedAt else start,
+                                            endsAtEpochMs = explicitEnd ?: now,
+                                            temporary = temporary,
+                                        ),
+                                    )
+                                }
+                            }.orEmpty()
+                        }
+
+                val targetValueColor = SugarliciousColors.argb(SugarliciousColorRole.TARGET_VALUE)
+                linePaint.color = targetValueColor
+                linePaint.strokeWidth = 2f.dp
+                linePaint.pathEffect = DashPathEffect(floatArrayOf(5f.dp, 4f.dp), 0f)
+                targetSegments.forEach { segment ->
+                    val from = segment.startedAtEpochMs.coerceIn(start, end)
+                    val to = segment.endsAtEpochMs.coerceIn(from, end)
+                    val targetY = mapGlucoseY(segment.valueMgDl, plot)
+                    canvas.drawLine(mapX(from, start, end, plot), targetY, mapX(to, start, end, plot), targetY, linePaint)
+                }
+                linePaint.pathEffect = null
+                targetSegments.lastOrNull()?.let { segment ->
+                    val targetY = mapGlucoseY(segment.valueMgDl, plot)
                     drawText(
                         canvas,
-                        "Ziel ${glucoseLabel(targetValue)}",
-                        plot.right - 1f.dp,
+                        "Ziel ${glucoseLabel(segment.valueMgDl)}",
+                        mapX(segment.endsAtEpochMs.coerceIn(start, end), start, end, plot) - 1f.dp,
                         (targetY - 4f.dp).coerceAtLeast(plot.top + 12f.dp),
                         10f,
                         targetValueColor,

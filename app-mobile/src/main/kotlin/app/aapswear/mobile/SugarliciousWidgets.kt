@@ -270,5 +270,5 @@ private fun widgetStatusLine(state: TherapyDisplayState?, freshness: Freshness, 
 private fun statusColor(freshness: Freshness): ColorProvider = when (freshness) {
     Freshness.CURRENT -> WidgetAccent
     Freshness.DELAYED -> WidgetWarning
-    Freshness.STALE, Freshness.NO_DATA -> WidgetError
+    Freshness.STALE, Freshness.ERROR, Freshness.NO_DATA -> WidgetError
 }
