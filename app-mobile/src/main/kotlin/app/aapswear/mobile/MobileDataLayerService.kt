@@ -5,8 +5,6 @@ import android.os.Handler
 import android.os.Looper
 import android.widget.Toast
 import app.aapswear.protocol.WatchConfig
-import app.aapswear.protocol.G7ReadingAck
-import app.aapswear.protocol.G7ReadingBatch
 import app.aapswear.protocol.WatchGlucoseUnit
 import app.aapswear.protocol.WearProtocol
 import app.aapswear.protocol.WatchGraphColors
@@ -15,11 +13,7 @@ import app.aapswear.protocol.WatchGraphStyle
 import app.aapswear.protocol.WatchUiColors
 import app.aapswear.protocol.WatchDataSource
 import app.aapswear.model.DataSourceId
-import app.aapswear.model.CgmQuality
 import app.aapswear.model.DiagnosticSeverity
-import app.aapswear.g7.CgmReading
-import app.aapswear.g7.CgmReadingIdentity
-import app.aapswear.g7.CgmReadingStatus
 import app.aapswear.mobile.ui.theme.SugarliciousColorRole
 import app.aapswear.mobile.ui.theme.SugarliciousColorStore
 import app.aapswear.storage.TherapyStateStore
@@ -40,27 +34,29 @@ import kotlinx.coroutines.tasks.await
 class MobileDataLayerService : WearableListenerService() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
+    override fun onCreate() {
+        super.onCreate()
+        scope.launch {
+            MobileWatchCgmMigration.runOnce(applicationContext)
+        }
+    }
+
     override fun onMessageReceived(event: MessageEvent) {
         recordWatchContact(applicationContext)
         when (event.path) {
             WearProtocol.REQUEST_PATH -> {
                 scope.launch {
                     applicationContext.recordMobileDiagnostic("SYNC", "SYNC-WATCH-100", "Watch requested current state")
+                    MobileWatchCgmMigration.runOnce(applicationContext)
                     val phoneState = PhoneTherapyStateStore(this@MobileDataLayerService)
                         .state
                         .first()
                         ?: TherapyStateStore(this@MobileDataLayerService)
                             .state
                             .first()
-                            ?.takeUnless { it.source == DataSourceId.DEXCOM_G7_WATCH }
+                            ?.withoutDirectWatchCgm()
                     phoneState?.let { publishState(this@MobileDataLayerService, it) }
-
                     publishWatchConfig(this@MobileDataLayerService)
-                    runCatching {
-                        Wearable.getMessageClient(this@MobileDataLayerService)
-                            .sendMessage(event.sourceNodeId, WearProtocol.G7_SYNC_REQUEST_PATH, byteArrayOf())
-                            .await()
-                    }
                 }
             }
 
@@ -99,44 +95,25 @@ class MobileDataLayerService : WearableListenerService() {
                         }
                     }
             }
-            WearProtocol.G7_READING_PATH -> {
+
+            // Product rule: direct G7 Watch readings are local-Watch CGM data only.
+            // Keep the legacy paths for compatibility, but reject their payloads explicitly so an
+            // older Wear client cannot repopulate Mobile history or Health Connect after migration.
+            WearProtocol.G7_READING_PATH,
+            WearProtocol.G7_READING_BATCH_PATH,
+            -> {
                 scope.launch {
-                    val incoming = runCatching { WearProtocol.decode(event.data) }.getOrNull()
-                        ?.takeIf { it.source == DataSourceId.DEXCOM_G7_WATCH }
-                        ?: return@launch
-                    val now = System.currentTimeMillis()
-                    val accepted = MobileG7BackfillStore(this@MobileDataLayerService)
-                        .merge(incoming.toLegacyG7Readings(), now)
-                    val merged = MobileCanonicalStateCoordinator.refreshFromWatchBackfill(
-                        this@MobileDataLayerService,
-                        now,
-                    ) ?: return@launch
+                    MobileWatchCgmMigration.runOnce(applicationContext)
                     applicationContext.recordMobileDiagnostic(
                         "G7",
-                        "G7-DATA-201",
-                        "Legacy direct G7 state migrated into Watch backfill history",
-                        metadata = mapOf("accepted" to accepted.size, "historyCount" to merged.glucoseHistory.size),
+                        "G7-SYNC-410",
+                        "Direct G7 Watch CGM payload rejected by Mobile-local data policy",
+                        DiagnosticSeverity.INFO,
+                        metadata = mapOf("path" to event.path, "sourceNodeId" to event.sourceNodeId),
                     )
-                    runCatching { HealthConnectIntegration.exportCgmReading(this@MobileDataLayerService, merged) }
-                    SugarliciousWidgets.update(this@MobileDataLayerService)
-                    PersistentBridgeService.refresh(this@MobileDataLayerService)
                 }
             }
-            WearProtocol.G7_READING_BATCH_PATH -> {
-                scope.launch {
-                    val batch = runCatching { WearProtocol.decodeG7ReadingBatch(event.data) }
-                        .getOrElse {
-                            applicationContext.recordMobileDiagnostic(
-                                "G7",
-                                "G7-SYNC-401",
-                                "Invalid G7 Watch history batch rejected",
-                                DiagnosticSeverity.WARNING,
-                            )
-                            return@launch
-                        }
-                    acceptG7Batch(batch, event.sourceNodeId)
-                }
-            }
+
             WearProtocol.DIAGNOSTICS_BATCH_PATH -> {
                 scope.launch {
                     runCatching { WearProtocol.decodeDiagnostics(event.data) }
@@ -166,79 +143,7 @@ class MobileDataLayerService : WearableListenerService() {
         scope.cancel()
         super.onDestroy()
     }
-
-    private suspend fun acceptG7Batch(batch: G7ReadingBatch, sourceNodeId: String) {
-        val now = System.currentTimeMillis()
-        val accepted = MobileG7BackfillStore(this).merge(batch.readings, now)
-        val canonical = MobileCanonicalStateCoordinator.refreshFromWatchBackfill(this, now)
-        canonical?.let {
-            runCatching { HealthConnectIntegration.exportCgmReading(this, it) }
-            SugarliciousWidgets.update(this)
-            PersistentBridgeService.refresh(this)
-        }
-
-        val ack =
-            G7ReadingAck(
-                batchId = batch.batchId,
-                acknowledgedIds = accepted,
-                acknowledgedAtEpochMs = System.currentTimeMillis(),
-            )
-        Wearable.getMessageClient(this)
-            .sendMessage(sourceNodeId, WearProtocol.G7_READING_ACK_PATH, WearProtocol.encodeG7ReadingAck(ack))
-            .await()
-        applicationContext.recordMobileDiagnostic(
-            "G7",
-            "G7-SYNC-200",
-            "G7 Watch history batch persisted and acknowledged",
-            metadata = mapOf(
-                "batchId" to batch.batchId,
-                "received" to batch.readings.size,
-                "acknowledged" to accepted.size,
-                "canonicalSource" to canonical?.source?.name,
-            ),
-        )
-    }
 }
-
-private fun app.aapswear.model.TherapyDisplayState.toLegacyG7Readings(): List<CgmReading> =
-    buildList {
-        addAll(glucoseHistory)
-        glucose?.let { value ->
-            add(
-                app.aapswear.model.GlucoseSample(
-                    valueMgDl = value.valueMgDl,
-                    measuredAtEpochMs = value.measuredAtEpochMs,
-                    source = DataSourceId.DEXCOM_G7_WATCH,
-                    sensorId = value.sensorId,
-                    sessionId = value.sessionId,
-                    sequenceNumber = value.sequenceNumber,
-                    receivedAtEpochMs = value.receivedAtEpochMs,
-                    quality = value.quality,
-                ),
-            )
-        }
-    }.filter { it.source == DataSourceId.DEXCOM_G7_WATCH }
-        .distinctBy { listOf(it.sensorId, it.sessionId, it.sequenceNumber, it.measuredAtEpochMs) }
-        .map { sample ->
-            val sensorId = sample.sensorId ?: "G7-WATCH-LEGACY"
-            val sessionId = sample.sessionId ?: sensorId
-            CgmReading(
-                id = CgmReadingIdentity.create(sensorId, sessionId, sample.sequenceNumber, sample.measuredAtEpochMs),
-                source = DataSourceId.DEXCOM_G7_WATCH,
-                sensorId = sensorId,
-                sessionId = sessionId,
-                glucoseMgDl = sample.valueMgDl,
-                timestampEpochMs = sample.measuredAtEpochMs,
-                receivedAtEpochMs = sample.receivedAtEpochMs ?: receivedAtEpochMs,
-                status =
-                    when (sample.quality) {
-                        CgmQuality.VALID -> CgmReadingStatus.VALID
-                        CgmQuality.SENSOR_ERROR -> CgmReadingStatus.SENSOR_ERROR
-                        CgmQuality.INVALID -> CgmReadingStatus.INVALID
-                    },
-                sequenceNumber = sample.sequenceNumber,
-            )
-        }
 
 internal fun readWatchConfig(context: Context): WatchConfig {
     val preferences =
@@ -330,7 +235,6 @@ internal fun readWatchConfig(context: Context): WatchConfig {
             cob = palette.argb(SugarliciousColorRole.ORANGE),
             basal = palette.argb(SugarliciousColorRole.SECONDARY),
         ),
-
         sentAtEpochMs = System.currentTimeMillis(),
     )
 }
