@@ -179,7 +179,7 @@ internal fun SugarliciousColorSettingsPanel(
                 modifier = Modifier.padding(top = 6.dp),
             )
 
-            GraphSettingSlider(
+            SugarliciousSettingSlider(
                 title = "Punktgröße",
                 description = "Größe der CGM-Dots im Glukosegraph",
                 value = cgmDotRadiusDp,
@@ -202,7 +202,7 @@ internal fun SugarliciousColorSettingsPanel(
             )
 
             if (cgmDotOutlineEnabled) {
-                GraphSettingSlider(
+                SugarliciousSettingSlider(
                     title = "Konturdicke",
                     description = "Dicke der Dot-Kontur",
                     value = cgmDotOutlineWidthDp,
@@ -261,6 +261,7 @@ internal fun SugarliciousColorSettingsPanel(
     editingRole?.let { role ->
         ColorEditorDialog(
             role = role,
+            label = role.label,
             initialArgb = palette.argb(role),
             onDismiss = {
                 editingRole = null
@@ -275,6 +276,120 @@ internal fun SugarliciousColorSettingsPanel(
                 editingRole = null
             },
         )
+    }
+}
+
+@Composable
+internal fun WidgetColorSettingsPanel() {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var revision by remember { mutableStateOf(0) }
+    var editingRole by remember { mutableStateOf<WidgetColorRole?>(null) }
+    val palette = remember(revision, SugarliciousColors.palette.isLight) { WidgetColorStore.load(context) }
+
+    fun refreshWidgets() {
+        revision++
+        scope.launch { SugarliciousWidgets.update(context.applicationContext) }
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(SugarliciousColors.Surface, RoundedCornerShape(24.dp))
+            .border(1.dp, SugarliciousColors.Border, RoundedCornerShape(24.dp))
+            .padding(14.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Text("GLUKOSEWIDGET", color = SugarliciousColors.TextSecondary, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+        Text("Farben", color = SugarliciousColors.TextPrimary, fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
+        Text(
+            "Die Farben werden als eigene Kopie gespeichert und ändern sich danach unabhängig vom mobilen Graphen.",
+            color = SugarliciousColors.TextSecondary,
+            fontSize = 10.sp,
+        )
+        Button(
+            onClick = {
+                WidgetColorStore.copyFromMobileGraph(context)
+                refreshWidgets()
+            },
+            modifier = Modifier.fillMaxWidth(),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = SugarliciousColors.Primary,
+                contentColor = SugarliciousColors.OnPrimary,
+            ),
+        ) {
+            Text("AUS MOBILE-GRAPH ÜBERNEHMEN", fontSize = 10.sp, fontWeight = FontWeight.Bold)
+        }
+        TextButton(
+            onClick = {
+                WidgetColorStore.resetAll(context)
+                refreshWidgets()
+            },
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Text("WIDGET-FARBEN ZURÜCKSETZEN", color = SugarliciousColors.Primary, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+        }
+        WidgetColorRole.entries.forEach { role ->
+            WidgetColorSettingRow(
+                role = role,
+                argb = palette.argb(role),
+                isDefault = !WidgetColorStore.hasOverride(context, role),
+                onEdit = { editingRole = role },
+                onReset = {
+                    WidgetColorStore.reset(context, role)
+                    refreshWidgets()
+                },
+            )
+        }
+    }
+
+    editingRole?.let { role ->
+        ColorEditorDialog(
+            role = null,
+            label = "Widget: ${role.label}",
+            initialArgb = palette.argb(role),
+            onDismiss = { editingRole = null },
+            onSave = { argb ->
+                WidgetColorStore.save(context, role, argb)
+                editingRole = null
+                refreshWidgets()
+            },
+        )
+    }
+}
+
+@Composable
+private fun WidgetColorSettingRow(
+    role: WidgetColorRole,
+    argb: Int,
+    isDefault: Boolean,
+    onEdit: () -> Unit,
+    onReset: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(SugarliciousColors.SurfaceHigh, RoundedCornerShape(16.dp))
+            .clickable(onClick = onEdit)
+            .padding(horizontal = 11.dp, vertical = 9.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            modifier = Modifier
+                .size(28.dp)
+                .background(Color(argb), CircleShape)
+                .border(1.dp, SugarliciousColors.Border, CircleShape),
+        )
+        Spacer(Modifier.width(9.dp))
+        Column(Modifier.weight(1f)) {
+            Text(role.label, color = SugarliciousColors.TextPrimary, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+            Text(toHex(argb), color = SugarliciousColors.TextSecondary, fontSize = 9.sp)
+        }
+        if (!isDefault) {
+            TextButton(onClick = onReset) {
+                Text("RESET", color = SugarliciousColors.Primary, fontSize = 8.sp, fontWeight = FontWeight.Bold)
+            }
+        }
     }
 }
 
@@ -343,7 +458,7 @@ private fun GraphSettingSwitch(
 }
 
 @Composable
-private fun GraphSettingSlider(
+internal fun SugarliciousSettingSlider(
     title: String,
     description: String,
     value: Float,
@@ -806,7 +921,8 @@ private fun ColorRoleExample(
 
 @Composable
 private fun ColorEditorDialog(
-    role: SugarliciousColorRole,
+    role: SugarliciousColorRole?,
+    label: String,
     initialArgb: Int,
     onDismiss: () -> Unit,
     onSave: (Int) -> Unit,
@@ -837,7 +953,7 @@ private fun ColorEditorDialog(
         onDismissRequest = onDismiss,
         title = {
             Text(
-                role.label,
+                label,
                 color = SugarliciousColors.TextPrimary,
             )
         },
@@ -845,13 +961,23 @@ private fun ColorEditorDialog(
             Column(
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                ColorRoleExample(
-                    role = role,
-                    argb = currentArgb(),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(62.dp),
-                )
+                if (role != null) {
+                    ColorRoleExample(
+                        role = role,
+                        argb = currentArgb(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(62.dp),
+                    )
+                } else {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(62.dp)
+                            .background(Color(currentArgb()), RoundedCornerShape(12.dp))
+                            .border(1.dp, SugarliciousColors.Border, RoundedCornerShape(12.dp)),
+                    )
+                }
 
                 OutlinedTextField(
                     value = hex,
@@ -1115,7 +1241,7 @@ internal fun NotificationGraphSettingsPanel() {
         ) {
             Text("MIT MOBILE SYNCHRONISIEREN", fontSize = 10.sp, fontWeight = FontWeight.Bold)
         }
-        GraphSettingSlider(
+        SugarliciousSettingSlider(
             "Punktgröße", "Nur die CGM-Dots in der Notification", dotRadius, 1.5f..6f,
             "${String.format(locale, "%.1f", dotRadius)} dp",
             { dotRadius = it },
@@ -1126,7 +1252,7 @@ internal fun NotificationGraphSettingsPanel() {
             preferences.edit().putBoolean(PersistentBridgeService.PREFERENCE_NOTIFICATION_DOT_OUTLINE_ENABLED, it).apply()
         }
         if (outlineEnabled) {
-            GraphSettingSlider(
+            SugarliciousSettingSlider(
                 "Konturdicke", "Nur für Notification-CGM-Dots", outlineWidth, 0.25f..3f,
                 "${String.format(locale, "%.2f", outlineWidth)} dp",
                 { outlineWidth = it },
@@ -1149,6 +1275,7 @@ internal fun NotificationGraphSettingsPanel() {
     editingRole?.let { role ->
         ColorEditorDialog(
             role = role,
+            label = role.label,
             initialArgb = resolved(role),
             onDismiss = { editingRole = null },
             onSave = { argb ->

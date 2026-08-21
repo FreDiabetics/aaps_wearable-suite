@@ -6,6 +6,7 @@ import android.graphics.Canvas
 import android.graphics.DashPathEffect
 import android.graphics.Outline
 import android.graphics.Paint
+import android.graphics.Path
 import android.graphics.Typeface
 import android.util.AttributeSet
 import android.util.TypedValue
@@ -17,6 +18,7 @@ import app.aapswear.model.CgmQuality
 import app.aapswear.model.GlucosePrediction
 import app.aapswear.model.GlucoseSample
 import app.aapswear.model.Freshness
+import app.aapswear.model.TargetStepTimeline
 import app.aapswear.model.PredictionKind
 import app.aapswear.model.RangeExcursion
 import app.aapswear.model.TherapyDisplayFormatter
@@ -353,10 +355,15 @@ class WearGlucoseChart @JvmOverloads constructor(
         linePaint.color = colors.targetValue
         linePaint.strokeWidth = 1.4f.dp
         linePaint.pathEffect = DashPathEffect(floatArrayOf(4f.dp, 3f.dp), 0f)
-        targetSegments.forEach { segment ->
-            val from = segment.startedAtEpochMs.coerceIn(start, end)
-            val to = segment.endsAtEpochMs.coerceIn(from, end)
-            canvas.drawLine(xFor(from), yFor(segment.valueMgDl), xFor(to), yFor(segment.valueMgDl), linePaint)
+        TargetStepTimeline.build(targetSegments, start, end).forEach { points ->
+            val path = Path().apply {
+                points.forEachIndexed { index, (time, value) ->
+                    val x = xFor(time)
+                    val y = yFor(value)
+                    if (index == 0) moveTo(x, y) else lineTo(x, y)
+                }
+            }
+            canvas.drawPath(path, linePaint)
         }
         linePaint.pathEffect = null
 

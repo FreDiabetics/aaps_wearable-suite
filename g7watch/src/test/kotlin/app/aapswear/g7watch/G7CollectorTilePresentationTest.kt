@@ -35,12 +35,12 @@ class G7CollectorTilePresentationTest {
     @Test
     fun `extremes use words and full tile alarm colors without changing the reading`() {
         val low = g7TilePresentation(reading(40.0), colors, now)
-        assertTrue(low.value.startsWith("NIEDRIG"))
-        assertEquals(colors.rangeLow, low.background)
+        assertEquals("NIEDRIG", low.value)
+        assertEquals(EXTREME_LOW_BACKGROUND, low.background)
 
         val high = g7TilePresentation(reading(400.0), colors, now)
-        assertTrue(high.value.startsWith("HOCH"))
-        assertEquals(colors.rangeHigh, high.background)
+        assertEquals("HOCH", high.value)
+        assertEquals(EXTREME_HIGH_BACKGROUND, high.background)
         assertEquals(0xFF181818.toInt(), high.foreground)
     }
 
@@ -51,10 +51,20 @@ class G7CollectorTilePresentationTest {
             colors,
             now,
         )
-        assertEquals("123  ↗", presentation.value)
+        assertEquals("123", presentation.value)
+        assertEquals(Trend.FORTY_FIVE_UP, presentation.trend)
         assertTrue(presentation.meta.contains("+5"))
         assertTrue(presentation.meta.contains("mg/dL"))
         assertEquals("vor 2 min", presentation.age)
+    }
+
+    @Test
+    fun `normal tile foreground follows light and dark user backgrounds`() {
+        val light = g7TilePresentation(reading(123.0), colors.copy(graphBackground = 0xFFF4F6F8.toInt()), now)
+        val dark = g7TilePresentation(reading(123.0), colors.copy(graphBackground = 0xFF111318.toInt()), now)
+
+        assertEquals(0xFF181818.toInt(), light.foreground)
+        assertEquals(0xFFF5F5F5.toInt(), dark.foreground)
     }
 
     private fun reading(

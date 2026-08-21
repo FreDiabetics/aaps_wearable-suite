@@ -46,6 +46,38 @@ class CanonicalCgmHistoryTest {
         assertEquals(listOf(corrected), CanonicalCgmHistory.merge(listOf(first, corrected), now))
     }
 
+    @Test
+    fun `phone remains the historical winner while live resolver prefers watch`() {
+        val watch = sample(DataSourceId.DEXCOM_G7_WATCH, "sensor", "session", 8L, 121.0, now - 60_000L)
+        val phone = watch.copy(source = DataSourceId.ANDROID_APS, receivedAtEpochMs = now - 10_000L)
+
+        val merged = CanonicalCgmHistory.merge(
+            listOf(phone, watch.copy(receivedAtEpochMs = now)),
+            now,
+            preferredSource = DataSourceId.DEXCOM_G7_WATCH,
+        )
+
+        assertEquals(listOf(phone), merged)
+    }
+
+    @Test
+    fun `timestamp tolerant phone duplicate wins and distinct watch gap is retained`() {
+        val watchDuplicate = sample(DataSourceId.DEXCOM_G7_WATCH, "sensor", "session", null, 120.0, now - 61_000L)
+        val phone = watchDuplicate.copy(
+            source = DataSourceId.ANDROID_APS,
+            valueMgDl = 122.0,
+            measuredAtEpochMs = now - 60_000L,
+            receivedAtEpochMs = now - 20_000L,
+        )
+        val watchGap = watchDuplicate.copy(valueMgDl = 114.0, measuredAtEpochMs = now - 6 * 60_000L)
+
+        val merged = CanonicalCgmHistory.merge(listOf(watchDuplicate, watchGap, phone), now)
+
+        assertEquals(2, merged.size)
+        assertEquals(DataSourceId.DEXCOM_G7_WATCH, merged.first().source)
+        assertEquals(DataSourceId.ANDROID_APS, merged.last().source)
+    }
+
     private fun sample(
         source: DataSourceId,
         sensor: String,

@@ -8,6 +8,7 @@ import android.widget.TextView
 import androidx.test.core.app.ApplicationProvider
 import app.aapswear.mobile.ui.theme.SugarliciousColorRole
 import app.aapswear.mobile.ui.theme.SugarliciousColorStore
+import app.aapswear.mobile.ui.theme.derivedTargetValueArgb
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Assert.assertEquals
@@ -141,7 +142,7 @@ class MainActivityTest {
         val target = SugarliciousColorStore.load(preferences).argb(SugarliciousColorRole.TARGET_VALUE)
 
         assertEquals(255, Color.alpha(target))
-        assertEquals(0xFF252525.toInt(), target)
+        assertEquals(derivedTargetValueArgb(SugarliciousColorRole.RANGE_IN_RANGE.lightArgb), target)
     }
 
     @Test fun `cgm dot appearance settings are read from preferences`() {
@@ -188,7 +189,7 @@ class MainActivityTest {
         assertTrue(ui.showCgmGraph)
         assertTrue(ui.showDetails)
         assertTrue(ui.showCgmTargetRange)
-        assertFalse(ui.showCgmTargetValue)
+        assertTrue(ui.showCgmTargetValue)
         assertFalse(ui.showCgmBasal)
         assertFalse(ui.showCgmActivity)
         assertFalse(ui.anyCgmPredictionEnabled)
@@ -277,7 +278,7 @@ class MainActivityTest {
 
         var headers = categories()
         assertEquals(
-            listOf("general", "display", "cgm_graph", "notification", "data", "diagnostics"),
+            listOf("general", "display", "cgm_graph", "notification", "data", "diagnostics", "about"),
             headers.map { it.tag.toString().removePrefix("settings-category-") },
         )
         assertTrue(headers.all { contentAfter(it).visibility == View.GONE })

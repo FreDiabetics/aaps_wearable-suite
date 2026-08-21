@@ -52,12 +52,20 @@ object CanonicalCgmHistory {
         candidate: GlucoseSample,
         preferredSource: DataSourceId?,
     ): GlucoseSample = when {
+        // A phone-originated value is the canonical historical representation whenever the same
+        // real measurement also arrived through Watch Direct. The Watch copy remains persisted
+        // for offline gap filling, but must not produce a second dot or replace the Phone dot when
+        // the live resolver temporarily switches to WATCH_DIRECT.
+        existing.source.isPhoneHistorySource() && candidate.source == DataSourceId.DEXCOM_G7_WATCH -> existing
+        candidate.source.isPhoneHistorySource() && existing.source == DataSourceId.DEXCOM_G7_WATCH -> candidate
         existing.source == preferredSource && candidate.source != preferredSource -> existing
         candidate.source == preferredSource && existing.source != preferredSource -> candidate
         (candidate.receivedAtEpochMs ?: candidate.measuredAtEpochMs) >=
             (existing.receivedAtEpochMs ?: existing.measuredAtEpochMs) -> candidate
         else -> existing
     }
+
+    private fun DataSourceId.isPhoneHistorySource(): Boolean = this != DataSourceId.DEXCOM_G7_WATCH
 
     private fun GlucoseSample.sameMeasurement(other: GlucoseSample): Boolean {
         if (

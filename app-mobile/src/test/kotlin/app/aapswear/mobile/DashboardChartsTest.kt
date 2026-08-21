@@ -14,6 +14,7 @@ import app.aapswear.model.InsulinState
 import app.aapswear.model.PredictionKind
 import app.aapswear.model.RangeExcursion
 import app.aapswear.model.TargetState
+import app.aapswear.model.TargetSample
 import app.aapswear.model.TherapyDisplayState
 import app.aapswear.model.TherapyHistorySample
 import app.aapswear.mobile.ui.theme.SugarliciousColorRole
@@ -203,6 +204,74 @@ class DashboardChartsTest {
         assertTrue(Color.green(result) > Color.green(translucentGreen))
     }
 
+    @Test
+    fun `target history becomes one continuous step path with vertical transitions`() {
+        val paths = targetStepPaths(
+            samples = listOf(
+                TargetSample(100.0, 0L, 10_000L),
+                TargetSample(120.0, 10_000L, 20_000L),
+                TargetSample(95.0, 20_000L, 30_000L),
+            ),
+            start = 0L,
+            end = 30_000L,
+        )
+
+        assertEquals(
+            listOf(
+                listOf(
+                    0L to 100.0,
+                    10_000L to 100.0,
+                    10_000L to 120.0,
+                    20_000L to 120.0,
+                    20_000L to 95.0,
+                    30_000L to 95.0,
+                ),
+            ),
+            paths,
+        )
+    }
+
+    @Test
+    fun `missing target history remains a visible gap`() {
+        val paths = targetStepPaths(
+            samples = listOf(
+                TargetSample(100.0, 0L, 10_000L),
+                TargetSample(120.0, 200_000L, 300_000L),
+            ),
+            start = 0L,
+            end = 300_000L,
+        )
+
+        assertEquals(2, paths.size)
+    }
+
+    @Test
+    fun `temporary target returns to profile exactly at its explicit end`() {
+        val paths = targetStepPaths(
+            samples = listOf(
+                TargetSample(100.0, 0L, 10_000L, temporary = false),
+                TargetSample(150.0, 10_000L, 20_000L, temporary = true),
+                // The profile value is first observed two minutes later. The renderer must still
+                // connect at the authoritative temp-target end.
+                TargetSample(100.0, 140_000L, 300_000L, temporary = false),
+            ),
+            start = 0L,
+            end = 300_000L,
+        )
+
+        assertEquals(
+            listOf(
+                0L to 100.0,
+                10_000L to 100.0,
+                10_000L to 150.0,
+                20_000L to 150.0,
+                20_000L to 100.0,
+                300_000L to 100.0,
+            ),
+            paths.single(),
+        )
+    }
+
     @Test fun `metabolic chart renders independent iob and cob areas`() {
         val now = System.currentTimeMillis()
         val history = (0..5).map { index ->
@@ -321,6 +390,39 @@ class DashboardChartsTest {
         viewport.pan(-10_000f, 100f)
         assertEquals(0L, viewport.panMs)
         assertEquals(now + 60L * 60_000L, viewport.endEpochMs(now))
+    }
+
+    @Test
+    fun `viewport zoom out and pan stop at available history and absolute twenty four hours`() {
+        val viewport = ChartViewport(6)
+        viewport.setAvailablePastWindow(8L * 60L * 60_000L)
+        viewport.setHours(24f)
+        assertEquals(8f, viewport.hours, 0.0001f)
+
+        viewport.zoom(0.01f)
+        assertEquals(8f, viewport.hours, 0.0001f)
+        viewport.setHours(2f)
+        viewport.pan(100_000f, 100f)
+        assertEquals(-6L * 60L * 60_000L, viewport.panMs)
+
+        viewport.setAvailablePastWindow(30L * 60L * 60_000L)
+        viewport.setHours(30f)
+        assertEquals(24f, viewport.hours, 0.0001f)
+    }
+
+    @Test
+    fun `available graph window follows real canonical history`() {
+        val now = 50L * 60L * 60_000L
+        val state = TherapyDisplayState(
+            receivedAtEpochMs = now,
+            glucose = GlucoseState(120.0, GlucoseUnit.MG_DL, measuredAtEpochMs = now),
+            glucoseHistory = listOf(
+                GlucoseSample(110.0, now - 7L * 60L * 60_000L),
+                GlucoseSample(120.0, now),
+            ),
+        )
+
+        assertEquals(7L * 60L * 60_000L, availableGlucoseHistoryWindowMs(state, now))
     }
 
     private fun render(view: View, height: Int): Bitmap {

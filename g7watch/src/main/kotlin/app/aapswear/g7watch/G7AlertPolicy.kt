@@ -12,7 +12,9 @@ import app.aapswear.g7.G7SessionState
 import app.aapswear.model.DiagnosticSeverity
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeout
 
 internal object G7AlertPolicyStore {
     private const val PREFS = "g7_alert_policy"
@@ -117,36 +119,50 @@ internal object G7SignalLossMonitor {
 
 class G7SignalLossReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
-        val state = G7SensorStateStore(context).read()
-        if (!state.collectorEnabled) return
+        // State deserialization, alarm-channel creation and notification delivery may all touch
+        // disk or system services. A BroadcastReceiver only has a few seconds on its main thread;
+        // keeping the complete signal-loss path behind goAsync avoids ANRs that would kill the
+        // collector process precisely while it is waiting for the next sensor advertisement.
+        val app = context.applicationContext
+        val pending = goAsync()
+        CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
+            try {
+                withTimeout(8_000L) {
+                    val state = G7SensorStateStore(app).read()
+                    if (!state.collectorEnabled) return@withTimeout
 
-        val lastReadingAt = state.lastReading?.timestampEpochMs
-        val now = System.currentTimeMillis()
-        if (!isG7SignalLoss(lastReadingAt, now)) {
-            G7SignalLossMonitor.scheduleFromState(context, state)
-            return
-        }
+                    val lastReadingAt = state.lastReading?.timestampEpochMs
+                    val now = System.currentTimeMillis()
+                    if (!isG7SignalLoss(lastReadingAt, now)) {
+                        G7SignalLossMonitor.scheduleFromState(app, state)
+                        return@withTimeout
+                    }
 
-        if (!G7AlertPolicyStore.alarmsEnabled(context)) {
-            G7AlertPolicyStore.nextAutomaticEnableAt(context, now)?.let { enableAt ->
-                G7SignalLossMonitor.schedulePolicyRecheck(context, enableAt)
-            }
-            val pending = goAsync()
-            CoroutineScope(Dispatchers.IO).launch {
-                try {
-                    context.applicationContext.recordG7Diagnostic(
-                        code = "G7-SIGNAL-LOSS-SUPPRESSED",
-                        message = "Direct G7 signal loss suppressed because another canonical source is active",
-                        severity = DiagnosticSeverity.INFO,
-                        metadata = mapOf("lastReadingEpochMs" to lastReadingAt),
-                    )
-                } finally {
-                    pending.finish()
+                    if (!G7AlertPolicyStore.alarmsEnabled(app)) {
+                        G7AlertPolicyStore.nextAutomaticEnableAt(app, now)?.let { enableAt ->
+                            G7SignalLossMonitor.schedulePolicyRecheck(app, enableAt)
+                        }
+                        app.recordG7Diagnostic(
+                            code = "G7-SIGNAL-LOSS-SUPPRESSED",
+                            message = "Direct G7 signal loss suppressed because another canonical source is active",
+                            severity = DiagnosticSeverity.INFO,
+                            metadata = mapOf("lastReadingEpochMs" to lastReadingAt),
+                        )
+                        return@withTimeout
+                    }
+
+                    G7CgmAlarmCoordinator.onSignalLoss(app, state.lastReading, now)
                 }
+            } catch (error: Throwable) {
+                app.recordG7Diagnostic(
+                    code = "G7-SIGNAL-LOSS-500",
+                    message = "Asynchronous signal-loss evaluation failed",
+                    severity = DiagnosticSeverity.ERROR,
+                    metadata = mapOf("errorType" to error.javaClass.simpleName.take(40)),
+                )
+            } finally {
+                pending.finish()
             }
-            return
         }
-
-        G7CgmAlarmCoordinator.onSignalLoss(context, state.lastReading, now)
     }
 }
