@@ -6,6 +6,8 @@ import app.aapswear.model.DataSourceId
 import app.aapswear.model.Trend
 import app.aapswear.protocol.WatchGraphColors
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -16,55 +18,96 @@ class G7CollectorTilePresentationTest {
         rangeLow = 0xFFAA0000.toInt(),
         rangeHigh = 0xFFCCAA00.toInt(),
         cgmLow = 0xFFFF0000.toInt(),
+        cgmHigh = 0xFFFFCC00.toInt(),
     )
 
     @Test
-    fun `no data and stale states are explicit`() {
-        assertEquals("NO_DATA", g7TilePresentation(null, colors, now).meta)
+    fun `no data stale invalid and sensor errors keep neutral glucose card`() {
+        val noData = g7TilePresentation(null, colors, now)
+        assertEquals(G7_TILE_CARD_BACKGROUND, noData.cardBackground)
+        assertNull(noData.trend)
+
         val stale = g7TilePresentation(reading(120.0, now - G7_SIGNAL_LOSS_AFTER_MS), colors, now)
-        assertEquals("STALE", stale.meta)
         assertEquals("—", stale.value)
-        val delayedBeyondDisplayLimit = g7TilePresentation(reading(120.0, now - 13 * 60_000L), colors, now)
-        assertEquals("STALE", delayedBeyondDisplayLimit.meta)
+        assertEquals(G7_TILE_CARD_BACKGROUND, stale.cardBackground)
+        assertNull(stale.trend)
+
         val invalid = g7TilePresentation(reading(120.0, status = CgmReadingStatus.INVALID), colors, now)
-        assertEquals("NO_DATA", invalid.meta)
+        assertEquals("—", invalid.value)
+        assertEquals(G7_TILE_CARD_BACKGROUND, invalid.cardBackground)
+
         val sensorError = g7TilePresentation(reading(0.0, status = CgmReadingStatus.SENSOR_ERROR), colors, now)
-        assertEquals("SENSORFEHLER", sensorError.meta)
+        assertEquals("—", sensorError.value)
+        assertEquals(G7_TILE_CARD_BACKGROUND, sensorError.cardBackground)
     }
 
     @Test
-    fun `extremes use words and full tile alarm colors without changing the reading`() {
-        val low = g7TilePresentation(reading(40.0), colors, now)
-        assertEquals("NIEDRIG", low.value)
-        assertEquals(EXTREME_LOW_BACKGROUND, low.background)
+    fun `only glucose card changes color outside target range`() {
+        val low = g7TilePresentation(reading(79.0), colors, now)
+        val normal = g7TilePresentation(reading(123.0), colors, now)
+        val high = g7TilePresentation(reading(161.0), colors, now)
 
-        val high = g7TilePresentation(reading(400.0), colors, now)
-        assertEquals("HOCH", high.value)
-        assertEquals(EXTREME_HIGH_BACKGROUND, high.background)
-        assertEquals(0xFF181818.toInt(), high.foreground)
+        assertEquals(colors.cgmLow, low.cardBackground)
+        assertEquals(G7_TILE_CARD_BACKGROUND, normal.cardBackground)
+        assertEquals(colors.cgmHigh, high.cardBackground)
+        assertEquals(G7_TILE_BACKGROUND, 0xFF181818.toInt())
+        assertEquals(G7_TILE_CARD_BORDER, 0xFF404040.toInt())
     }
 
     @Test
-    fun `normal tile shows trend delta unit and age`() {
+    fun `normal tile shows vector trend delta and age without glucose unit text`() {
         val presentation = g7TilePresentation(
             reading(123.0, now - 2 * 60_000L, delta = 5.0, trend = Trend.FORTY_FIVE_UP),
             colors,
             now,
         )
+
         assertEquals("123", presentation.value)
         assertEquals(Trend.FORTY_FIVE_UP, presentation.trend)
         assertTrue(presentation.meta.contains("+5"))
-        assertTrue(presentation.meta.contains("mg/dL"))
-        assertEquals("vor 2 min", presentation.age)
+        assertTrue(presentation.meta.contains("vor 2 min"))
+        assertFalse(presentation.meta.contains("mg/dL"))
     }
 
     @Test
-    fun `normal tile foreground follows light and dark user backgrounds`() {
-        val light = g7TilePresentation(reading(123.0), colors.copy(graphBackground = 0xFFF4F6F8.toInt()), now)
-        val dark = g7TilePresentation(reading(123.0), colors.copy(graphBackground = 0xFF111318.toInt()), now)
+    fun `unknown trend never invents a tile arrow`() {
+        val presentation = g7TilePresentation(reading(123.0, trend = Trend.UNKNOWN), colors, now)
+        assertNull(presentation.trend)
+    }
 
-        assertEquals(0xFF181818.toInt(), light.foreground)
-        assertEquals(0xFFF5F5F5.toInt(), dark.foreground)
+    @Test
+    fun `collector ok and working status use Sugarlicious green pill`() {
+        val ok = g7TileStatusPresentation(
+            G7UserStatus(
+                level = G7UserStatusLevel.OK,
+                title = "Verbunden",
+                phase = "Bereit",
+                status = "Aktiv",
+                description = "ok",
+                action = "none",
+            ),
+        )
+        val working = g7TileStatusPresentation(
+            G7UserStatus(
+                level = G7UserStatusLevel.WORKING,
+                title = "Verbindung wird aufgebaut",
+                phase = "Verbinden",
+                status = "Aktiv",
+                description = "working",
+                action = "none",
+            ),
+        )
+
+        assertEquals("VERBUNDEN", ok.label)
+        assertEquals(G7_TILE_ACCENT, ok.color)
+        assertEquals(G7_TILE_ACCENT, working.color)
+        assertEquals(0x246DE892, withTileAlpha(G7_TILE_ACCENT, 36))
+    }
+
+    @Test
+    fun `card foreground follows light and dark alarm backgrounds`() {
+        assertEquals(G7_TILE_TEXT_DARK, tileForegroundFor(0xFFFFD040.toInt()))
+        assertEquals(G7_TILE_TEXT_PRIMARY, tileForegroundFor(0xFF242424.toInt()))
     }
 
     private fun reading(
