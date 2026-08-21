@@ -10,9 +10,13 @@ import app.aapswear.model.GlucoseSample
 import app.aapswear.model.GlucoseState
 import app.aapswear.model.GlucoseUnit
 import app.aapswear.model.TherapyDisplayState
+import app.aapswear.storage.PhoneTherapyStateStore
+import app.aapswear.storage.TherapyStateStore
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -23,71 +27,100 @@ import org.robolectric.annotation.Config
 @Config(sdk = [35])
 class MobileCanonicalCgmTest {
     @Test
-    fun `Watch backfill survives recreation deduplicates and drives canonical recovery`() = runBlocking {
+    fun `direct Watch G7 backfill is discarded on Mobile`() = runBlocking {
         val context = ApplicationProvider.getApplicationContext<Context>()
-        context.getSharedPreferences("dashboard_ui", Context.MODE_PRIVATE).edit().clear().commit()
-        context.getSharedPreferences("mobile_canonical_cgm_resolver", Context.MODE_PRIVATE).edit().clear().commit()
         val now = System.currentTimeMillis()
-        val prefix = "backfill-${now}-"
-        val first = reading(prefix + "first", "sensor-a", "session-a", 1L, 111.0, now - 20 * 60_000L)
-        val sameIdentity = first.copy(id = prefix + "same-sequence", glucoseMgDl = 112.0)
-        val outOfOrder = reading(prefix + "out-of-order", "sensor-a", "session-a", 3L, 115.0, now - 15 * 60_000L)
-        val second = reading(prefix + "second", "sensor-a", "session-a", 2L, 114.0, now - 10 * 60_000L)
-        val otherSession = reading(prefix + "other-session", "sensor-a", "session-b", 1L, 119.0, now - 5 * 60_000L)
-        val latest = reading(prefix + "latest", "sensor-b", "session-c", 7L, 121.0, now - 60_000L)
-        val invalidStatus = reading(prefix + "invalid", "sensor-a", "session-a", 4L, 118.0, now).copy(status = CgmReadingStatus.INVALID)
-        val wrongSource = reading(prefix + "phone", "sensor-a", "session-a", 5L, 120.0, now).copy(source = DataSourceId.ANDROID_APS)
-        val future = reading(prefix + "future", "sensor-a", "session-a", 6L, 120.0, now + 10 * 60_000L)
+        val watch = reading("watch-$now", now - 60_000L)
 
-        val accepted = MobileG7BackfillStore(context).merge(
-            listOf(first, first, sameIdentity, second, outOfOrder, otherSession, latest, invalidStatus, wrongSource, future),
-            now,
+        val accepted = MobileG7BackfillStore(context).merge(listOf(watch), now)
+
+        assertTrue(accepted.isEmpty())
+        assertTrue(MobileG7BackfillStore(context).snapshot().isEmpty())
+    }
+
+    @Test
+    fun `Mobile canonical resolver remains phone only even when phone is stale or sensor error`() = runBlocking {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        context.getSharedPreferences("mobile_watch_cgm_migration", Context.MODE_PRIVATE).edit().clear().commit()
+        val now = System.currentTimeMillis()
+        val stalePhone = phoneState(now, now - 30 * 60_000L)
+
+        val staleResolved = MobileCanonicalCgmResolver.resolve(context, stalePhone, now)!!
+        assertEquals(DataSourceId.ANDROID_APS, staleResolved.source)
+        assertEquals(stalePhone.glucose?.measuredAtEpochMs, staleResolved.glucose?.measuredAtEpochMs)
+        assertFalse(staleResolved.glucoseHistory.any { it.source == DataSourceId.DEXCOM_G7_WATCH })
+
+        val sensorError = stalePhone.copy(
+            glucose = stalePhone.glucose?.copy(quality = CgmQuality.SENSOR_ERROR),
         )
+        val errorResolved = MobileCanonicalCgmResolver.resolve(context, sensorError, now)!!
+        assertEquals(DataSourceId.ANDROID_APS, errorResolved.source)
+        assertEquals(CgmQuality.SENSOR_ERROR, errorResolved.glucose?.quality)
+    }
 
-        assertTrue(first.id in accepted)
-        assertTrue(sameIdentity.id in accepted)
-        assertFalse(invalidStatus.id in accepted)
-        assertFalse(wrongSource.id in accepted)
-        assertFalse(future.id in accepted)
-
-        val restored = MobileG7BackfillStore(context).snapshot().filter { it.id.startsWith(prefix) }
-        assertEquals(5, restored.size)
-        assertEquals(restored.sortedBy(CgmReading::timestampEpochMs), restored)
-        assertEquals(1, restored.count { it.sensorId == "sensor-a" && it.sessionId == "session-a" && it.sequenceNumber == 1L })
-        assertEquals(2, restored.count { it.sequenceNumber == 1L })
-
-        val stalePhone = phoneState(
-            now = now,
-            measuredAt = now - 16 * 60_000L,
-            history = listOf(first.toPhoneSample()),
+    @Test
+    fun `migration removes persisted Watch current and history but keeps phone CGM`() = runBlocking {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        context.getSharedPreferences("mobile_watch_cgm_migration", Context.MODE_PRIVATE).edit().clear().commit()
+        val now = System.currentTimeMillis()
+        val phone = phoneState(
+            now,
+            now - 30_000L,
+            history = listOf(
+                GlucoseSample(120.0, now - 5 * 60_000L, source = DataSourceId.ANDROID_APS),
+            ),
         )
-        val watchDirect = MobileCanonicalCgmResolver.resolve(context, stalePhone, now)!!
-        assertEquals(DataSourceId.DEXCOM_G7_WATCH, watchDirect.source)
-        assertEquals("sensor-b", watchDirect.glucose?.sensorId)
-        assertEquals("session-c", watchDirect.glucose?.sessionId)
-        assertEquals(7L, watchDirect.glucose?.sequenceNumber)
-        assertEquals(1, watchDirect.glucoseHistory.count { it.sensorId == first.sensorId && it.sessionId == first.sessionId && it.sequenceNumber == first.sequenceNumber })
-        assertEquals(DataSourceId.ANDROID_APS, watchDirect.glucoseHistory.single { it.sensorId == first.sensorId && it.sessionId == first.sessionId && it.sequenceNumber == first.sequenceNumber }.source)
+        val watchState = TherapyDisplayState(
+            source = DataSourceId.DEXCOM_G7_WATCH,
+            sourceVersion = "G7 Watch Collector",
+            receivedAtEpochMs = now,
+            glucose = GlucoseState(
+                valueMgDl = 124.0,
+                displayUnit = GlucoseUnit.MG_DL,
+                measuredAtEpochMs = now - 60_000L,
+                source = DataSourceId.DEXCOM_G7_WATCH,
+                receivedAtEpochMs = now,
+            ),
+            glucoseHistory = listOf(
+                GlucoseSample(118.0, now - 10 * 60_000L, source = DataSourceId.ANDROID_APS),
+                GlucoseSample(124.0, now - 60_000L, source = DataSourceId.DEXCOM_G7_WATCH),
+            ),
+        )
+        PhoneTherapyStateStore(context).save(phone)
+        TherapyStateStore(context).save(watchState)
 
-        val firstRecovery = MobileCanonicalCgmResolver.resolve(
-            context,
-            phoneState(now, now - 30_000L),
-            now,
-        )!!
-        assertEquals(DataSourceId.DEXCOM_G7_WATCH, firstRecovery.source)
-        val recovered = MobileCanonicalCgmResolver.resolve(
-            context,
-            phoneState(now, now - 10_000L),
-            now,
-        )!!
-        assertEquals(DataSourceId.ANDROID_APS, recovered.source)
+        assertTrue(MobileWatchCgmMigration.runOnce(context))
+        val migrated = TherapyStateStore(context).state.first()!!
 
-        val invalidPhone =
-            phoneState(now, now).copy(
-                glucose = phoneState(now, now).glucose?.copy(quality = CgmQuality.SENSOR_ERROR),
-            )
-        val invalidPhoneResult = MobileCanonicalCgmResolver.resolve(context, invalidPhone, now)!!
-        assertEquals(DataSourceId.DEXCOM_G7_WATCH, invalidPhoneResult.source)
+        assertEquals(DataSourceId.ANDROID_APS, migrated.source)
+        assertEquals(phone.glucose?.measuredAtEpochMs, migrated.glucose?.measuredAtEpochMs)
+        assertFalse(migrated.glucoseHistory.any { it.source == DataSourceId.DEXCOM_G7_WATCH })
+        assertFalse(MobileWatchCgmMigration.runOnce(context))
+    }
+
+    @Test
+    fun `sanitizing Watch-only state produces explicit no current glucose without inventing fallback`() {
+        val now = System.currentTimeMillis()
+        val sanitized = TherapyDisplayState(
+            source = DataSourceId.DEXCOM_G7_WATCH,
+            sourceVersion = "G7 Watch Collector",
+            receivedAtEpochMs = now,
+            glucose = GlucoseState(
+                valueMgDl = 111.0,
+                displayUnit = GlucoseUnit.MG_DL,
+                measuredAtEpochMs = now - 60_000L,
+                source = DataSourceId.DEXCOM_G7_WATCH,
+                receivedAtEpochMs = now,
+            ),
+            glucoseHistory = listOf(
+                GlucoseSample(109.0, now - 6 * 60_000L, source = DataSourceId.DEXCOM_G7_WATCH),
+            ),
+        ).withoutDirectWatchCgm()
+
+        assertEquals(DataSourceId.OTHER, sanitized.source)
+        assertNull(sanitized.glucose)
+        assertTrue(sanitized.glucoseHistory.isEmpty())
+        assertEquals("MOBILE_PHONE_ONLY:NO_WATCH_CGM", sanitized.sourceContract)
     }
 
     private fun phoneState(
@@ -107,32 +140,15 @@ class MobileCanonicalCgmTest {
         glucoseHistory = history,
     )
 
-    private fun reading(
-        id: String,
-        sensor: String,
-        session: String,
-        sequence: Long,
-        value: Double,
-        timestamp: Long,
-    ) = CgmReading(
+    private fun reading(id: String, timestamp: Long) = CgmReading(
         id = id,
         source = DataSourceId.DEXCOM_G7_WATCH,
-        sensorId = sensor,
-        sessionId = session,
-        glucoseMgDl = value,
+        sensorId = "sensor-a",
+        sessionId = "session-a",
+        glucoseMgDl = 121.0,
         timestampEpochMs = timestamp,
         receivedAtEpochMs = timestamp + 1_000L,
         status = CgmReadingStatus.VALID,
-        sequenceNumber = sequence,
-    )
-
-    private fun CgmReading.toPhoneSample() = GlucoseSample(
-        valueMgDl = glucoseMgDl,
-        measuredAtEpochMs = timestampEpochMs,
-        source = DataSourceId.ANDROID_APS,
-        sensorId = sensorId,
-        sessionId = sessionId,
-        sequenceNumber = sequenceNumber,
-        receivedAtEpochMs = receivedAtEpochMs + 1L,
+        sequenceNumber = 7L,
     )
 }
