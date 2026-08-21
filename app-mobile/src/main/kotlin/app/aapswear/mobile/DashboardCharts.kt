@@ -2,6 +2,7 @@ package app.aapswear.mobile
 
 import android.annotation.SuppressLint
 import android.content.Context
+import android.content.SharedPreferences
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.DashPathEffect
@@ -53,6 +54,8 @@ private const val GLUCOSE_LOW_RATIO = 0.215
 private const val GLUCOSE_TARGET_HIGH_RATIO = 0.515
 private const val GLUCOSE_DISPLAY_MAX = 400.0
 private const val TOOLKIT_ACTIVITY_SCALE_FACTOR = 1.15
+private const val OVERVIEW_GRAPH_HOURS_MIGRATION = "graphHoursDefault24MigratedV4"
+
 internal fun sustainedRangeExcursion(
     samples: List<GlucoseSample>,
     lowMgDl: Double,
@@ -70,10 +73,43 @@ internal fun availableGlucoseHistoryWindowMs(state: TherapyDisplayState?, nowEpo
     return (nowEpochMs - earliest).coerceIn(0L, 24L * HOUR_MS)
 }
 
+internal fun resolveOverviewGraphHoursPreference(
+    preferences: SharedPreferences,
+    durationHours: Int,
+): Int {
+    val normalized = durationHours.takeIf { it in listOf(3, 6, 12, 24) } ?: 24
+    if (preferences.getBoolean(OVERVIEW_GRAPH_HOURS_MIGRATION, false)) return normalized
+
+    val legacyForcedThreeHours =
+        preferences.getBoolean("graphHoursDefault3Migrated", false) &&
+            preferences.getInt("graphHours", normalized) == 3
+    val resolved = if (!preferences.contains("graphHours") || legacyForcedThreeHours) 24 else normalized
+    preferences.edit()
+        .putInt("graphHours", resolved)
+        .putBoolean(OVERVIEW_GRAPH_HOURS_MIGRATION, true)
+        .apply()
+    return resolved
+}
+
+internal fun graphCenterBeforeDivider(
+    dividerX: Float,
+    radiusPx: Float,
+    outlineWidthPx: Float,
+    safetyPx: Float,
+): Float = dividerX - radiusPx - outlineWidthPx / 2f - safetyPx
+
+internal fun graphCenterAfterDivider(
+    dividerX: Float,
+    radiusPx: Float,
+    outlineWidthPx: Float,
+    safetyPx: Float,
+): Float = dividerX + radiusPx + outlineWidthPx / 2f + safetyPx
+
 internal class ChartViewport(initialHours: Int) {
     private val listeners = LinkedHashSet<() -> Unit>()
     private var availablePastWindowMs = 24L * HOUR_MS
-    var hours = initialHours.toFloat().coerceIn(1f, 24f)
+    private var requestedHours = initialHours.toFloat().coerceIn(1f, 24f)
+    var hours = requestedHours
         private set
     var panMs = 0L
         private set
@@ -81,7 +117,8 @@ internal class ChartViewport(initialHours: Int) {
         private set
 
     fun setHours(value: Float, resetPan: Boolean = false) {
-        val next = value.coerceIn(1f, maximumHours())
+        requestedHours = value.coerceIn(1f, 24f)
+        val next = requestedHours.coerceAtMost(maximumHours())
         val changed = next != hours || (resetPan && panMs != 0L)
         hours = next
         if (resetPan) panMs = 0L
@@ -93,7 +130,7 @@ internal class ChartViewport(initialHours: Int) {
         val next = valueMs.coerceIn(0L, 2L * HOUR_MS)
         if (next == futureWindowMs) return
         futureWindowMs = next
-        hours = hours.coerceAtMost(maximumHours())
+        hours = requestedHours.coerceAtMost(maximumHours())
         clampPan()
         notifyChanged()
     }
@@ -102,7 +139,7 @@ internal class ChartViewport(initialHours: Int) {
         val next = valueMs.coerceIn(0L, 24L * HOUR_MS)
         if (next == availablePastWindowMs) return
         availablePastWindowMs = next
-        hours = hours.coerceAtMost(maximumHours())
+        hours = requestedHours.coerceAtMost(maximumHours())
         clampPan()
         notifyChanged()
     }
@@ -111,7 +148,8 @@ internal class ChartViewport(initialHours: Int) {
 
     fun zoom(scaleFactor: Float) {
         val oldHours = hours
-        hours = (hours / scaleFactor.coerceAtLeast(0.05f)).coerceIn(1f, maximumHours())
+        requestedHours = (hours / scaleFactor.coerceAtLeast(0.05f)).coerceIn(1f, 24f)
+        hours = requestedHours.coerceAtMost(maximumHours())
         clampPan()
         if (hours != oldHours) notifyChanged()
     }
@@ -244,6 +282,7 @@ internal class GlucoseDashboardChart @JvmOverloads constructor(
     private var predictionDotOutlineWidthDp = 0.70f
     private var stateSignature: List<Any?>? = null
     private var clockBucket: Long = Long.MIN_VALUE
+    private var boundDurationHours: Int? = null
 
     fun bind(
         state: TherapyDisplayState?,
@@ -266,6 +305,7 @@ internal class GlucoseDashboardChart @JvmOverloads constructor(
         val resolvedRadius = cgmDotRadiusDp.coerceIn(1.5f, 6.0f)
         val resolvedOutlineWidth = cgmDotOutlineWidthDp.coerceIn(0.25f, 3.0f)
         val stylePreferences = context.getSharedPreferences("dashboard_ui", Context.MODE_PRIVATE)
+        val resolvedDurationHours = resolveOverviewGraphHoursPreference(stylePreferences, durationHours)
         val resolvedPredictionRadius = stylePreferences.getFloat("cgm.prediction.dotRadiusDp", 1.75f).coerceIn(1.0f, 6.0f)
         val resolvedPredictionOutlineWidth = stylePreferences.getFloat("cgm.prediction.dotOutlineWidthDp", 0.70f).coerceIn(0.0f, 3.0f)
         val resolvedClockBucket = clockEpochMs / CLOCK_REFRESH_MS
@@ -281,8 +321,10 @@ internal class GlucoseDashboardChart @JvmOverloads constructor(
                 if (showBasal || showActivity) add(it.therapyHistory)
             }
         }
+        val durationChanged = boundDurationHours != resolvedDurationHours
         val changed =
             stateSignature != newStateSignature ||
+                durationChanged ||
                 this.unit != unit ||
                 this.showPredictions != showPredictions ||
                 this.showTargetRange != showTargetRange ||
@@ -304,6 +346,7 @@ internal class GlucoseDashboardChart @JvmOverloads constructor(
 
         this.state = state
         stateSignature = newStateSignature
+        boundDurationHours = resolvedDurationHours
         this.unit = unit
         this.showPredictions = showPredictions
         this.showTargetRange = showTargetRange
@@ -321,7 +364,7 @@ internal class GlucoseDashboardChart @JvmOverloads constructor(
         this.predictionDotOutlineWidthDp = resolvedPredictionOutlineWidth
         clockBucket = resolvedClockBucket
 
-        if (!isAttachedToWindow) viewport.setHours(durationHours.toFloat())
+        if (durationChanged) viewport.setHours(resolvedDurationHours.toFloat(), resetPan = true)
         invalidate()
     }
 
@@ -495,16 +538,22 @@ internal class GlucoseDashboardChart @JvmOverloads constructor(
                 linePaint.pathEffect = null
             }
 
-            val historyRightEdge = if (futureLaneVisible) dividerX - 2f.dp else plot.right - 4f.dp
             history.forEachIndexed { index, point ->
-                val x = min(mapX(point.measuredAtEpochMs, start, end, plot), historyRightEdge)
+                val mappedX = mapX(point.measuredAtEpochMs, start, end, plot)
                 val y = mapGlucoseY(point.valueMgDl, plot)
                 val current = index == history.lastIndex
                 val dotRadius = (cgmDotRadiusDp + if (current) 0.1f else 0f).dp
+                val outlineWidth = if (cgmDotOutlineEnabled) cgmDotOutlineWidthDp.dp else 0f
+                val historyRightEdge =
+                    if (futureLaneVisible) {
+                        graphCenterBeforeDivider(dividerX, dotRadius, outlineWidth, 2f.dp)
+                    } else {
+                        plot.right - dotRadius - outlineWidth / 2f - 2f.dp
+                    }
+                val x = min(mappedX, historyRightEdge).coerceAtLeast(plot.left + dotRadius + outlineWidth / 2f)
                 fillPaint.color = dotColor(point.valueMgDl, targetLow, targetHigh)
                 canvas.drawCircle(x, y, dotRadius, fillPaint)
                 if (cgmDotOutlineEnabled) {
-                    val outlineWidth = cgmDotOutlineWidthDp.dp
                     dotOutlinePaint.color = SugarliciousColors.argb(SugarliciousColorRole.GRAPH_CURRENT_OUTLINE)
                     dotOutlinePaint.strokeWidth = outlineWidth
                     canvas.drawCircle(x, y, dotRadius + outlineWidth / 2f, dotOutlinePaint)
@@ -638,10 +687,12 @@ internal class GlucoseDashboardChart @JvmOverloads constructor(
         }
         val radius = predictionDotRadiusDp.dp
         val outlineWidth = predictionDotOutlineWidthDp.dp
+        val minimumPredictionCenter = graphCenterAfterDivider(anchorX, radius, outlineWidth, 2f.dp)
+        val maximumPredictionCenter = plot.right - radius - outlineWidth / 2f - 1f.dp
         series.samples.forEachIndexed { index, point ->
             val mappedX = mapX(point.measuredAtEpochMs, start, end, plot)
-            if (mappedX > plot.right) return@forEachIndexed
-            val x = if (index == 0) anchorX else mappedX.coerceAtLeast(anchorX)
+            val x = mappedX.coerceAtLeast(minimumPredictionCenter)
+            if (x > maximumPredictionCenter) return@forEachIndexed
             val y = if (index == 0 && anchorY != null) anchorY else mapGlucoseY(point.valueMgDl, plot)
             if (outlineWidth > 0f) {
                 dotOutlinePaint.color = SugarliciousColors.argb(SugarliciousColorRole.GRAPH_CURRENT_OUTLINE)
