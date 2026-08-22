@@ -9,6 +9,7 @@ import app.aapswear.model.Trend
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -99,6 +100,43 @@ class G7ReadingDatabaseTest {
         assertEquals(listOf(valid, newerValid), database.getUnsynced())
         assertEquals(sensorError, database.getLatest())
         assertEquals(newerValid, database.getLatestValid())
+    }
+
+    @Test
+    fun `temporal predecessor ignores future rows and other sessions`() = runBlocking {
+        val currentAt = 1_800_000L
+        val base =
+            CgmReading(
+                id = "previous",
+                source = DataSourceId.DEXCOM_G7_WATCH,
+                sensorId = "sensor-a",
+                sessionId = "session-a",
+                glucoseMgDl = 120.0,
+                timestampEpochMs = currentAt - 300_000L,
+                receivedAtEpochMs = currentAt - 299_000L,
+                status = CgmReadingStatus.VALID,
+            )
+        val older = base.copy(id = "older", timestampEpochMs = currentAt - 600_000L)
+        val future = base.copy(id = "future", timestampEpochMs = currentAt + 300_000L)
+        val otherSession =
+            base.copy(
+                id = "other-session",
+                sessionId = "session-b",
+                timestampEpochMs = currentAt - 60_000L,
+            )
+
+        database.insert(future)
+        database.insert(otherSession)
+        database.insert(older)
+        database.insert(base)
+
+        assertEquals(
+            base,
+            database.getLatestValidBefore("sensor-a", "session-a", currentAt),
+        )
+        assertNull(
+            database.getLatestValidBefore("sensor-a", "missing-session", currentAt),
+        )
     }
 
     private companion object {
