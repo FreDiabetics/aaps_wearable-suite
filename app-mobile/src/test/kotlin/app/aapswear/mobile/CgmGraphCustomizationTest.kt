@@ -18,6 +18,7 @@ import app.aapswear.model.PredictionKind
 import app.aapswear.model.TargetSample
 import app.aapswear.model.TargetState
 import app.aapswear.model.TherapyDisplayState
+import kotlin.math.abs
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -94,7 +95,8 @@ class CgmGraphCustomizationTest {
                 240,
             )
 
-            assertTrue("targetColorPixels=${count(bitmap) { it == targetColor }}", count(bitmap) { it == targetColor } > 40)
+            val targetPixels = countTargetLinePixels(bitmap, targetColor)
+            assertTrue("targetLinePixels=$targetPixels", targetPixels > 40)
         } finally {
             SugarliciousColors.apply(SugarliciousPalette.defaults())
         }
@@ -132,7 +134,8 @@ class CgmGraphCustomizationTest {
                 240,
             )
 
-            assertTrue("targetColorPixels=${count(bitmap) { it == targetColor }}", count(bitmap) { it == targetColor } > 40)
+            val targetPixels = countTargetLinePixels(bitmap, targetColor)
+            assertTrue("targetLinePixels=$targetPixels", targetPixels > 40)
         } finally {
             SugarliciousColors.apply(SugarliciousPalette.defaults())
         }
@@ -167,7 +170,7 @@ class CgmGraphCustomizationTest {
                 cgmDotOutlineEnabled = false,
                 clockEpochMs = now,
             )
-            assertEquals(0, count(render(chart, 240)) { it == targetColor })
+            assertEquals(0, countTargetLinePixels(render(chart, 240), targetColor))
 
             chart.bind(
                 state = base.copy(
@@ -188,7 +191,7 @@ class CgmGraphCustomizationTest {
                 clockEpochMs = now,
             )
 
-            assertTrue(count(render(chart, 240)) { it == targetColor } > 40)
+            assertTrue(countTargetLinePixels(render(chart, 240), targetColor) > 40)
         } finally {
             SugarliciousColors.apply(SugarliciousPalette.defaults())
         }
@@ -288,6 +291,27 @@ class CgmGraphCustomizationTest {
         view.layout(0, 0, size, size)
         view.draw(Canvas(bitmap))
         return bitmap
+    }
+
+    private fun countTargetLinePixels(bitmap: Bitmap, targetColor: Int): Int {
+        val background = SugarliciousColors.argb(SugarliciousColorRole.GRAPH_BACKGROUND)
+        val expected = blendOverBackground(targetColor, background, 190)
+        return count(bitmap) { pixel ->
+            abs(Color.red(pixel) - Color.red(expected)) <= 8 &&
+                abs(Color.green(pixel) - Color.green(expected)) <= 8 &&
+                abs(Color.blue(pixel) - Color.blue(expected)) <= 8
+        }
+    }
+
+    private fun blendOverBackground(foreground: Int, background: Int, alpha: Int): Int {
+        val inverse = 255 - alpha
+        fun channel(foregroundChannel: Int, backgroundChannel: Int): Int =
+            (foregroundChannel * alpha + backgroundChannel * inverse + 127) / 255
+        return Color.rgb(
+            channel(Color.red(foreground), Color.red(background)),
+            channel(Color.green(foreground), Color.green(background)),
+            channel(Color.blue(foreground), Color.blue(background)),
+        )
     }
 
     private fun count(bitmap: Bitmap, predicate: (Int) -> Boolean): Int {
