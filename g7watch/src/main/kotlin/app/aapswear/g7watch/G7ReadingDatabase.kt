@@ -85,6 +85,27 @@ internal class G7ReadingDatabase(context: Context) : SQLiteOpenHelper(context, "
             args = arrayOf(CgmReadingStatus.VALID.name),
             limit = 1,
         ).firstOrNull()
+
+    /**
+     * Returns the closest validated predecessor for one sensor/session stream. Delta/trend must
+     * never be derived from a future or out-of-order row that happened to be newest globally.
+     */
+    suspend fun getLatestValidBefore(
+        sensorId: String,
+        sessionId: String,
+        beforeEpochMs: Long,
+    ): CgmReading? =
+        query(
+            selection = "status=? AND sensor_id=? AND session_id=? AND measured_at<?",
+            args = arrayOf(
+                CgmReadingStatus.VALID.name,
+                sensorId,
+                sessionId,
+                beforeEpochMs.toString(),
+            ),
+            limit = 1,
+        ).firstOrNull()
+
     override suspend fun getPrevious(): CgmReading? = query(limit = 2).getOrNull(1)
     override suspend fun getRecent(sinceEpochMs: Long): List<CgmReading> = query("measured_at>=?", arrayOf(sinceEpochMs.toString()))
     override suspend fun getRange(fromEpochMs: Long, toEpochMs: Long): List<CgmReading> = query("measured_at BETWEEN ? AND ?", arrayOf(fromEpochMs.toString(), toEpochMs.toString()))
