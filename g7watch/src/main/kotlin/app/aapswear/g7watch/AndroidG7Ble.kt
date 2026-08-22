@@ -23,17 +23,19 @@ import app.aapswear.g7.G7ProtocolState
 import app.aapswear.g7.G7Reading
 import app.aapswear.g7.G7Scanner
 import app.aapswear.g7.G7Sensor
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withTimeout
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicInteger
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 
 internal const val G7_INITIAL_PAIRING_SCAN_TIMEOUT_MS = 30 * 60_000L
-internal const val G7_RECONNECT_SCAN_TIMEOUT_MS = 90_000L
+internal const val G7_RECONNECT_SCAN_TIMEOUT_MS = 60_000L
 internal const val G7_GATT_133_ERROR_CODE = "G7-GATT-133"
 
 internal fun g7ScanTimeoutMs(sensor: G7Sensor): Long =
@@ -93,17 +95,31 @@ internal class AndroidG7Scanner(
 
         return suspendCancellableCoroutine { continuation ->
             val finished = AtomicBoolean(false)
+            val totalResults = AtomicInteger(0)
+            val connectableResults = AtomicInteger(0)
+            val namedG7Results = AtomicInteger(0)
+            val exactAddressResults = AtomicInteger(0)
+            val handler = android.os.Handler(context.mainLooper)
+            var timeoutCallback: Runnable? = null
             lateinit var callback: ScanCallback
             fun finish(result: G7Sensor?, error: Throwable? = null) {
                 if (!finished.compareAndSet(false, true)) return
+                timeoutCallback?.let(handler::removeCallbacks)
+                timeoutCallback = null
                 runCatching { scanner.stopScan(callback) }
                 if (!continuation.isActive) return
                 if (error != null) continuation.resumeWithException(error) else continuation.resume(result)
             }
             callback = object : ScanCallback() {
                 override fun onScanResult(callbackType: Int, result: ScanResult) {
-                    if (!isConnectableG7Advertisement(result.isConnectable)) return
+                    totalResults.incrementAndGet()
                     val advertisedName = result.scanRecord?.deviceName
+                    if (isG7AdvertisedName(advertisedName)) namedG7Results.incrementAndGet()
+                    if (knownG7AddressMatches(sensor?.deviceAddress, result.device.address) == true) {
+                        exactAddressResults.incrementAndGet()
+                    }
+                    if (!isConnectableG7Advertisement(result.isConnectable)) return
+                    connectableResults.incrementAndGet()
                     if (!matcher.matches(result.device, advertisedName, sensor)) return
                     val name = advertisedName ?: runCatching { result.device.name }.getOrNull() ?: sensor?.deviceName
                     val sensorId = sensor?.sensorId ?: name ?: "Dexcom-G7"
@@ -133,13 +149,23 @@ internal class AndroidG7Scanner(
                     callback,
                 )
             }.onFailure { finish(null, G7BleException("G7-BLE-106", "Sensorsuche konnte nicht gestartet werden", true, it)) }
-            android.os.Handler(context.mainLooper).postDelayed(
-                { finish(null) },
-                timeoutMs.coerceIn(5_000L, G7_INITIAL_PAIRING_SCAN_TIMEOUT_MS),
-            )
-            continuation.invokeOnCancellation {
-                if (finished.compareAndSet(false, true)) runCatching { scanner.stopScan(callback) }
+            if (!finished.get()) {
+                timeoutCallback = Runnable {
+                    finish(
+                        null,
+                        G7BleException(
+                            "G7-BLE-107",
+                            "Kein sendender Dexcom-G7-Sensor gefunden · scan=${totalResults.get()} · connectable=${connectableResults.get()} · g7Name=${namedG7Results.get()} · exactAddress=${exactAddressResults.get()}",
+                            true,
+                        ),
+                    )
+                }
+                handler.postDelayed(
+                    requireNotNull(timeoutCallback),
+                    timeoutMs.coerceIn(5_000L, G7_INITIAL_PAIRING_SCAN_TIMEOUT_MS),
+                )
             }
+            continuation.invokeOnCancellation { finish(null) }
         }
     }
 
@@ -173,6 +199,7 @@ internal class AndroidG7Collector(
         credentials: StoredG7Credentials,
         onState: (G7ProtocolState) -> Unit,
         onSharedKey: (String, ByteArray) -> Unit = { _, _ -> },
+        scanTimeoutMsOverride: Long? = null,
     ): G7CollectionResult {
         var sensor = initialSensor
         var sharedKey = credentials.sharedKey?.takeIf {
@@ -184,12 +211,31 @@ internal class AndroidG7Collector(
 
         while (true) {
             onState(G7ProtocolState.SCANNING)
-            val discovered = scanner.findKnownSensor(sensor, g7ScanTimeoutMs(sensor))
+            val scanTimeout =
+                scanTimeoutMsOverride?.coerceIn(5_000L, G7_RECONNECT_SCAN_TIMEOUT_MS)
+                    ?: g7ScanTimeoutMs(sensor)
+            val discovered =
+                try {
+                    withTimeout(scanTimeout + SCAN_TIMEOUT_GUARD_MS) {
+                        scanner.findKnownSensor(sensor, scanTimeout)
+                    }
+                } catch (error: G7BleException) {
+                    if (error.errorCode == "G7-BLE-107") pendingGatt133?.let { throw it }
+                    throw error
+                } catch (_: TimeoutCancellationException) {
+                    pendingGatt133?.let { throw it }
+                    throw G7BleException(
+                        "G7-BLE-111",
+                        "Sensorsuche hat ihr begrenztes Zeitfenster überschritten",
+                        true,
+                    )
+                }
             if (discovered == null) {
                 pendingGatt133?.let { throw it }
                 throw G7BleException("G7-BLE-107", "Kein sendender Dexcom-G7-Sensor gefunden", true)
             }
             sensor = discovered
+            onState(G7ProtocolState.SENSOR_FOUND)
             if (sharedKey != null && credentials.sharedKeyAddress != null &&
                 !credentials.sharedKeyAddress.equals(sensor.deviceAddress, ignoreCase = true)
             ) {
@@ -235,6 +281,7 @@ internal class AndroidG7Collector(
 
     private companion object {
         const val SESSION_TIMEOUT_MS = 75_000L
+        const val SCAN_TIMEOUT_GUARD_MS = 2_000L
         const val MAX_BOND_RECONNECT_ATTEMPTS = 2
         const val BOND_RECONNECT_DELAY_MS = 1_500L
         const val MAX_GATT_133_RETRIES_PER_CYCLE = 3

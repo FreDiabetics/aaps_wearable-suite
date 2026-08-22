@@ -1,0 +1,130 @@
+package app.aapswear.g7watch
+
+import android.app.AlarmManager
+import android.app.PendingIntent
+import android.content.Context
+import android.content.Intent
+import android.os.BatteryManager
+import android.os.Build
+import android.os.PowerManager
+import app.aapswear.g7.CollectorAlarmKind
+import app.aapswear.g7.CollectorCycleTiming
+import app.aapswear.g7.G7PersistedState
+import app.aapswear.g7.G7ReconnectScheduler
+
+/**
+ * Owns the single durable reconnect alarm for the Watch collector.
+ *
+ * A future sensor-window alarm is staged before BLE work begins. If Android kills the process in
+ * the middle of a scan/GATT cycle, that alarm survives and restarts collection at the next slot.
+ * A normal success/failure simply replaces the safety alarm with the newly calculated cadence.
+ */
+internal object G7ReconnectAlarmScheduler {
+    private const val REQUEST_CODE = 0
+    private const val MIN_TRIGGER_LEAD_MS = 1_000L
+
+    fun scheduleForState(
+        context: Context,
+        state: G7PersistedState,
+    ): CollectorCycleTiming? {
+        if (!state.collectorEnabled) return null
+        val requestedAt = state.nextReconnectEpochMs ?: return null
+        return scheduleRequested(context, requestedAt)
+    }
+
+    fun scheduleSafetyForCycle(
+        context: Context,
+        scheduledCycle: CollectorCycleTiming?,
+        state: G7PersistedState,
+        nowEpochMs: Long,
+    ): CollectorCycleTiming? {
+        if (!state.collectorEnabled) return null
+        val requestedAt = nextSafetyReconnectEpoch(scheduledCycle, state, nowEpochMs) ?: return null
+        val expectedAt =
+            scheduledCycle?.expectedReadingEpoch?.plus(G7ReconnectScheduler.EXPECTED_READING_INTERVAL_MS)
+                ?: requestedAt + G7ReconnectScheduler.PRECONNECT_LEAD_MS
+        return scheduleRequested(context, requestedAt, expectedAt)
+    }
+
+    fun scheduleRecovery(
+        context: Context,
+        state: G7PersistedState,
+        nowEpochMs: Long = System.currentTimeMillis(),
+    ): CollectorCycleTiming? {
+        if (!state.collectorEnabled) return null
+        val plan = G7ReconnectScheduler.afterExpectedWindowMiss(nowEpochMs, state.lastReading?.timestampEpochMs)
+        return scheduleRequested(context, plan.nextReconnectEpochMs)
+    }
+
+    fun scheduleRequested(
+        context: Context,
+        requestedReconnectEpochMs: Long,
+        expectedReadingEpochMs: Long = requestedReconnectEpochMs + G7ReconnectScheduler.PRECONNECT_LEAD_MS,
+    ): CollectorCycleTiming {
+        val app = context.applicationContext
+        val triggerAt = maxOf(requestedReconnectEpochMs, System.currentTimeMillis() + MIN_TRIGGER_LEAD_MS)
+        val pending = reconnectPendingIntent(app)
+        val alarmManager = app.getSystemService(AlarmManager::class.java)
+        val exactAllowed = Build.VERSION.SDK_INT < Build.VERSION_CODES.S || alarmManager.canScheduleExactAlarms()
+        val exactScheduled =
+            if (exactAllowed) {
+                runCatching {
+                    alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAt, pending)
+                    true
+                }.getOrElse {
+                    alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAt, pending)
+                    false
+                }
+            } else {
+                alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAt, pending)
+                false
+            }
+        val power = app.getSystemService(PowerManager::class.java)
+        val cycle =
+            CollectorCycleTiming(
+                expectedReadingEpoch = expectedReadingEpochMs,
+                requestedReconnectEpoch = triggerAt,
+                alarmKind = if (exactScheduled) CollectorAlarmKind.EXACT else CollectorAlarmKind.INEXACT,
+                canScheduleExactAlarms = exactAllowed,
+                batteryUnrestricted = G7BackgroundAccess.isBatteryUnrestricted(app),
+                deviceIdleMode = power.isDeviceIdleMode,
+                isInteractive = power.isInteractive,
+                charging = runCatching { app.getSystemService(BatteryManager::class.java).isCharging }.getOrNull(),
+            )
+        G7CollectorDiagnosticStore(app).stageScheduledCycle(cycle)
+        return cycle
+    }
+
+    fun cancel(context: Context) {
+        val app = context.applicationContext
+        val pending = reconnectPendingIntent(app)
+        app.getSystemService(AlarmManager::class.java).cancel(pending)
+        pending.cancel()
+    }
+
+    private fun reconnectPendingIntent(context: Context): PendingIntent =
+        PendingIntent.getBroadcast(
+            context,
+            REQUEST_CODE,
+            Intent(context, G7ReconnectReceiver::class.java),
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+        )
+}
+
+internal fun nextSafetyReconnectEpoch(
+    scheduledCycle: CollectorCycleTiming?,
+    state: G7PersistedState,
+    nowEpochMs: Long,
+): Long? {
+    if (!state.collectorEnabled) return null
+    scheduledCycle?.expectedReadingEpoch?.let { expected ->
+        return expected +
+            G7ReconnectScheduler.EXPECTED_READING_INTERVAL_MS -
+            G7ReconnectScheduler.PRECONNECT_LEAD_MS
+    }
+    state.nextReconnectEpochMs?.takeIf { it > nowEpochMs + 1_000L }?.let { return it }
+    return G7ReconnectScheduler.afterExpectedWindowMiss(
+        nowEpochMs,
+        state.lastReading?.timestampEpochMs,
+    ).nextReconnectEpochMs
+}
