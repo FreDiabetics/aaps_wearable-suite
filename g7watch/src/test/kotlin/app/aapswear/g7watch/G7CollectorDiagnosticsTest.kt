@@ -30,8 +30,8 @@ class G7CollectorDiagnosticsTest {
     }
 
     @Test
-    fun `attempt ids survive recreation and only the latest fifty attempts remain`() {
-        repeat(55) { index ->
+    fun `attempt ids survive recreation and only the latest overnight window remains`() {
+        repeat(197) { index ->
             val store = G7CollectorDiagnosticStore(context)
             val attempt = store.begin(manual = index % 2 == 0, restart = index % 3 == 0, nowEpochMs = index.toLong())
             store.record(
@@ -44,8 +44,8 @@ class G7CollectorDiagnosticsTest {
         }
 
         val restored = G7CollectorDiagnosticStore(context).snapshot()
-        assertEquals(50, restored.size)
-        assertEquals(55L, restored.first().attemptId)
+        assertEquals(192, restored.size)
+        assertEquals(197L, restored.first().attemptId)
         assertEquals(6L, restored.last().attemptId)
         assertTrue(restored.all { it.completedAtEpochMs != null })
     }
@@ -142,7 +142,7 @@ class G7CollectorDiagnosticsTest {
         }
 
         val events = store.snapshot().single().events
-        assertEquals(100, events.size)
+        assertEquals(40, events.size)
         val text = events.joinToString(" ", transform = { it.message })
         assertFalse(text.contains("DEADBEEF"))
         assertFalse(text.contains("1234"))
