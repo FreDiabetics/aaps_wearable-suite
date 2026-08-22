@@ -95,19 +95,23 @@ internal fun resolveOverviewGraphHoursPreference(
     return resolved
 }
 
+/**
+ * The divider is a visual time marker only. Dots keep their timestamp-derived X coordinate instead
+ * of being pushed away from Now, matching AndroidAPS' continuous time-axis behaviour.
+ */
 internal fun graphCenterBeforeDivider(
     dividerX: Float,
     radiusPx: Float,
     outlineWidthPx: Float,
     safetyPx: Float,
-): Float = dividerX - radiusPx - outlineWidthPx / 2f - safetyPx
+): Float = dividerX
 
 internal fun graphCenterAfterDivider(
     dividerX: Float,
     radiusPx: Float,
     outlineWidthPx: Float,
     safetyPx: Float,
-): Float = dividerX + radiusPx + outlineWidthPx / 2f + safetyPx
+): Float = dividerX
 
 internal class ChartViewport(initialHours: Int) {
     private val listeners = LinkedHashSet<() -> Unit>()
@@ -392,11 +396,9 @@ internal class GlucoseDashboardChart @JvmOverloads constructor(
             val freshness = FreshnessPolicy.classify(state?.glucose?.measuredAtEpochMs, now)
             val signalLost = !TherapyDisplayFormatter.isGlucoseDisplayable(state, now)
             val predictions = if (showPredictions) state?.glucosePredictions.orEmpty().filter { predictionEnabled(it.kind) } else emptyList()
-            val liveEdge = when {
-                signalLost -> now
-                !showPredictions || predictions.isEmpty() -> state?.glucose?.measuredAtEpochMs?.coerceAtMost(now) ?: now
-                else -> now
-            }
+            // Like AAPS, the viewport is tied to real current time. A new CGM therefore advances
+            // the same time axis instead of pinning the latest point while neighbours get squeezed.
+            val liveEdge = now
             val end = viewport.endEpochMs(liveEdge)
             val start = end - (viewport.hours * HOUR_MS).toLong()
             val allHistory = CanonicalCgmHistory.merge(
