@@ -49,15 +49,17 @@ class G7BootReceiver : BroadcastReceiver() {
 
         G7CgmAlarmCoordinator.restore(context)
         // Lifecycle recovery must never rewrite the user's persisted enable/disable decision.
-        // If Android temporarily refuses the FGS launch, keep collectorEnabled=true so a later
-        // reconnect/user-visible start can recover without re-pairing or losing session state.
+        // If Android temporarily refuses the FGS launch, keep collectorEnabled=true and retain a
+        // durable future alarm so a later slot can recover without re-pairing or losing the session.
         runCatching { G7CollectorService.start(context) }
+            .onFailure { G7ReconnectAlarmScheduler.scheduleRecovery(context, state) }
     }
 }
 
 class G7ReconnectReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
-        if (!G7SensorStateStore(context).read().collectorEnabled) return
+        val state = G7SensorStateStore(context).read()
+        if (!state.collectorEnabled) return
         val now = System.currentTimeMillis()
         val diagnosticStore = G7CollectorDiagnosticStore(context)
         val scheduled = diagnosticStore.markScheduledAlarmReceived(now)
@@ -65,6 +67,10 @@ class G7ReconnectReceiver : BroadcastReceiver() {
         runCatching { G7CollectorService.startScheduledReconnect(context) }
             .onFailure { error ->
                 G7WakeHandoff.release()
+                // The alarm that brought us here has already fired. Always stage another future
+                // slot before returning, otherwise a transient FGS launch rejection can strand the
+                // collector indefinitely.
+                G7ReconnectAlarmScheduler.scheduleRecovery(context, state, now)
                 val attempt = diagnosticStore.begin(
                     manual = false,
                     restart = false,
@@ -76,7 +82,7 @@ class G7ReconnectReceiver : BroadcastReceiver() {
                     attempt.attemptId,
                     CollectorDiagnosticStage.ERROR,
                     CollectorDiagnosticResult.RECOVERABLE_ERROR,
-                    "SERVICE_START_FAILED · Foreground-Service konnte aus dem Sensorfenster-Alarm nicht gestartet werden (${error.javaClass.simpleName})",
+                    "SERVICE_START_FAILED · Foreground-Service konnte aus dem Sensorfenster-Alarm nicht gestartet werden; Folgeslot wurde geplant (${error.javaClass.simpleName})",
                     nowEpochMs = System.currentTimeMillis(),
                 )
             }
