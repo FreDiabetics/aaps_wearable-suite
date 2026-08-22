@@ -1,6 +1,5 @@
 package app.aapswear.g7watch
 
-import android.app.AlarmManager
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -9,12 +8,10 @@ import android.app.Service
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
-import android.os.BatteryManager
 import android.os.Build
 import android.os.IBinder
 import android.os.PowerManager
 import app.aapswear.g7.CgmReadingStatus
-import app.aapswear.g7.CollectorAlarmKind
 import app.aapswear.g7.CollectorCycleClassification
 import app.aapswear.g7.CollectorCycleTiming
 import app.aapswear.g7.CollectorDiagnosticResult
@@ -23,7 +20,6 @@ import app.aapswear.g7.G7CollectorError
 import app.aapswear.g7.G7ConnectionState
 import app.aapswear.g7.G7PersistedState
 import app.aapswear.g7.G7ProtocolState
-import app.aapswear.g7.G7ReconnectScheduler
 import app.aapswear.g7.G7SessionManager
 import app.aapswear.g7.G7SessionState
 import app.aapswear.g7.toCgm
@@ -118,6 +114,18 @@ class G7CollectorService : Service() {
                 null
             }
 
+        // Stage the next automatic slot before any scan/GATT work starts. The prior implementation
+        // consumed the current alarm first and scheduled the next one only after cycle completion;
+        // a process death mid-scan therefore left the collector with no future wake-up at all.
+        if (request == CycleRequest.AUTOMATIC) {
+            G7ReconnectAlarmScheduler.scheduleSafetyForCycle(
+                this,
+                scheduledCycle,
+                persisted,
+                serviceStartAt,
+            )
+        }
+
         if (request == CycleRequest.AUTOMATIC && collectionJob?.isActive == true) {
             scheduledCycle?.let { cycle ->
                 val attempt = attemptStore.begin(false, false, cycle.copy(cycleEndedAt = serviceStartAt), serviceStartAt)
@@ -126,7 +134,7 @@ class G7CollectorService : Service() {
                     attempt.attemptId,
                     CollectorDiagnosticStage.ERROR,
                     CollectorDiagnosticResult.RECOVERABLE_ERROR,
-                    "Geplanter Sensorzyklus konnte nicht starten, weil der vorherige Zyklus noch aktiv war",
+                    "Geplanter Sensorzyklus konnte nicht starten, weil der vorherige Zyklus noch aktiv war; Folgeslot bleibt geplant",
                     nowEpochMs = serviceStartAt,
                 )
             }
@@ -142,7 +150,12 @@ class G7CollectorService : Service() {
         scheduledCycle: CollectorCycleTiming?,
         serviceStartAt: Long,
     ) {
-        if (request != CycleRequest.AUTOMATIC) cancelScheduledReconnect(this)
+        if (request != CycleRequest.AUTOMATIC) {
+            cancelScheduledReconnect(this)
+            // Restart/manual scan must also retain a future autonomous recovery path if Android
+            // kills the process while the bounded operation is in progress.
+            G7ReconnectAlarmScheduler.scheduleRecovery(this, store.read(), serviceStartAt)
+        }
         val previous = collectionJob
         val token = ++cycleToken
         collectionJob = scope.launch {
@@ -276,7 +289,11 @@ class G7CollectorService : Service() {
             val now = System.currentTimeMillis()
             val previousValid = G7ReadingDatabase(this).let { database ->
                 try {
-                    database.getLatestValid()
+                    database.getLatestValidBefore(
+                        sensorId = result.reading.sensorId,
+                        sessionId = result.reading.sessionId,
+                        beforeEpochMs = result.reading.sensorTimestampEpochMs,
+                    )
                 } finally {
                     database.close()
                 }
@@ -559,46 +576,21 @@ class G7CollectorService : Service() {
     }
 
     private fun scheduleReconnect(state: G7PersistedState) {
-        if (!state.collectorEnabled) return
-        val requestedAt = state.nextReconnectEpochMs ?: return
-        val triggerAt = maxOf(requestedAt, System.currentTimeMillis() + MIN_RECONNECT_LEAD_MS)
-        val pending = reconnectPendingIntent(this)
-        val alarmManager = getSystemService(AlarmManager::class.java)
-        val exactAllowed = Build.VERSION.SDK_INT < Build.VERSION_CODES.S || alarmManager.canScheduleExactAlarms()
-        val exactScheduled = if (exactAllowed) {
-            runCatching {
-                alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAt, pending)
-                true
-            }.getOrElse {
-                alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAt, pending)
-                false
-            }
-        } else {
-            alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAt, pending)
-            false
-        }
-        val power = getSystemService(PowerManager::class.java)
-        val cycle = CollectorCycleTiming(
-            expectedReadingEpoch = requestedAt + G7ReconnectScheduler.PRECONNECT_LEAD_MS,
-            requestedReconnectEpoch = triggerAt,
-            alarmKind = if (exactScheduled) CollectorAlarmKind.EXACT else CollectorAlarmKind.INEXACT,
-            canScheduleExactAlarms = exactAllowed,
-            batteryUnrestricted = G7BackgroundAccess.isBatteryUnrestricted(this),
-            deviceIdleMode = power.isDeviceIdleMode,
-            isInteractive = power.isInteractive,
-            charging = runCatching { getSystemService(BatteryManager::class.java).isCharging }.getOrNull(),
-        )
-        attemptStore.stageScheduledCycle(cycle)
+        val cycle = G7ReconnectAlarmScheduler.scheduleForState(this, state) ?: return
         scope.launch {
             applicationContext.recordG7Diagnostic(
-                if (exactScheduled) "G7-SCHED-200" else "G7-SCHED-201",
-                if (exactScheduled) "Exact G7 reconnect scheduled" else "DEGRADED BACKGROUND RELIABILITY · exact alarm unavailable; inexact fallback scheduled",
-                if (exactScheduled) DiagnosticSeverity.INFO else DiagnosticSeverity.WARNING,
+                if (cycle.alarmKind == app.aapswear.g7.CollectorAlarmKind.EXACT) "G7-SCHED-200" else "G7-SCHED-201",
+                if (cycle.alarmKind == app.aapswear.g7.CollectorAlarmKind.EXACT) {
+                    "Exact G7 reconnect scheduled"
+                } else {
+                    "DEGRADED BACKGROUND RELIABILITY · exact alarm unavailable; inexact fallback scheduled"
+                },
+                if (cycle.alarmKind == app.aapswear.g7.CollectorAlarmKind.EXACT) DiagnosticSeverity.INFO else DiagnosticSeverity.WARNING,
                 mapOf(
                     "expectedReadingEpoch" to cycle.expectedReadingEpoch,
                     "requestedReconnectEpoch" to cycle.requestedReconnectEpoch,
                     "alarmKind" to cycle.alarmKind.name,
-                    "canScheduleExactAlarms" to exactAllowed,
+                    "canScheduleExactAlarms" to cycle.canScheduleExactAlarms,
                     "batteryUnrestricted" to cycle.batteryUnrestricted,
                     "deviceIdleMode" to cycle.deviceIdleMode,
                     "isInteractive" to cycle.isInteractive,
@@ -673,7 +665,6 @@ class G7CollectorService : Service() {
         internal const val NOTIFICATION_ID = 7001
         private const val NORMAL_CYCLE_WAKE_LOCK_TIMEOUT_MS = 3L * 60_000L
         private const val INITIAL_PAIRING_WAKE_LOCK_TIMEOUT_MS = 31L * 60_000L
-        private const val MIN_RECONNECT_LEAD_MS = 1_000L
         private val SOFT_WINDOW_ERRORS = setOf(G7_GATT_133_ERROR_CODE, "G7-BLE-107", "G7-BLE-111")
 
         fun start(context: Context) {
@@ -729,18 +720,8 @@ class G7CollectorService : Service() {
             app.startForegroundService(Intent(app, G7CollectorService::class.java).setAction(ACTION_MANUAL_SCAN))
         }
 
-        private fun reconnectPendingIntent(context: Context): PendingIntent =
-            PendingIntent.getBroadcast(
-                context,
-                0,
-                Intent(context, G7ReconnectReceiver::class.java),
-                PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
-            )
-
         private fun cancelScheduledReconnect(context: Context) {
-            val pending = reconnectPendingIntent(context)
-            context.getSystemService(AlarmManager::class.java).cancel(pending)
-            pending.cancel()
+            G7ReconnectAlarmScheduler.cancel(context)
         }
     }
 }
