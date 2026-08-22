@@ -54,7 +54,7 @@ private const val GLUCOSE_LOW_RATIO = 0.215
 private const val GLUCOSE_TARGET_HIGH_RATIO = 0.515
 private const val GLUCOSE_DISPLAY_MAX = 400.0
 private const val TOOLKIT_ACTIVITY_SCALE_FACTOR = 1.15
-private const val OVERVIEW_GRAPH_HOURS_MIGRATION = "graphHoursDefault24MigratedV4"
+private const val OVERVIEW_GRAPH_HOURS_MIGRATION = "graphHoursDefault3MigratedV5"
 
 internal fun sustainedRangeExcursion(
     samples: List<GlucoseSample>,
@@ -77,13 +77,17 @@ internal fun resolveOverviewGraphHoursPreference(
     preferences: SharedPreferences,
     durationHours: Int,
 ): Int {
-    val normalized = durationHours.takeIf { it in listOf(3, 6, 12, 24) } ?: 24
+    val normalized = durationHours.takeIf { it in listOf(3, 6, 12, 24) } ?: 3
     if (preferences.getBoolean(OVERVIEW_GRAPH_HOURS_MIGRATION, false)) return normalized
 
-    val legacyForcedThreeHours =
-        preferences.getBoolean("graphHoursDefault3Migrated", false) &&
-            preferences.getInt("graphHours", normalized) == 3
-    val resolved = if (!preferences.contains("graphHours") || legacyForcedThreeHours) 24 else normalized
+    val previousAuto24 =
+        preferences.getBoolean("graphHoursDefault24MigratedV4", false) &&
+            preferences.getInt("graphHours", normalized) == 24
+    val resolved = when {
+        !preferences.contains("graphHours") -> 3
+        previousAuto24 -> 3
+        else -> normalized
+    }
     preferences.edit()
         .putInt("graphHours", resolved)
         .putBoolean(OVERVIEW_GRAPH_HOURS_MIGRATION, true)
@@ -503,10 +507,10 @@ internal class GlucoseDashboardChart @JvmOverloads constructor(
                             }.orEmpty()
                         }
 
-                val targetValueColor = SugarliciousColors.argb(SugarliciousColorRole.TARGET_VALUE)
+                val targetValueColor = withAlpha(SugarliciousColors.argb(SugarliciousColorRole.TARGET_VALUE), 190)
                 linePaint.color = targetValueColor
-                linePaint.strokeWidth = 2f.dp
-                linePaint.pathEffect = DashPathEffect(floatArrayOf(6f.dp, 4f.dp), 0f)
+                linePaint.strokeWidth = 1.35f.dp
+                linePaint.pathEffect = DashPathEffect(floatArrayOf(3f.dp, 3f.dp), 0f)
                 targetStepPaths(targetSegments, start, end).forEach { points ->
                     canvas.drawPath(
                         valuePath(points, start, end, plot) { value -> mapGlucoseY(value, plot) },
