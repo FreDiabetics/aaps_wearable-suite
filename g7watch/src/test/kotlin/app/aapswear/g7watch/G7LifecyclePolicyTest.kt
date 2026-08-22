@@ -2,16 +2,19 @@ package app.aapswear.g7watch
 
 import android.content.Intent
 import app.aapswear.g7.CgmReading
+import app.aapswear.g7.CollectorCycleTiming
 import app.aapswear.g7.CollectorOwner
 import app.aapswear.g7.G7CollectorError
 import app.aapswear.g7.G7ConnectionState
 import app.aapswear.g7.G7PersistedState
 import app.aapswear.g7.G7ProtocolState
+import app.aapswear.g7.G7ReconnectScheduler
 import app.aapswear.g7.G7Sensor
 import app.aapswear.g7.G7SessionState
 import app.aapswear.model.DataSourceId
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -62,6 +65,30 @@ class G7LifecyclePolicyTest {
             shouldResumeEnabledCollectorForSourceSignal(
                 g7Selected = true,
                 collectorEnabled = true,
+            ),
+        )
+    }
+
+    @Test fun `scheduled cycle stages next five minute safety slot before BLE work`() {
+        val expected = 1_000_000L
+        val state = G7PersistedState(collectorEnabled = true)
+
+        assertEquals(
+            expected + G7ReconnectScheduler.EXPECTED_READING_INTERVAL_MS - G7ReconnectScheduler.PRECONNECT_LEAD_MS,
+            nextSafetyReconnectEpoch(
+                CollectorCycleTiming(expectedReadingEpoch = expected),
+                state,
+                nowEpochMs = expected - 30_000L,
+            ),
+        )
+    }
+
+    @Test fun `disabled collector never stages safety reconnect`() {
+        assertNull(
+            nextSafetyReconnectEpoch(
+                CollectorCycleTiming(expectedReadingEpoch = 1_000_000L),
+                G7PersistedState(collectorEnabled = false),
+                nowEpochMs = 900_000L,
             ),
         )
     }
