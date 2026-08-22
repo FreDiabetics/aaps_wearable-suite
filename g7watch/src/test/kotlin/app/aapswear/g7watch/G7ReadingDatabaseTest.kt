@@ -104,7 +104,7 @@ class G7ReadingDatabaseTest {
 
     @Test
     fun `temporal predecessor ignores future rows and other sessions`() = runBlocking {
-        val currentAt = 1_800_000L
+        val currentAt = System.currentTimeMillis()
         val base =
             CgmReading(
                 id = "previous",
