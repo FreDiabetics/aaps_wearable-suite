@@ -15,23 +15,23 @@ class OverviewGraphRegressionTest {
     private val context = ApplicationProvider.getApplicationContext<Context>()
 
     @Test
-    fun `legacy forced three hour overview migrates once to twenty four hours`() {
+    fun `legacy auto forced twenty four hour overview restores once to three hours`() {
         val preferences = context.getSharedPreferences("overview_graph_migration", Context.MODE_PRIVATE)
         preferences.edit()
             .clear()
-            .putBoolean("graphHoursDefault3Migrated", true)
-            .putInt("graphHours", 3)
+            .putBoolean("graphHoursDefault24MigratedV4", true)
+            .putInt("graphHours", 24)
             .commit()
 
-        val resolved = resolveOverviewGraphHoursPreference(preferences, 3)
+        val resolved = resolveOverviewGraphHoursPreference(preferences, 24)
 
-        assertEquals(24, resolved)
-        assertEquals(24, preferences.getInt("graphHours", -1))
-        assertTrue(preferences.getBoolean("graphHoursDefault24MigratedV4", false))
+        assertEquals(3, resolved)
+        assertEquals(3, preferences.getInt("graphHours", -1))
+        assertTrue(preferences.getBoolean("graphHoursDefault3MigratedV5", false))
     }
 
     @Test
-    fun `explicit three hour choice survives after twenty four hour migration`() {
+    fun `explicit three hour choice survives migration`() {
         val preferences = context.getSharedPreferences("overview_graph_explicit", Context.MODE_PRIVATE)
         preferences.edit()
             .clear()
@@ -55,19 +55,10 @@ class OverviewGraphRegressionTest {
     }
 
     @Test
-    fun `actual and prediction dot extents stay clear of now divider`() {
+    fun `now divider never rewrites actual or prediction timestamp positions`() {
         val divider = 100f
-        val radius = 4f
-        val outline = 2f
-        val safety = 2f
-        val actualCenter = graphCenterBeforeDivider(divider, radius, outline, safety)
-        val predictionCenter = graphCenterAfterDivider(divider, radius, outline, safety)
 
-        val actualRightEdge = actualCenter + radius + outline / 2f
-        val predictionLeftEdge = predictionCenter - radius - outline / 2f
-
-        assertEquals(divider - safety, actualRightEdge, 0.001f)
-        assertEquals(divider + safety, predictionLeftEdge, 0.001f)
-        assertTrue(predictionLeftEdge > actualRightEdge)
+        assertEquals(divider, graphCenterBeforeDivider(divider, 4f, 2f, 2f), 0.001f)
+        assertEquals(divider, graphCenterAfterDivider(divider, 4f, 2f, 2f), 0.001f)
     }
 }
