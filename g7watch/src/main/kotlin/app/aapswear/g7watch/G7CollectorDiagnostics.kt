@@ -215,8 +215,10 @@ internal class G7CollectorDiagnosticStore(context: Context) {
         const val KEY_COUNTER = "attempt_counter"
         const val KEY_ATTEMPTS = "attempts_v1"
         const val KEY_PENDING_CYCLE = "pending_cycle_v2"
-        const val MAX_ATTEMPTS = 50
-        const val MAX_EVENTS_PER_ATTEMPT = 100
+        // 192 five-minute attempts retain roughly 16 hours, enough to preserve a complete
+        // overnight test plus the morning recovery while remaining bounded on Wear OS storage.
+        const val MAX_ATTEMPTS = 192
+        const val MAX_EVENTS_PER_ATTEMPT = 40
         val lock = Any()
     }
 }
